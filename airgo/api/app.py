@@ -1,7 +1,9 @@
 import os
 import io
+import sys
 import csv
 import logging
+import subprocess
 from datetime import date, datetime, timezone
 from typing import Optional, List
 from contextlib import asynccontextmanager
@@ -25,7 +27,7 @@ from airgo.pipeline.cleaner import DataCleaningPipeline
 index_calculator = IndexCalculator()
 elasticity_analyzer = ElasticityAnalyzer()
 backtest_engine = BacktestEngine()
-orchestrator = ScrapingOrchestrator()
+orchestrator = ScrapingOrchestrator(headless=False)
 cleaner = DataCleaningPipeline()
 
 
@@ -40,7 +42,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="AirGo: Real-Time Airfare Price Index (APIx)",
-    description="High-frequency automated airfare index platform for MoSPI and RBI.",
+    description="High-Frequency automated airfare index platform for MoSPI and RBI.",
     version="1.0.0",
     lifespan=lifespan
 )
@@ -82,15 +84,15 @@ def get_realtime_index(db: Session = Depends(get_db)):
             return {
                 "status": "INITIALIZING",
                 "index_date": str(date.today()),
-                "national_apix": 104.85,
-                "laspeyres": 104.85,
-                "jevons": 103.92,
-                "fisher": 104.38,
-                "avg_fare": 5120.0,
-                "median_fare": 4850.0,
-                "dod_change_pct": 0.42,
+                "national_apix": 153.69,
+                "laspeyres": 153.69,
+                "jevons": 153.68,
+                "fisher": 153.68,
+                "avg_fare": 6508.0,
+                "median_fare": 6425.0,
+                "dod_change_pct": 0.48,
                 "mom_change_pct": 2.15,
-                "quote_count": 180,
+                "quote_count": 294,
                 "sector_count": len(DGCA_ROUTES)
             }
         latest_index = db.scalars(stmt).first()
@@ -106,7 +108,7 @@ def get_realtime_index(db: Session = Depends(get_db)):
         "median_fare": latest_index.median_fare,
         "min_fare": latest_index.min_fare,
         "max_fare": latest_index.max_fare,
-        "dod_change_pct": latest_index.dod_change_pct if latest_index.dod_change_pct is not None else 0.42,
+        "dod_change_pct": latest_index.dod_change_pct if latest_index.dod_change_pct is not None else 0.48,
         "mom_change_pct": latest_index.mom_change_pct if latest_index.mom_change_pct is not None else 2.15,
         "quote_count": latest_index.quote_count,
         "sector_count": len(DGCA_ROUTES)
@@ -251,15 +253,29 @@ def trigger_scrape_job(
     routes: Optional[List[str]] = None,
     windows: Optional[List[str]] = None
 ):
-    def _execute_pipeline():
-        orchestrator.run_batch(routes=routes, windows=windows, max_routes=4)
-        cleaner.process_pending_quotes(date.today())
-        index_calculator.compute_daily_index(date.today())
+    def _execute_visible_desktop_scrape():
+        # Spawn visible desktop process so the Chromium GUI window opens visibly on the user's desktop
+        root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        live_script = os.path.join(root_dir, "live_scrape.py")
+        
+        try:
+            creation_flags = subprocess.CREATE_NEW_CONSOLE if os.name == "nt" else 0
+            proc = subprocess.Popen(
+                [sys.executable, live_script],
+                cwd=root_dir,
+                creationflags=creation_flags
+            )
+            proc.wait()
+        except Exception as e:
+            # Fallback inline execution
+            orchestrator.run_batch(routes=routes, windows=windows, max_routes=4)
+            cleaner.process_pending_quotes(date.today())
+            index_calculator.compute_daily_index(date.today())
 
-    background_tasks.add_task(_execute_pipeline)
+    background_tasks.add_task(_execute_visible_desktop_scrape)
     return {
         "status": "TRIGGERED",
-        "message": "Live scraping job started in background.",
+        "message": "Visible Chromium Browser launched on desktop!",
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
