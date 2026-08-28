@@ -8,7 +8,7 @@ let activeTab = "overview";
 document.addEventListener("DOMContentLoaded", () => {
     initTabs();
     loadDashboardData();
-    setInterval(loadLiveStatus, 10000);
+    setInterval(loadLiveStatus, 8000);
 });
 
 function initTabs() {
@@ -60,48 +60,60 @@ async function loadLiveStatus() {
 }
 
 async function fetchRealtimeIndex() {
-    const res = await fetch("/api/v1/index/realtime");
-    const data = await res.json();
+    try {
+        const res = await fetch("/api/v1/index/realtime");
+        const data = await res.json();
 
-    document.getElementById("ticker-apix").innerText = data.national_apix.toFixed(2);
-    document.getElementById("ticker-laspeyres").innerText = data.laspeyres.toFixed(2);
-    document.getElementById("ticker-jevons").innerText = data.jevons.toFixed(2);
-    document.getElementById("ticker-avg-fare").innerText = `₹${data.avg_fare.toLocaleString()}`;
-    
-    const dodElem = document.getElementById("ticker-dod");
-    const dodVal = data.dod_change_pct || 0.0;
-    const isPositive = dodVal >= 0;
-    dodElem.innerHTML = `<span class="${isPositive ? 'text-rose-400' : 'text-emerald-400'} font-semibold">${isPositive ? '+' : ''}${dodVal}%</span>`;
+        document.getElementById("ticker-apix").innerText = data.national_apix.toFixed(2);
+        document.getElementById("ticker-laspeyres").innerText = data.laspeyres.toFixed(2);
+        document.getElementById("ticker-jevons").innerText = data.jevons.toFixed(2);
+        document.getElementById("ticker-avg-fare").innerText = `₹${Math.round(data.avg_fare).toLocaleString()}`;
+        
+        const dodElem = document.getElementById("ticker-dod");
+        const dodVal = data.dod_change_pct || 0.0;
+        const isPositive = dodVal >= 0;
+        dodElem.innerHTML = `<span class="${isPositive ? 'text-rose-400' : 'text-emerald-400'} font-semibold">${isPositive ? '+' : ''}${dodVal}%</span>`;
 
-    const momElem = document.getElementById("ticker-mom");
-    const momVal = data.mom_change_pct || 0.0;
-    momElem.innerHTML = `<span class="${momVal >= 0 ? 'text-rose-400' : 'text-emerald-400'} font-semibold">${momVal >= 0 ? '+' : ''}${momVal}%</span>`;
+        const momElem = document.getElementById("ticker-mom");
+        const momVal = data.mom_change_pct || 0.0;
+        momElem.innerHTML = `<span class="${momVal >= 0 ? 'text-rose-400' : 'text-emerald-400'} font-semibold">${momVal >= 0 ? '+' : ''}${momVal}%</span>`;
 
-    document.getElementById("ticker-quotes-count").innerText = `${data.quote_count} quotes`;
+        document.getElementById("ticker-quotes-count").innerText = `${data.quote_count} quotes`;
+    } catch (e) {}
 }
 
 async function fetchSectorSummary() {
-    const res = await fetch("/api/v1/sectors/summary");
-    const data = await res.json();
-    const sectors = data.sectors || [];
+    try {
+        const res = await fetch("/api/v1/sectors/summary");
+        const data = await res.json();
+        const sectors = data.sectors || [];
 
-    const container = document.getElementById("sector-grid-container");
-    if (container) {
-        container.innerHTML = "";
-        sectors.slice(0, 8).forEach(sec => container.appendChild(createSectorCard(sec)));
-    }
+        const container = document.getElementById("sector-grid-container");
+        if (container) {
+            container.innerHTML = "";
+            sectors.slice(0, 8).forEach(sec => container.appendChild(createSectorCard(sec)));
+        }
 
-    const allGrid = document.getElementById("all-sectors-grid");
-    if (allGrid) {
-        allGrid.innerHTML = "";
-        sectors.forEach(sec => allGrid.appendChild(createSectorCard(sec)));
-    }
+        const allGrid = document.getElementById("all-sectors-grid");
+        if (allGrid) {
+            allGrid.innerHTML = "";
+            sectors.forEach(sec => allGrid.appendChild(createSectorCard(sec)));
+        }
+    } catch (e) {}
 }
 
 function createSectorCard(sec) {
     const changeClass = sec.dod_change_pct >= 0 ? "text-rose-400" : "text-emerald-400";
     const card = document.createElement("div");
-    card.className = "glass-panel p-4 rounded-xl flex flex-col justify-between hover:border-cyan-500/50 transition-all";
+    card.className = "glass-panel p-4 rounded-xl flex flex-col justify-between hover:border-cyan-500/50 transition-all cursor-pointer";
+    card.onclick = () => {
+        const secFilter = document.getElementById("filter-sector");
+        if (secFilter) {
+            secFilter.value = sec.sector;
+            document.querySelector("[data-tab='quotes']").click();
+            loadQuotesTable();
+        }
+    };
     card.innerHTML = `
         <div class="flex justify-between items-start mb-2">
             <div>
@@ -115,7 +127,7 @@ function createSectorCard(sec) {
         <div class="mt-2 flex justify-between items-end">
             <div>
                 <div class="text-xs text-slate-400">Current Avg Fare</div>
-                <div class="text-lg font-bold text-white">₹${sec.current_avg_fare.toLocaleString()}</div>
+                <div class="text-lg font-bold text-white">₹${Math.round(sec.current_avg_fare).toLocaleString()}</div>
             </div>
             <div class="text-right">
                 <div class="text-xs text-slate-400">APIx Index</div>
@@ -329,6 +341,20 @@ async function loadBacktestData() {
     });
 }
 
+function getCarrierBadge(carrier) {
+    const c = (carrier || "").toLowerCase();
+    if (c.includes("indigo")) {
+        return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-cyan-950/80 text-cyan-300 border border-cyan-500/40">IndiGo</span>`;
+    } else if (c.includes("air india")) {
+        return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-rose-950/80 text-rose-300 border border-rose-500/40">Air India</span>`;
+    } else if (c.includes("akasa")) {
+        return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-orange-950/80 text-orange-300 border border-orange-500/40">Akasa Air</span>`;
+    } else if (c.includes("spicejet")) {
+        return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-amber-950/80 text-amber-300 border border-amber-500/40">SpiceJet</span>`;
+    }
+    return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-slate-800 text-slate-200 border border-slate-700">${carrier}</span>`;
+}
+
 // Live Quotes Table with Clickable Verification Links
 async function loadQuotesTable() {
     const secVal = document.getElementById("filter-sector") ? document.getElementById("filter-sector").value : "ALL";
@@ -357,18 +383,18 @@ async function loadQuotesTable() {
         
         tr.innerHTML = `
             <td class="font-mono text-cyan-400 font-semibold">${q.flight_number}</td>
-            <td class="font-semibold text-white">${q.carrier}</td>
+            <td>${getCarrierBadge(q.carrier)}</td>
             <td><span class="bg-indigo-900/50 border border-indigo-500/30 text-indigo-200 px-2 py-0.5 rounded text-xs font-mono">${q.sector}</span></td>
-            <td class="text-slate-300 font-mono text-xs">${q.departure_date} (${q.departure_time || '08:00'})</td>
+            <td class="text-slate-300 font-mono text-xs">${q.departure_date} <span class="text-cyan-400">(${q.departure_time || '08:00'})</span></td>
             <td><span class="bg-amber-900/50 border border-amber-500/30 text-amber-200 px-2 py-0.5 rounded text-xs font-mono font-bold">${q.advance_window}</span></td>
-            <td class="text-slate-300">₹${q.base_fare.toLocaleString()}</td>
-            <td class="text-slate-400">₹${q.taxes_and_fees.toLocaleString()}</td>
-            <td class="font-bold text-emerald-400">₹${q.total_fare.toLocaleString()}</td>
-            <td><span class="text-xs text-slate-300 bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700">${q.sources || 'Playwright Live'}</span></td>
+            <td class="text-slate-300">₹${Math.round(q.base_fare).toLocaleString()}</td>
+            <td class="text-slate-400">₹${Math.round(q.taxes_and_fees).toLocaleString()}</td>
+            <td class="font-bold text-emerald-400 text-sm">₹${Math.round(q.total_fare).toLocaleString()}</td>
+            <td><span class="text-xs text-slate-300 bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700">${q.sources || 'Google Flights Live'}</span></td>
             <td>
-                <a href="${sourceLink}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-200 bg-cyan-950/60 hover:bg-cyan-900/90 px-2.5 py-1 rounded-md border border-cyan-500/40 transition-all font-medium">
-                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
-                    Live Source
+                <a href="${sourceLink}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-xs text-cyan-300 hover:text-white bg-cyan-950/80 hover:bg-cyan-600 px-3 py-1.5 rounded-lg border border-cyan-500/50 transition-all font-semibold shadow-sm hover:shadow-cyan-500/30">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                    Verify Live Link
                 </a>
             </td>
         `;
