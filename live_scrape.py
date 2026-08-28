@@ -3,8 +3,22 @@ Visual Live Flight Scraper Launcher.
 Run this directly in your terminal: `python live_scrape.py`
 Opens a real Chrome browser window on your desktop to scrape live fares.
 """
+import os
 import sys
 import io
+
+# 1. Ensure project root is on sys.path for any new terminal window
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+
+# 2. Ensure UTF-8 output on Windows terminal
+if sys.stdout.encoding != 'utf-8':
+    try:
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    except Exception:
+        pass
+
 from datetime import date, timedelta
 from airgo.scrapers.playwright_scraper import PlaywrightFlightScraper
 from airgo.pipeline.cleaner import DataCleaningPipeline
@@ -12,9 +26,6 @@ from airgo.engine.index_calculator import IndexCalculator
 from airgo.pipeline.db import init_db, get_db_session
 from airgo.pipeline.models import RawQuoteDB
 
-# Ensure utf-8 output in Windows terminal
-if sys.stdout.encoding != 'utf-8':
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
 def main():
     print("\n" + "="*70)
@@ -37,6 +48,10 @@ def main():
         advance_days=1
     )
     
+    if not quotes:
+        print("\n[!] No live quotes extracted. Check internet connection or route availability.\n")
+        return
+
     # Save raw quotes to DB
     with get_db_session() as session:
         for q in quotes:
@@ -72,9 +87,12 @@ def main():
     print("="*70)
     for q in quotes:
         dep_str = q.departure_datetime.strftime('%I:%M %p')
-        print(f"  * {q.carrier:<14} | Flight: {q.flight_number:<8} | Fare: INR {q.total_fare:<7} | Base: INR {q.base_fare:<7} | Dep: {dep_str}")
-        print(f"    Source Link: {q.source_url}")
+        print(f"  * {q.carrier:<15} | Flight: {q.flight_number:<8} | Fare: INR {q.total_fare:<7} | Base: INR {q.base_fare:<7} | Dep: {dep_str}")
+    
+    if quotes:
+        print(f"\n[Live Link] Verify on Google Flights:\n  {quotes[0].source_url}")
     print("="*70 + "\n")
+
 
 if __name__ == "__main__":
     main()
