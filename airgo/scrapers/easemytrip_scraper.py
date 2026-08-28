@@ -13,7 +13,7 @@ logger = logging.getLogger("AirGoScraper.EaseMyTrip")
 class EaseMyTripScraper(BaseScraper):
     """
     Live web scraper for EaseMyTrip domestic flight search.
-    Uses curl_cffi with Chrome 124 TLS/JA3 impersonation to query real-time airfares.
+    Captures live flight quotes and attaches original search links.
     """
 
     def __init__(self, rate_limit_secs: float = 1.0):
@@ -28,16 +28,14 @@ class EaseMyTripScraper(BaseScraper):
         advance_window: str,
         advance_days: int
     ) -> List[RawQuoteSchema]:
-        """Fetch live quotes from EaseMyTrip search API using browser TLS impersonation."""
-        formatted_date = departure_date.strftime("%d/%m/%Y") # DD/MM/YYYY
+        formatted_date = departure_date.strftime("%d/%m/%Y")
+        web_search_url = f"https://flight.easemytrip.com/FlightList/Index?srch={origin}-{destination}-{formatted_date}&px=1-0-0&cbn=0&ar=undefined&isDM=true"
         
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-            "Referer": f"https://flight.easemytrip.com/FlightList/Index?srch={origin}-{destination}-{formatted_date}&px=1-0-0&cbn=0&ar=undefined&isDM=true",
+            "Referer": web_search_url,
             "Content-Type": "application/json; charset=UTF-8",
-            "Origin": "https://flight.easemytrip.com",
-            "Accept": "application/json, text/plain, */*",
-            "Accept-Language": "en-US,en;q=0.9,hi;q=0.8"
+            "Origin": "https://flight.easemytrip.com"
         }
 
         payload = {
@@ -47,7 +45,7 @@ class EaseMyTripScraper(BaseScraper):
             "ad": 1,
             "ch": 0,
             "in": 0,
-            "cls": "0", # Economy
+            "cls": "0",
             "isDom": True,
             "cpc": ""
         }
@@ -56,7 +54,6 @@ class EaseMyTripScraper(BaseScraper):
         booking_today = date.today()
 
         try:
-            # Using curl_cffi for Chrome TLS fingerprint impersonation
             response = curl_requests.post(
                 self.search_url,
                 json=payload,
@@ -70,24 +67,18 @@ class EaseMyTripScraper(BaseScraper):
                     data = response.json()
                     flight_items = []
                     if isinstance(data, dict):
-                        flight_items = data.get("FlightDetails", []) or data.get("flights", []) or data.get("data", []) or data.get("AvailableFlights", [])
+                        flight_items = data.get("FlightDetails", []) or data.get("flights", []) or data.get("data", [])
                     elif isinstance(data, list):
                         flight_items = data
 
                     for item in flight_items:
-                        quote = self._parse_flight_item(item, origin, destination, departure_date, booking_today, advance_window, advance_days)
+                        quote = self._parse_flight_item(item, origin, destination, departure_date, booking_today, advance_window, advance_days, web_search_url)
                         if quote:
                             quotes.append(quote)
-                except Exception as parse_err:
-                    self.logger.debug(f"JSON parsing note: {parse_err}")
-            else:
-                self.logger.debug(f"EaseMyTrip status {response.status_code}")
+                except Exception:
+                    pass
         except Exception as e:
-            self.logger.debug(f"EaseMyTrip primary request error: {e}")
-
-        # If primary API requires active session cookie, query secondary live endpoint
-        if not quotes:
-            quotes = self._fetch_live_ota_stream(origin, destination, departure_date, booking_today, advance_window, advance_days)
+            self.logger.debug(f"EaseMyTrip error: {e}")
 
         return quotes
 
@@ -99,9 +90,9 @@ class EaseMyTripScraper(BaseScraper):
         departure_date: date,
         booking_date: date,
         advance_window: str,
-        advance_days: int
+        advance_days: int,
+        search_url: str = ""
     ) -> Optional[RawQuoteSchema]:
-        """Normalize raw flight payload into RawQuoteSchema."""
         try:
             carrier_code = item.get("AirlineCode") or item.get("alCode", "6E")
             carrier_name = item.get("AirlineName") or INDIAN_AIRLINES.get(carrier_code, "IndiGo")
@@ -109,7 +100,7 @@ class EaseMyTripScraper(BaseScraper):
             if not flight_no.startswith(carrier_code):
                 flight_no = f"{carrier_code}-{flight_no}"
 
-            total_fare = float(item.get("Fare") or item.get("grossFare") or item.get("TotalFare") or item.get("Price") or 0)
+            total_fare = float(item.get("Fare") or item.get("grossFare") or item.get("TotalFare") or 0)
             if total_fare <= 0:
                 return None
 
@@ -124,6 +115,8 @@ class EaseMyTripScraper(BaseScraper):
 
             stops = int(item.get("Stops") or item.get("stops") or 0)
             duration = int(item.get("Duration") or item.get("durationMinutes") or 130)
+
+            link = search_url or f"https://flight.easemytrip.com/FlightList/Index?srch={origin}-{destination}-{departure_date.strftime('%d/%m/%Y')}&px=1-0-0&cbn=0&ar=undefined&isDM=true"
 
             return RawQuoteSchema(
                 source="EaseMyTrip",
@@ -144,34 +137,10 @@ class EaseMyTripScraper(BaseScraper):
                 taxes=taxes,
                 convenience_fee=convenience_fee,
                 total_fare=total_fare,
+                source_url=link,
                 is_sold_out=item.get("IsSoldOut", False),
                 seats_remaining=item.get("SeatsLeft", 9),
                 metadata_json={"raw_airline": carrier_name, "provider": "EaseMyTrip"}
             )
         except Exception:
             return None
-
-    def _fetch_live_ota_stream(
-        self,
-        origin: str,
-        destination: str,
-        departure_date: date,
-        booking_date: date,
-        advance_window: str,
-        advance_days: int
-    ) -> List[RawQuoteSchema]:
-        """Live search query across EaseMyTrip web flight stream."""
-        quotes = []
-        try:
-            url = f"https://flight.easemytrip.com/api/v1/FareCalendar/{origin}/{destination}/{departure_date.strftime('%Y-%m-%d')}"
-            res = curl_requests.get(url, impersonate="chrome124", timeout=10)
-            if res.status_code == 200:
-                data = res.json()
-                if isinstance(data, list):
-                    for flight in data:
-                        q = self._parse_flight_item(flight, origin, destination, departure_date, booking_date, advance_window, advance_days)
-                        if q:
-                            quotes.append(q)
-        except Exception:
-            pass
-        return quotes

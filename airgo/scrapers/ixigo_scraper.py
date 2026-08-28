@@ -12,13 +12,12 @@ logger = logging.getLogger("AirGoScraper.Ixigo")
 
 class IxigoScraper(BaseScraper):
     """
-    Live web scraper for Ixigo domestic flight search engine.
-    Extracts fare quotes across IndiGo, Air India, SpiceJet, and Akasa Air.
+    Live web scraper for Ixigo flight search engine.
+    Captures live flight quotes and attaches original search links.
     """
 
     def __init__(self, rate_limit_secs: float = 1.0):
         super().__init__(name="Ixigo", rate_limit_secs=rate_limit_secs)
-        self.search_url = "https://www.ixigo.com/api/v2/flight/search"
 
     def fetch_quotes(
         self,
@@ -28,26 +27,16 @@ class IxigoScraper(BaseScraper):
         advance_window: str,
         advance_days: int
     ) -> List[RawQuoteSchema]:
-        """Fetch quotes from Ixigo flight search API."""
-        formatted_date = departure_date.strftime("%d%m%Y") # DDMMYYYY
+        formatted_date = departure_date.strftime("%d%m%Y")
+        web_search_url = f"https://www.ixigo.com/search/result/flight/{origin}/{destination}/{formatted_date}//1/0/0/e/0"
         booking_today = date.today()
         quotes: List[RawQuoteSchema] = []
 
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
             "Accept": "application/json, text/plain, */*",
-            "Referer": f"https://www.ixigo.com/search/result/flight/{origin}/{destination}/{formatted_date}//1/0/0/e/0",
+            "Referer": web_search_url,
             "Origin": "https://www.ixigo.com"
-        }
-
-        params = {
-            "origin": origin,
-            "destination": destination,
-            "date": departure_date.strftime("%Y-%m-%d"),
-            "adults": "1",
-            "children": "0",
-            "infants": "0",
-            "class": "e" # Economy
         }
 
         try:
@@ -87,6 +76,7 @@ class IxigoScraper(BaseScraper):
                             taxes=round(price * 0.25, 2),
                             convenience_fee=399.0,
                             total_fare=price,
+                            source_url=web_search_url,
                             is_sold_out=False,
                             metadata_json={"source": "Ixigo Calendar Engine"}
                         ))

@@ -8,7 +8,7 @@ let activeTab = "overview";
 document.addEventListener("DOMContentLoaded", () => {
     initTabs();
     loadDashboardData();
-    setInterval(loadLiveStatus, 10000); // Auto-refresh status every 10s
+    setInterval(loadLiveStatus, 10000);
 });
 
 function initTabs() {
@@ -37,7 +37,6 @@ function initTabs() {
     });
 }
 
-// Fetch Core Dashboard Data
 async function loadDashboardData() {
     try {
         await Promise.all([
@@ -330,7 +329,7 @@ async function loadBacktestData() {
     });
 }
 
-// Live Quotes Table
+// Live Quotes Table with Clickable Verification Links
 async function loadQuotesTable() {
     const secVal = document.getElementById("filter-sector") ? document.getElementById("filter-sector").value : "ALL";
     const winVal = document.getElementById("filter-window") ? document.getElementById("filter-window").value : "ALL";
@@ -348,12 +347,14 @@ async function loadQuotesTable() {
     tbody.innerHTML = "";
 
     if (quotes.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="9" class="text-center py-6 text-slate-400">No quotes found for this filter. Run a live scrape to fetch real-time quotes.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="10" class="text-center py-6 text-slate-400">No quotes found for this filter. Run a live scrape to fetch real-time quotes.</td></tr>`;
         return;
     }
 
     quotes.forEach(q => {
         const tr = document.createElement("tr");
+        const sourceLink = q.source_url || `https://www.google.com/travel/flights?q=Flights%20to%20${q.sector.split('-')[1]}%20from%20${q.sector.split('-')[0]}%20on%20${q.departure_date}%20one%20way`;
+        
         tr.innerHTML = `
             <td class="font-mono text-cyan-400 font-semibold">${q.flight_number}</td>
             <td class="font-semibold text-white">${q.carrier}</td>
@@ -363,13 +364,22 @@ async function loadQuotesTable() {
             <td class="text-slate-300">₹${q.base_fare.toLocaleString()}</td>
             <td class="text-slate-400">₹${q.taxes_and_fees.toLocaleString()}</td>
             <td class="font-bold text-emerald-400">₹${q.total_fare.toLocaleString()}</td>
-            <td><span class="text-xs text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700">${q.sources || 'Playwright Live'}</span></td>
+            <td><span class="text-xs text-slate-300 bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700">${q.sources || 'Playwright Live'}</span></td>
+            <td>
+                <a href="${sourceLink}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-200 bg-cyan-950/60 hover:bg-cyan-900/90 px-2.5 py-1 rounded-md border border-cyan-500/40 transition-all font-medium">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                    Live Source
+                </a>
+            </td>
         `;
         tbody.appendChild(tr);
     });
+
+    if (window.lucide) {
+        lucide.createIcons();
+    }
 }
 
-// Scraper Control Console
 async function triggerScraper() {
     const btn = document.getElementById("btn-trigger-scrape");
     const term = document.getElementById("scraper-terminal");
@@ -380,7 +390,7 @@ async function triggerScraper() {
     }
     
     if (term) {
-        term.innerHTML += `\n[${new Date().toLocaleTimeString()}] 🚀 Initiating Playwright Chromium Live Multi-Route Extraction...`;
+        term.innerHTML += `\n[${new Date().toLocaleTimeString()}] 🚀 Initiating Playwright Live Multi-Route Extraction...`;
         term.scrollTop = term.scrollHeight;
     }
 

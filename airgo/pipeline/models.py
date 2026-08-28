@@ -40,6 +40,7 @@ class RawQuoteDB(Base):
     convenience_fee = Column(Float, nullable=True)
     total_fare = Column(Float, nullable=False)
     
+    source_url = Column(String(500), nullable=True)
     is_sold_out = Column(Boolean, default=False)
     seats_remaining = Column(Integer, nullable=True)
     scraped_at = Column(DateTime, default=datetime.utcnow, index=True)
@@ -71,6 +72,7 @@ class CleanFareDB(Base):
     taxes_and_fees = Column(Float, nullable=False)
     total_fare = Column(Float, nullable=False, index=True)
     
+    source_url = Column(String(500), nullable=True)
     is_outlier = Column(Boolean, default=False, index=True)
     outlier_reason = Column(String(100), nullable=True)
     source_count = Column(Integer, default=1)
@@ -164,6 +166,7 @@ class RawQuoteSchema(BaseModel):
     taxes: Optional[float] = None
     convenience_fee: Optional[float] = None
     total_fare: float
+    source_url: Optional[str] = None
     is_sold_out: bool = False
     seats_remaining: Optional[int] = None
     metadata_json: Optional[Dict[str, Any]] = None
@@ -185,6 +188,7 @@ class CleanFareSchema(BaseModel):
     base_fare: float
     taxes_and_fees: float
     total_fare: float
+    source_url: Optional[str] = None
     is_outlier: bool = False
     outlier_reason: Optional[str] = None
     source_count: int = 1

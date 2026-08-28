@@ -12,7 +12,7 @@ logger = logging.getLogger("AirGo.Cleaner")
 class DataCleaningPipeline:
     """
     Cleans, de-duplicates, and removes statistical price outliers from raw scraped flight quotes.
-    Segregates base fare and tax/airport development fees.
+    Preserves original live source URLs for transparent auditability.
     """
 
     def __init__(self, iqr_multiplier: float = 2.0, min_quotes_for_outlier: int = 4):
@@ -20,15 +20,10 @@ class DataCleaningPipeline:
         self.min_quotes_for_outlier = min_quotes_for_outlier
 
     def process_pending_quotes(self, booking_date: date = None) -> Dict[str, Any]:
-        """
-        Fetch raw quotes for a booking date, clean and de-duplicate them, filter outliers,
-        and populate clean_fares table.
-        """
         target_date = booking_date or date.today()
         logger.info(f"🧹 [Cleaner] Processing raw quotes for booking date: {target_date}")
 
         with get_db_session() as session:
-            # 1. Fetch raw quotes
             stmt = select(RawQuoteDB).where(RawQuoteDB.booking_date == target_date)
             raw_quotes = session.scalars(stmt).all()
 
@@ -36,8 +31,6 @@ class DataCleaningPipeline:
                 logger.info(f"No raw quotes found for {target_date}")
                 return {"status": "NO_DATA", "processed": 0, "clean_count": 0, "outliers_removed": 0}
 
-            # 2. De-duplicate quotes by flight + departure date
-            # Key: (origin, destination, carrier, flight_number, departure_date, advance_window)
             dedup_groups: Dict[Tuple, List[RawQuoteDB]] = {}
             for q in raw_quotes:
                 dep_date = q.departure_datetime.date()
@@ -49,14 +42,15 @@ class DataCleaningPipeline:
             normalized_candidates: List[CleanFareSchema] = []
             for key, group in dedup_groups.items():
                 origin, dest, carrier, flight_no, dep_date, adv_win = key
-                # Pick best quote (lowest verified total fare)
                 best_quote = min(group, key=lambda x: x.total_fare)
                 all_sources = ",".join(sorted(list(set(x.source for x in group))))
                 
-                # Base Fare & Tax segregation
                 total_f = best_quote.total_fare
                 base_f = best_quote.base_fare if (best_quote.base_fare and best_quote.base_fare < total_f) else round(total_f * 0.74, 2)
                 taxes_f = round(total_f - base_f, 2)
+
+                # Fallback source URL if None
+                source_link = best_quote.source_url or f"https://www.google.com/travel/flights?q=Flights%20to%20{dest}%20from%20{origin}%20on%20{dep_date.strftime('%Y-%m-%d')}%20one%20way"
 
                 normalized_candidates.append(CleanFareSchema(
                     sector=f"{origin}-{dest}",
@@ -74,14 +68,13 @@ class DataCleaningPipeline:
                     base_fare=base_f,
                     taxes_and_fees=taxes_f,
                     total_fare=total_f,
+                    source_url=source_link,
                     is_outlier=False,
                     source_count=len(group),
                     sources=all_sources
                 ))
 
-            # 3. Sector & Advance Window Outlier Detection using IQR
             outliers_detected = 0
-            # Group by sector + advance_window
             sector_win_groups: Dict[Tuple[str, str], List[CleanFareSchema]] = {}
             for cand in normalized_candidates:
                 sw_key = (cand.sector, cand.advance_window)
@@ -103,7 +96,6 @@ class DataCleaningPipeline:
                             item.outlier_reason = f"IQR Outlier (Fare {item.total_fare} outside [{lower_bound:.0f}, {upper_bound:.0f}])"
                             outliers_detected += 1
 
-            # 4. Overwrite clean_fares for this booking date
             session.execute(delete(CleanFareDB).where(CleanFareDB.booking_date == target_date))
             
             clean_db_objects = [
@@ -123,6 +115,7 @@ class DataCleaningPipeline:
                     base_fare=c.base_fare,
                     taxes_and_fees=c.taxes_and_fees,
                     total_fare=c.total_fare,
+                    source_url=c.source_url,
                     is_outlier=c.is_outlier,
                     outlier_reason=c.outlier_reason,
                     source_count=c.source_count,

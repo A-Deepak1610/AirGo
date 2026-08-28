@@ -83,12 +83,12 @@
                     <span class="p-1.5 bg-cyan-500/10 text-cyan-400 rounded-lg"><i data-lucide="activity" class="w-4 h-4"></i></span>
                 </div>
                 <div class="mt-3 flex items-baseline space-x-2">
-                    <span id="ticker-apix" class="text-3xl font-extrabold gradient-text stat-glow">105.62</span>
+                    <span id="ticker-apix" class="text-3xl font-extrabold gradient-text stat-glow">158.00</span>
                     <span class="text-xs text-slate-400">Base=100</span>
                 </div>
                 <div class="mt-2 flex items-center justify-between text-xs text-slate-400">
-                    <span>Laspeyres: <b id="ticker-laspeyres" class="text-slate-200">105.62</b></span>
-                    <span>Jevons: <b id="ticker-jevons" class="text-slate-200">104.90</b></span>
+                    <span>Laspeyres: <b id="ticker-laspeyres" class="text-slate-200">158.00</b></span>
+                    <span>Jevons: <b id="ticker-jevons" class="text-slate-200">157.99</b></span>
                 </div>
             </div>
 
@@ -111,7 +111,7 @@
                     <span class="p-1.5 bg-indigo-500/10 text-indigo-400 rounded-lg"><i data-lucide="calendar" class="w-4 h-4"></i></span>
                 </div>
                 <div class="mt-3 flex items-baseline space-x-2">
-                    <div id="ticker-mom" class="text-3xl font-extrabold text-cyan-400">+2.35%</div>
+                    <div id="ticker-mom" class="text-3xl font-extrabold text-cyan-400">+2.15%</div>
                 </div>
                 <div class="mt-2 text-xs text-slate-400">30-Day Airfare Velocity</div>
             </div>
@@ -123,7 +123,7 @@
                     <span class="p-1.5 bg-emerald-500/10 text-emerald-400 rounded-lg"><i data-lucide="indian-rupee" class="w-4 h-4"></i></span>
                 </div>
                 <div class="mt-3 flex items-baseline space-x-2">
-                    <span id="ticker-avg-fare" class="text-3xl font-extrabold text-white">₹5,180</span>
+                    <span id="ticker-avg-fare" class="text-3xl font-extrabold text-white">₹6,508</span>
                 </div>
                 <div class="mt-2 text-xs text-slate-400">Cleaned Non-Outlier Quotes</div>
             </div>
@@ -135,9 +135,9 @@
                     <span class="p-1.5 bg-purple-500/10 text-purple-400 rounded-lg"><i data-lucide="database" class="w-4 h-4"></i></span>
                 </div>
                 <div class="mt-3 flex items-baseline space-x-2">
-                    <span id="ticker-quotes-count" class="text-3xl font-extrabold text-purple-300">240 quotes</span>
+                    <span id="ticker-quotes-count" class="text-3xl font-extrabold text-purple-300">1,356 quotes</span>
                 </div>
-                <div class="mt-2 text-xs text-slate-400">13 DGCA City-Pairs • 5 Windows</div>
+                <div class="mt-2 text-xs text-slate-400">13 DGCA Corridors • 5 Windows</div>
             </div>
         </section>
 
@@ -232,9 +232,9 @@
                     <div>
                         <h2 class="text-lg font-bold text-white flex items-center gap-2">
                             <i data-lucide="search" class="w-5 h-5 text-indigo-400"></i>
-                            Live Cleaned Airfare Quotes Explorer
+                            Live Cleaned Airfare Quotes Explorer & Source Verification
                         </h2>
-                        <p class="text-xs text-slate-400">De-duplicated inventory across EaseMyTrip, Ixigo, IndiGo, Air India, SpiceJet, and Akasa Air.</p>
+                        <p class="text-xs text-slate-400">Real quotes extracted directly from live portals with clickable links to original search sources.</p>
                     </div>
                     <div class="flex items-center gap-2">
                         <select id="filter-sector" onchange="loadQuotesTable()" class="bg-slate-900 text-xs border border-slate-700 text-slate-200 rounded-lg px-3 py-2">
@@ -244,15 +244,19 @@
                             <option value="BOM-BLR">BOM-BLR</option>
                             <option value="DEL-CCU">DEL-CCU</option>
                             <option value="BLR-HYD">BLR-HYD</option>
+                            <option value="MAA-DEL">MAA-DEL</option>
                         </select>
                         <select id="filter-window" onchange="loadQuotesTable()" class="bg-slate-900 text-xs border border-slate-700 text-slate-200 rounded-lg px-3 py-2">
                             <option value="ALL">All Windows</option>
-                            <option value="T+1">T+1</option>
-                            <option value="T+7">T+7</option>
-                            <option value="T+15">T+15</option>
-                            <option value="T+30">T+30</option>
-                            <option value="T+45">T+45</option>
+                            <option value="T+1">T+1 (Next-Day)</option>
+                            <option value="T+7">T+7 (1-Week)</option>
+                            <option value="T+15">T+15 (2-Weeks)</option>
+                            <option value="T+30">T+30 (1-Month)</option>
+                            <option value="T+45">T+45 (45-Days)</option>
                         </select>
+                        <button onclick="loadQuotesTable()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-3 py-2 rounded-lg border border-slate-700 flex items-center gap-1">
+                            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Refresh
+                        </button>
                     </div>
                 </div>
 
@@ -263,12 +267,13 @@
                                 <th>Flight</th>
                                 <th>Carrier</th>
                                 <th>Sector</th>
-                                <th>Dep Date</th>
+                                <th>Dep Date / Time</th>
                                 <th>Window</th>
                                 <th>Base Fare</th>
                                 <th>Taxes/Fees</th>
                                 <th>Total Fare</th>
                                 <th>Source</th>
+                                <th>Live Source Link</th>
                             </tr>
                         </thead>
                         <tbody id="quotes-tbody">
@@ -325,18 +330,17 @@
         <!-- ================= TAB 6: SCRAPER CONTROL ================= -->
         <section id="tab-scraper" class="tab-content-panel space-y-6" style="display:none;">
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <!-- Control Panel & Live Log Output -->
                 <div class="glass-panel p-6 rounded-2xl flex flex-col justify-between">
                     <div>
                         <h2 class="text-lg font-bold text-white flex items-center gap-2 mb-2">
                             <i data-lucide="terminal" class="w-5 h-5 text-cyan-400"></i>
-                            Live Crawlee + TLS Impersonated Execution Terminal
+                            Live Execution Terminal
                         </h2>
                         <p class="text-xs text-slate-400 mb-4">Real-time status of multi-source scraping jobs across Indian airline and OTA portals.</p>
                         
                         <div id="scraper-terminal" class="terminal-window whitespace-pre-wrap">
 [09:50:00] AirGo Scraper Engine Initialized.
-[09:50:00] Crawlee + curl_cffi Chrome 124 TLS Impersonation Ready.
+[09:50:00] Playwright Chromium + TLS Impersonation Ready.
 [09:50:00] Standing by for execution trigger...
                         </div>
                     </div>
@@ -348,7 +352,6 @@
                     </div>
                 </div>
 
-                <!-- Recent Scraper Execution Logs Table -->
                 <div class="glass-panel p-6 rounded-2xl">
                     <h2 class="text-lg font-bold text-white flex items-center gap-2 mb-2">
                         <i data-lucide="list" class="w-5 h-5 text-indigo-400"></i>

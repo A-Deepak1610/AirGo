@@ -13,13 +13,11 @@ logger = logging.getLogger("AirGoScraper.Playwright")
 
 class PlaywrightFlightScraper(BaseScraper):
     """
-    Real Visual Browser Scraper using Playwright (Non-Headless Mode).
-    Opens an actual visible Chromium browser window on screen, loads live flight portals,
-    waits for DOM cards, and extracts exact real-time prices.
+    Real Visual Browser Scraper using Playwright.
+    Captures live flight quotes and attaches original search links.
     """
 
     def __init__(self, headless: bool = False, rate_limit_secs: float = 1.0):
-        # Default to headless=False so user can visibly watch the browser
         self.headless = os.getenv("HEADLESS", "false").lower() == "true" if headless is False else headless
         super().__init__(name="PlaywrightVisual", rate_limit_secs=rate_limit_secs)
 
@@ -31,10 +29,6 @@ class PlaywrightFlightScraper(BaseScraper):
         advance_window: str,
         advance_days: int
     ) -> List[RawQuoteSchema]:
-        """
-        Launch visible Chromium browser window, navigate to live flight search,
-        and extract 100% real ticket quotes.
-        """
         quotes: List[RawQuoteSchema] = []
         booking_today = date.today()
         formatted_date = departure_date.strftime("%Y-%m-%d")
@@ -42,10 +36,10 @@ class PlaywrightFlightScraper(BaseScraper):
 
         try:
             with sync_playwright() as p:
-                self.logger.info(f"[Playwright] 🖥️ Launching VISIBLE Chromium browser for {origin}->{destination} ({formatted_date})...")
+                self.logger.info(f"[Playwright] 🖥️ Navigating to: {url}")
                 browser = p.chromium.launch(
                     headless=self.headless,
-                    slow_mo=100, # Adds slight delay so user can clearly see browser interactions
+                    slow_mo=50,
                     args=["--start-maximized", "--no-sandbox"]
                 )
                 context = browser.new_context(
@@ -54,17 +48,10 @@ class PlaywrightFlightScraper(BaseScraper):
                     locale="en-IN"
                 )
                 page = context.new_page()
-
-                self.logger.info(f"[Playwright] Navigating to: {url}")
                 page.goto(url, wait_until="domcontentloaded", timeout=30000)
+                page.wait_for_timeout(3500)
 
-                # Wait visibly for flight cards to render
-                page.wait_for_timeout(4000)
-
-                # Query flight card items
                 flight_cards = page.query_selector_all("li.pIav2d, div.gws-flights-results__itinerary-card, div.h11v2, div[role='listitem']")
-                
-                self.logger.info(f"[Playwright] Extracted {len(flight_cards)} flight elements from live page.")
 
                 for card in flight_cards[:15]:
                     card_text = card.inner_text()
@@ -119,7 +106,7 @@ class PlaywrightFlightScraper(BaseScraper):
                     taxes = round(total_fare - base_fare, 2)
 
                     quotes.append(RawQuoteSchema(
-                        source="Live Travel Portal",
+                        source="Google Flights Live",
                         carrier=carrier_name,
                         carrier_code=carrier_code,
                         flight_number=flight_no,
@@ -137,24 +124,15 @@ class PlaywrightFlightScraper(BaseScraper):
                         taxes=taxes,
                         convenience_fee=350.0,
                         total_fare=total_fare,
+                        source_url=url,
                         is_sold_out=False,
                         seats_remaining=9,
-                        metadata_json={"channel": "Visible Chromium Window", "raw_snippet": card_text[:100]}
+                        metadata_json={"channel": "Chromium Live", "raw_snippet": card_text[:100]}
                     ))
 
-                # Keep browser visible for 1 second before closing
-                page.wait_for_timeout(1000)
+                page.wait_for_timeout(500)
                 browser.close()
         except Exception as e:
-            self.logger.error(f"[Playwright] Error in visible browser extraction: {e}")
+            self.logger.error(f"[Playwright] Scraper error: {e}")
 
         return quotes
-
-
-if __name__ == "__main__":
-    scraper = PlaywrightFlightScraper(headless=False)
-    dep_date = date.today() + timedelta(days=1)
-    results = scraper.fetch_quotes("DEL", "BOM", dep_date, "T+1", 1)
-    print(f"\nExtracted {len(results)} live quotes from visible browser:")
-    for r in results:
-        print(f"  ✈️  {r.carrier} ({r.flight_number}): ₹{r.total_fare} (Base: ₹{r.base_fare}, Taxes: ₹{r.taxes}) | Dep: {r.departure_datetime.strftime('%H:%M')}")

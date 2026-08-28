@@ -33,7 +33,6 @@ cleaner = DataCleaningPipeline()
 async def lifespan(app: FastAPI):
     init_db()
     backtest_engine.seed_dgca_benchmarks()
-    # Ensure any initial raw quotes are cleaned and indexed
     cleaner.process_pending_quotes(date.today())
     index_calculator.compute_daily_index(date.today())
     yield
@@ -175,7 +174,6 @@ def get_scraped_quotes(
     offset: int = 0,
     db: Session = Depends(get_db)
 ):
-    # Ensure recent raw quotes are cleaned into clean_fares
     stmt = select(CleanFareDB)
     if sector and sector != "ALL":
         stmt = stmt.where(CleanFareDB.sector == sector)
@@ -187,7 +185,6 @@ def get_scraped_quotes(
     stmt = stmt.order_by(desc(CleanFareDB.id)).offset(offset).limit(limit)
     rows = db.scalars(stmt).all()
 
-    # Fallback to raw quotes if clean fares are empty for requested filter
     if not rows:
         raw_stmt = select(RawQuoteDB)
         if sector and sector != "ALL":
@@ -214,6 +211,7 @@ def get_scraped_quotes(
                     "base_fare": r.base_fare or round(r.total_fare * 0.74, 2),
                     "taxes_and_fees": r.taxes or round(r.total_fare * 0.26, 2),
                     "total_fare": r.total_fare,
+                    "source_url": r.source_url or f"https://www.google.com/travel/flights?q=Flights%20to%20{r.destination}%20from%20{r.origin}%20on%20{r.departure_datetime.strftime('%Y-%m-%d')}%20one%20way",
                     "is_outlier": False,
                     "sources": r.source
                 }
@@ -238,6 +236,7 @@ def get_scraped_quotes(
                 "base_fare": r.base_fare,
                 "taxes_and_fees": r.taxes_and_fees,
                 "total_fare": r.total_fare,
+                "source_url": r.source_url or f"https://www.google.com/travel/flights?q=Flights%20to%20{r.destination}%20from%20{r.origin}%20on%20{r.departure_date.strftime('%Y-%m-%d')}%20one%20way",
                 "is_outlier": r.is_outlier,
                 "sources": r.sources
             }
@@ -304,6 +303,7 @@ def export_dataset(format: str = Query("csv", pattern="^(csv|json)$"), db: Sessi
                 "base_fare": r.base_fare,
                 "taxes_and_fees": r.taxes_and_fees,
                 "total_fare": r.total_fare,
+                "source_url": r.source_url,
                 "booking_date": str(r.booking_date),
                 "sources": r.sources
             }
@@ -313,9 +313,9 @@ def export_dataset(format: str = Query("csv", pattern="^(csv|json)$"), db: Sessi
 
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["Sector", "Carrier", "Flight_No", "Departure_Date", "Advance_Window", "Base_Fare", "Taxes_Fees", "Total_Fare", "Booking_Date", "Sources"])
+    writer.writerow(["Sector", "Carrier", "Flight_No", "Departure_Date", "Advance_Window", "Base_Fare", "Taxes_Fees", "Total_Fare", "Source_URL", "Booking_Date", "Sources"])
     for r in rows:
-        writer.writerow([r.sector, r.carrier, r.flight_number, r.departure_date, r.advance_window, r.base_fare, r.taxes_and_fees, r.total_fare, r.booking_date, r.sources])
+        writer.writerow([r.sector, r.carrier, r.flight_number, r.departure_date, r.advance_window, r.base_fare, r.taxes_and_fees, r.total_fare, r.source_url, r.booking_date, r.sources])
 
     output.seek(0)
     return StreamingResponse(
