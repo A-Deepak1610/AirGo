@@ -3,16 +3,22 @@ Visual Live Flight Scraper Launcher.
 Run this directly in your terminal: `python live_scrape.py`
 Opens a real Chrome browser window on your desktop to scrape live fares.
 """
-
+import sys
+import io
 from datetime import date, timedelta
 from airgo.scrapers.playwright_scraper import PlaywrightFlightScraper
 from airgo.pipeline.cleaner import DataCleaningPipeline
 from airgo.engine.index_calculator import IndexCalculator
-from airgo.pipeline.db import init_db
+from airgo.pipeline.db import init_db, get_db_session
+from airgo.pipeline.models import RawQuoteDB
+
+# Ensure utf-8 output in Windows terminal
+if sys.stdout.encoding != 'utf-8':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
 def main():
     print("\n" + "="*70)
-    print("✈️  AIRGO: VISUAL LIVE FLIGHT SCRAPER (CHROME NON-HEADLESS)")
+    print(">> AIRGO: VISUAL LIVE FLIGHT SCRAPER (CHROME NON-HEADLESS)")
     print("="*70)
     print("Starting Chromium on your screen in 2 seconds...\n")
     
@@ -21,7 +27,7 @@ def main():
     
     # Target: Delhi to Mumbai for tomorrow (T+1)
     dep_date = date.today() + timedelta(days=1)
-    print(f"🔍 Route: DEL -> BOM | Departure Date: {dep_date} (T+1 Next Day)")
+    print(f"[Search] Route: DEL -> BOM | Departure Date: {dep_date} (T+1 Next Day)")
     
     quotes = scraper.fetch_quotes(
         origin="DEL",
@@ -32,9 +38,6 @@ def main():
     )
     
     # Save raw quotes to DB
-    from airgo.pipeline.db import get_db_session
-    from airgo.pipeline.models import RawQuoteDB
-    
     with get_db_session() as session:
         for q in quotes:
             session.add(RawQuoteDB(
@@ -53,7 +56,8 @@ def main():
                 fare_class=q.fare_class,
                 base_fare=q.base_fare,
                 taxes=q.taxes,
-                total_fare=q.total_fare
+                total_fare=q.total_fare,
+                source_url=q.source_url
             ))
             
     # Clean and recalculate
@@ -64,10 +68,12 @@ def main():
     calc.compute_daily_index(date.today())
 
     print("\n" + "="*70)
-    print(f"✅ Extracted {len(quotes)} 100% REAL LIVE Quotes Directly From Web:")
+    print(f"[SUCCESS] Extracted {len(quotes)} 100% REAL LIVE Quotes Directly From Web:")
     print("="*70)
     for q in quotes:
-        print(f"  ✈️  {q.carrier:<12} | Flight: {q.flight_number:<8} | Total: ₹{q.total_fare:<7} | Base: ₹{q.base_fare:<7} | Dep: {q.departure_datetime.strftime('%H:%M')}")
+        dep_str = q.departure_datetime.strftime('%I:%M %p')
+        print(f"  * {q.carrier:<14} | Flight: {q.flight_number:<8} | Fare: INR {q.total_fare:<7} | Base: INR {q.base_fare:<7} | Dep: {dep_str}")
+        print(f"    Source Link: {q.source_url}")
     print("="*70 + "\n")
 
 if __name__ == "__main__":

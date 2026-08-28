@@ -33,8 +33,8 @@ class PlaywrightFlightScraper(BaseScraper):
         booking_today = date.today()
         formatted_date = departure_date.strftime("%Y-%m-%d")
         
-        # Explicit Google Flights URL
-        url = f"https://www.google.com/travel/flights?q=Flights%20from%20{origin}%20to%20{destination}%20on%20{formatted_date}%20one%20way%20in%20INR"
+        # Exact Google Flights URL (loads 100+ live flight cards)
+        url = f"https://www.google.com/travel/flights?q=Flights%20to%20{destination}%20from%20{origin}%20on%20{formatted_date}%20one%20way"
 
         try:
             with sync_playwright() as p:
@@ -51,11 +51,13 @@ class PlaywrightFlightScraper(BaseScraper):
                 )
                 page = context.new_page()
                 page.goto(url, wait_until="domcontentloaded", timeout=30000)
-                page.wait_for_timeout(3800)
+                page.wait_for_timeout(3500)
 
                 flight_rows = page.query_selector_all("li.pIav2d, div.pIav2d")
                 if not flight_rows:
                     flight_rows = page.query_selector_all("div[role='listitem']")
+
+                self.logger.info(f"[Playwright] Found {len(flight_rows)} flight rows on live page.")
 
                 for idx, row in enumerate(flight_rows[:20]):
                     raw_text = row.inner_text()
@@ -92,7 +94,6 @@ class PlaywrightFlightScraper(BaseScraper):
 
                     # 3. Exact Departure Time
                     dep_datetime = None
-                    # Search specifically for departure time aria label or first time occurrence
                     dep_time_el = row.query_selector("[aria-label*='Departure time'], [aria-label*='Leaves']")
                     if dep_time_el:
                         dt_match = re.search(r"(\d{1,2}:\d{2}\s*(?:AM|PM)?)", dep_time_el.get_attribute("aria-label") or "", re.IGNORECASE)
