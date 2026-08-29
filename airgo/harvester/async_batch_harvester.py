@@ -150,13 +150,21 @@ async def audit_single_route_checkout(
     }
 
     try:
-        # 1. Search page
+        # 1. Navigate to Search page
         await page.goto(search_url, wait_until="domcontentloaded", timeout=timeout_ms)
-        await page.wait_for_timeout(5500)
+        
+        # Dynamic selector wait: wait until flight cards render into the DOM
+        try:
+            await page.wait_for_selector(
+                "div.fltResult, .fltResult, [class*='fltResult'], div[ng-repeat*='Flight'], button:has-text('BOOK NOW')",
+                timeout=18000
+            )
+        except Exception:
+            await page.wait_for_timeout(4000)
 
         # Extract search flight details from first flight card
         card_data = await page.evaluate(r"""() => {
-            const firstCard = document.querySelector('div.fltResult');
+            const firstCard = document.querySelector('div.fltResult') || document.querySelector('.fltResult');
             if (!firstCard) return null;
 
             const priceEl = firstCard.querySelector("span[id*='spnPrice']") || firstCard.querySelector("div.col-md-2 span[price]");
@@ -337,11 +345,21 @@ async def worker_consumer(
             queries_handled = 0
 
         # Anti-bot randomized jitter
-        await asyncio.sleep(random.uniform(0.8, 2.0))
+        await asyncio.sleep(random.uniform(0.8, 1.8))
 
         # Execute checkout audit
         res = await audit_single_route_checkout(context, job)
-        results_list.append(res)
+        
+        # Automatic Retry (up to 2 retries on transient network/rendering lag)
+        retries = job.get("retries", 0)
+        if res["status"] != "success" and retries < 2:
+            job["retries"] = retries + 1
+            print(f"🔄 Retrying {job['route']}_{job['horizon']} (Attempt {job['retries']}/2 after short backoff)...")
+            await asyncio.sleep(2.0)
+            await queue.put(job)
+        else:
+            results_list.append(res)
+
         queue.task_done()
 
     try:
