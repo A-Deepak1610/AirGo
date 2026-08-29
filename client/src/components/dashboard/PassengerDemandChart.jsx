@@ -2,7 +2,7 @@ import React from 'react';
 import { PASSENGER_DEMAND_DATA } from '../../config/dashboardData';
 import { Info } from 'lucide-react';
 
-export const PassengerDemandChart = () => {
+export const PassengerDemandChart = ({ onNavigateDemand }) => {
   return (
     <div className="bg-white border border-slate-200/90 rounded-xl p-5 shadow-2xs">
       {/* Header */}
@@ -17,9 +17,12 @@ export const PassengerDemandChart = () => {
           </p>
         </div>
 
-        <span className="bg-slate-100 text-slate-600 text-[10px] font-bold px-2 py-0.5 rounded tracking-wider uppercase border border-slate-200/60">
-          ANNUAL - FY 2025-26
-        </span>
+        <button
+          onClick={onNavigateDemand}
+          className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold px-2.5 py-1 rounded-lg tracking-wider uppercase border border-slate-200 transition-colors cursor-pointer"
+        >
+          ANNUAL - FY 2024-25 • View All 100
+        </button>
       </div>
 
       {/* Horizontal Demand Bars */}

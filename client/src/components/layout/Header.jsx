@@ -2,20 +2,51 @@ import React from 'react';
 import { useRole } from '../../context/RoleContext';
 import { Calendar, Clock, Bell, ChevronDown, Sparkles } from 'lucide-react';
 
-export const Header = () => {
+export const Header = ({ activeTab, setActiveTab }) => {
   const { currentRole, setIsRoleModalOpen } = useRole();
+
+  const getPageTitle = () => {
+    switch (activeTab) {
+      case 'route_intelligence':
+        return 'DGCA Domestic Route Basket & Index Weights';
+      case 'passenger_demand':
+        return 'Passenger Demand & Traffic Weighting';
+      case 'airfare_index':
+        return 'Airfare Price Index (APIx)';
+      default:
+        return 'National Airfare Intelligence';
+    }
+  };
+
+  const getBreadcrumb = () => {
+    switch (activeTab) {
+      case 'route_intelligence':
+        return 'Route Basket & Weights';
+      case 'passenger_demand':
+        return 'Passenger Demand';
+      case 'airfare_index':
+        return 'Airfare Index';
+      default:
+        return 'Dashboard';
+    }
+  };
 
   return (
     <header className="bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between sticky top-0 z-20 shadow-xs">
       {/* Title & Breadcrumbs */}
       <div>
         <h1 className="text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
-          National Airfare Intelligence
+          {getPageTitle()}
         </h1>
         <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
-          <span>Home</span>
+          <button 
+            onClick={() => setActiveTab && setActiveTab('dashboard')}
+            className="hover:text-blue-600 transition-colors"
+          >
+            Home
+          </button>
           <span>/</span>
-          <span className="text-slate-800 font-semibold">Dashboard</span>
+          <span className="text-slate-800 font-semibold">{getBreadcrumb()}</span>
         </div>
       </div>
 

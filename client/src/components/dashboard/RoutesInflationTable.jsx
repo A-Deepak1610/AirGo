@@ -2,7 +2,7 @@ import React from 'react';
 import { ROUTES_INFLATION_DATA } from '../../config/dashboardData';
 import { ArrowRight, TrendingUp } from 'lucide-react';
 
-export const RoutesInflationTable = () => {
+export const RoutesInflationTable = ({ onNavigateRoutes }) => {
   return (
     <div className="bg-white border border-slate-200/90 rounded-xl p-5 shadow-2xs">
       {/* Header */}
@@ -16,8 +16,11 @@ export const RoutesInflationTable = () => {
           </p>
         </div>
 
-        <button className="text-blue-600 hover:text-blue-700 text-xs font-semibold flex items-center gap-1 hover:underline">
-          <span>View All Routes</span>
+        <button
+          onClick={onNavigateRoutes}
+          className="text-blue-600 hover:text-blue-700 text-xs font-semibold flex items-center gap-1 hover:underline cursor-pointer"
+        >
+          <span>View All 100 Routes</span>
           <ArrowRight className="w-3.5 h-3.5" />
         </button>
       </div>

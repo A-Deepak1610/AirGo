@@ -2,7 +2,7 @@ import React from 'react';
 import { KEY_INSIGHTS_DATA } from '../../config/dashboardData';
 import { TrendingUp, Plane, AlertTriangle, Compass, ArrowRight } from 'lucide-react';
 
-export const KeyInsights = () => {
+export const KeyInsights = ({ onNavigateAnalysis }) => {
   const getIcon = (type) => {
     switch (type) {
       case 'trend_up':
@@ -53,7 +53,10 @@ export const KeyInsights = () => {
             </div>
 
             <div className="mt-3 pt-2.5 border-t border-slate-100">
-              <button className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 hover:underline">
+              <button
+                onClick={onNavigateAnalysis}
+                className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 hover:underline cursor-pointer"
+              >
                 <span>{card.linkText}</span>
                 <ArrowRight className="w-3 h-3" />
               </button>
@@ -64,3 +67,4 @@ export const KeyInsights = () => {
     </div>
   );
 };
+

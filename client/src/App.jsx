@@ -13,6 +13,8 @@ import { PassengerDemandChart } from './components/dashboard/PassengerDemandChar
 import { KeyInsights } from './components/dashboard/KeyInsights';
 import { RoleSwitcherModal } from './components/common/RoleSwitcherModal';
 
+import { ProcessedRoutesPage } from './components/routes/ProcessedRoutesPage';
+
 function DashboardContent() {
   const [activeTab, setActiveTab] = useState('dashboard');
 
@@ -24,33 +26,39 @@ function DashboardContent() {
       {/* Main Content View */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Navbar */}
-        <Header />
+        <Header activeTab={activeTab} setActiveTab={setActiveTab} />
 
         {/* Global Filter Bar */}
         <FilterBar />
 
         {/* Dashboard Body */}
         <main className="flex-1 p-6 space-y-6 max-w-[1600px] w-full mx-auto">
-          {/* Top 6 KPI Metric Cards */}
-          <MetricCards />
+          {activeTab === 'route_intelligence' || activeTab === 'passenger_demand' ? (
+            <ProcessedRoutesPage />
+          ) : (
+            <>
+              {/* Top 6 KPI Metric Cards */}
+              <MetricCards />
 
-          {/* India Airfare Index - Historical Trend Area Chart */}
-          <HistoricalTrendChart />
+              {/* India Airfare Index - Historical Trend Area Chart */}
+              <HistoricalTrendChart />
 
-          {/* 2-Column Row: Domestic Fare Movement & Fare Pressure */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <DomesticFareMovement />
-            <FarePressureGauge />
-          </div>
+              {/* 2-Column Row: Domestic Fare Movement & Fare Pressure */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <DomesticFareMovement />
+                <FarePressureGauge />
+              </div>
 
-          {/* Routes Driving Airfare Inflation Table */}
-          <RoutesInflationTable />
+              {/* Routes Driving Airfare Inflation Table */}
+              <RoutesInflationTable onNavigateRoutes={() => setActiveTab('route_intelligence')} />
 
-          {/* Passenger Demand by Route Horizontal Bar Chart */}
-          <PassengerDemandChart />
+              {/* Passenger Demand by Route Horizontal Bar Chart */}
+              <PassengerDemandChart onNavigateDemand={() => setActiveTab('passenger_demand')} />
 
-          {/* Key Insights AI Briefing Cards */}
-          <KeyInsights />
+              {/* Key Insights AI Briefing Cards */}
+              <KeyInsights onNavigateAnalysis={() => setActiveTab('route_intelligence')} />
+            </>
+          )}
 
           {/* Page Bottom Disclaimer / Note */}
           <div className="text-center text-[11px] text-slate-400 py-4 border-t border-slate-200/60">
