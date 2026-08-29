@@ -28,6 +28,12 @@ These rules are **MANDATORY** for all AI coding agents working on the AirGo code
 
 ---
 
-## 4. 📊 CLEAR SEPARATION OF OBSERVED VS COMPUTED METRICS
+## 4. 📁 TIMESTAMPED RUN FOLDERS (LOCAL AUDIT STORAGE)
+- **ISOLATED RUN DIRECTORIES**: Every execution must write its artifacts into a dedicated timestamped folder: `runs/YYYY-MM-DD_HH-MM-SS_<prefix>/`.
+- **EVIDENCE PRESERVATION**: Never overwrite historical audit runs. Store the rendered `search_results.html`, `checkout_review.html`, screenshot proof, and `run_summary.json` inside the run folder locally.
+
+---
+
+## 5. 📊 CLEAR SEPARATION OF OBSERVED VS COMPUTED METRICS
 - **Raw Observed Data**: Price tags, seat IDs, taxes, convenience fees extracted directly from the DOM must be stored and displayed without modification.
 - **Econometric / Statistical Models**: Any derived metrics (e.g., Econometric Expected Consumer Seat Surcharge, Flight Load Factor %, CPI Baskets) must be explicitly marked as computed models and separated from raw observed data points.

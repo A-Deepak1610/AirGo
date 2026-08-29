@@ -11,3 +11,7 @@
 
 ## Rule 3: Visual Screenshot Proof
 1. Maintain screenshot artifacts (`checkout_screenshot.png`, `aircraft_cabin_seat_map.png`, `live_payment_proof.png`) for full auditability.
+
+## Rule 4: Timestamped Run Folders (Local Audit Storage)
+1. Write all outputs, logs, HTML dumps, and screenshots into isolated timestamped directories: `runs/YYYY-MM-DD_HH-MM-SS_<prefix>/`.
+2. Keep runs cleanly isolated locally without overwriting previous audit history.
