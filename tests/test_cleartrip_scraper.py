@@ -6,7 +6,7 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
-from scrape_cleartrip import parse_cleartrip_flight_card
+from airgo.scrapers.cleartrip_scraper import parse_cleartrip_flight_card
 
 
 class TestCleartripScraper(unittest.TestCase):

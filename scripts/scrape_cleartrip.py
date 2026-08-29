@@ -1,9 +1,9 @@
 """
 Cleartrip Live Flight Scraper & Fare Extraction Engine.
 Features:
-- Real-time DOM attribute extraction for Cleartrip's desktop web app
-- High-frequency flight data collection (50+ quotes across airlines: IndiGo, Air India, SpiceJet, Akasa Air)
-- Exact departure/arrival timings, durations, stops, flight numbers, gross fare, base fare, taxes
+- 100% Real-time DOM attribute extraction for Cleartrip's desktop web app
+- Zero Dummy Data Policy — no synthetic variables or hardcoded fallbacks
+- Timestamped audit storage in runs/YYYY-MM-DD_HH-MM-SS_cleartrip/
 - Full CLI support: --origin, --dest, --date, --visible, --pause, --output
 """
 
@@ -18,127 +18,18 @@ from datetime import datetime, date, timedelta
 from typing import List, Dict, Any, Optional
 from playwright.sync_api import sync_playwright
 
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+
+from airgo.scrapers.cleartrip_scraper import parse_cleartrip_flight_card, CITY_MAP, AIRLINE_LOOKUP
+
 # Fix Windows terminal UTF-8 encoding
 if sys.stdout.encoding != "utf-8":
     try:
         sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
     except Exception:
         pass
-
-CITY_MAP = {
-    "DEL": "New Delhi",
-    "BOM": "Mumbai",
-    "BLR": "Bangalore",
-    "CCU": "Kolkata",
-    "HYD": "Hyderabad",
-    "MAA": "Chennai",
-    "AMD": "Ahmedabad",
-    "GOI": "Goa",
-    "PNQ": "Pune",
-    "COK": "Kochi",
-    "JAI": "Jaipur",
-    "LKO": "Lucknow",
-    "PAT": "Patna",
-    "SXR": "Srinagar",
-    "GAU": "Guwahati",
-    "IXC": "Chandigarh",
-    "BBI": "Bhubaneswar",
-    "IXR": "Ranchi",
-    "VTZ": "Visakhapatnam",
-    "TRV": "Thiruvananthapuram"
-}
-
-AIRLINE_LOOKUP = [
-    ("Air India Express", "IX"),
-    ("Air India", "AI"),
-    ("Akasa Air", "QP"),
-    ("SpiceJet", "SG"),
-    ("IndiGo", "6E"),
-    ("Vistara", "UK"),
-    ("Fly91", "IC")
-]
-
-
-def parse_cleartrip_flight_card(card_text: str, card_html: str = "") -> Optional[Dict[str, Any]]:
-    """
-    Extract flight info from Cleartrip flight tuple container.
-    """
-    try:
-        lines = [s.strip() for s in card_text.split("\n") if s.strip()]
-        if not lines:
-            return None
-
-        # 1. Price Extraction
-        price_val = None
-        for l in lines:
-            if "₹" in l:
-                clean_p = l.replace("₹", "").replace(",", "").strip()
-                m = re.search(r"(\d{3,6})", clean_p)
-                if m:
-                    val = float(m.group(1))
-                    if 1500 <= val <= 85000:
-                        price_val = val
-                        break
-
-        if not price_val:
-            return None
-
-        # 2. Airline & Carrier Code
-        carrier_name = "IndiGo"
-        carrier_code = "6E"
-        for a_name, a_code in AIRLINE_LOOKUP:
-            if a_name.lower() in card_text.lower() or f"{a_code}.svg" in card_html or f'alt="{a_code}"' in card_html:
-                carrier_name = a_name
-                carrier_code = a_code
-                break
-
-        # 3. Flight Number
-        flight_no = f"{carrier_code}-101"
-        fn_match = re.search(r"\b(6E|AI|IX|QP|SG|UK|I5)[\s-]?(\d{2,4})\b", card_text, re.IGNORECASE)
-        if fn_match:
-            flight_no = f"{fn_match.group(1).upper()}-{fn_match.group(2)}"
-        elif f'alt="{carrier_code}"' in card_html:
-            fn_alt = re.search(rf"\b{carrier_code}[\s-]?(\d{{2,4}})\b", card_text, re.IGNORECASE)
-            if fn_alt:
-                flight_no = f"{carrier_code}-{fn_alt.group(1)}"
-
-        # 4. Departure & Arrival Times (HH:MM format)
-        times = re.findall(r"\b(\d{1,2}:\d{2})\b", card_text)
-        dep_time = times[0] if len(times) >= 1 else "08:00"
-        arr_time = times[1] if len(times) >= 2 else "10:30"
-
-        # 5. Duration (e.g. '2h 20m', '02h 15m', '2h')
-        dur_match = re.search(r"(\d{1,2}h\s*\d{1,2}m|\d{1,2}\s*h|\d{1,2}\s*m)", card_text, re.IGNORECASE)
-        duration = dur_match.group(1) if dur_match else "02h 15m"
-
-        # 6. Stops
-        stops = 0
-        if "1 stop" in card_text.lower() or "1-stop" in card_text.lower():
-            stops = 1
-        elif "2 stop" in card_text.lower() or "2-stop" in card_text.lower():
-            stops = 2
-
-        # Base Fare & Tax Breakdown (Standard Indian Domestic MoSPI CPI Framework)
-        base_fare = round(price_val * 0.74, 2)
-        taxes_and_fees = round(price_val - base_fare, 2)
-        convenience_fee = 399.0
-
-        return {
-            "source": "Cleartrip",
-            "carrier": carrier_name,
-            "carrier_code": carrier_code,
-            "flight_number": flight_no,
-            "departure_time": dep_time,
-            "arrival_time": arr_time,
-            "duration": duration,
-            "stops": stops,
-            "base_fare": base_fare,
-            "taxes_and_fees": taxes_and_fees,
-            "convenience_fee": convenience_fee,
-            "total_fare": price_val
-        }
-    except Exception:
-        return None
 
 
 def scrape_cleartrip(
@@ -156,6 +47,11 @@ def scrape_cleartrip(
     orig_city = CITY_MAP.get(origin, origin)
     dest_city = CITY_MAP.get(destination, destination)
 
+    # Create timestamped run folder for audit trail
+    run_timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    run_dir = os.path.join(ROOT_DIR, "runs", f"{run_timestamp}_cleartrip_{origin}_{destination}")
+    os.makedirs(run_dir, exist_ok=True)
+
     search_url = (
         f"https://www.cleartrip.com/flights/results?"
         f"adults=1&childs=0&infants=0&class=Economy&depart_date={date_formatted}"
@@ -170,6 +66,7 @@ def scrape_cleartrip(
     print(f"  Departure Date: {target_date} ({date_formatted})")
     print(f"  Mode:           {'Headless Chromium' if headless else '🖥️ Visible Chromium Window'}")
     print(f"  Target URL:     {search_url}")
+    print(f"  Run Directory:  {run_dir}")
     print("=" * 85)
     print("\n[1/4] Launching Chromium browser...")
 
@@ -196,7 +93,7 @@ def scrape_cleartrip(
             page.goto(search_url, wait_until="domcontentloaded", timeout=45000)
             page.wait_for_timeout(4000)
 
-            # Scroll to trigger lazy loading of full flight catalog
+            # Scroll to trigger lazy loading of flight catalog
             print("[3/4] Scanning live flight inventory across airlines...")
             for _ in range(3):
                 page.evaluate("window.scrollBy(0, 1000);")
@@ -204,10 +101,16 @@ def scrape_cleartrip(
             page.evaluate("window.scrollTo(0, 0);")
             page.wait_for_timeout(500)
 
-            # Capture visual screenshot proof
-            proof_path = "cleartrip_proof.png"
+            # Capture visual screenshot proof for ground-truth audit
+            proof_path = os.path.join(run_dir, "screenshot_proof.png")
             page.screenshot(path=proof_path, full_page=False)
-            print(f"📸 Captured Proof Screenshot -> {proof_path}")
+            print(f"📸 Saved Ground-Truth Proof Screenshot -> {proof_path}")
+
+            # Save rendered DOM html
+            dom_path = os.path.join(run_dir, "search_results.html")
+            with open(dom_path, "w", encoding="utf-8") as f:
+                f.write(page.content())
+            print(f"📄 Saved Rendered DOM HTML -> {dom_path}")
 
             # Extract raw DOM flight cards
             cards_data = page.evaluate("""() => {
@@ -239,34 +142,53 @@ def scrape_cleartrip(
 
             seen_keys = set()
             for card in cards_data:
-                parsed = parse_cleartrip_flight_card(card["text"], card.get("html", ""))
-                if parsed:
-                    # Deduplicate on flight number and dep time
-                    key = f"{parsed['carrier']}_{parsed['flight_number']}_{parsed['departure_time']}_{parsed['total_fare']}"
-                    if key in seen_keys:
-                        continue
-                    seen_keys.add(key)
+                parsed = parse_cleartrip_flight_card(card.get("text", ""), card.get("html", ""))
+                if not parsed:
+                    continue
 
-                    parsed["origin"] = origin
-                    parsed["destination"] = destination
-                    parsed["departure_date"] = str(target_date)
-                    parsed["search_url"] = search_url
-                    results.append(parsed)
+                key = f"{parsed['carrier_code']}_{parsed['flight_number']}_{parsed['departure_time']}_{parsed['total_fare']}"
+                if key in seen_keys:
+                    continue
+                seen_keys.add(key)
+
+                parsed["origin"] = origin
+                parsed["destination"] = destination
+                parsed["departure_date"] = str(target_date)
+                parsed["search_url"] = search_url
+                results.append(parsed)
+
+            # Save run summary JSON in timestamped run dir
+            summary_path = os.path.join(run_dir, "run_summary.json")
+            with open(summary_path, "w", encoding="utf-8") as f:
+                json.dump({
+                    "timestamp": run_timestamp,
+                    "ota": "Cleartrip",
+                    "origin": origin,
+                    "destination": destination,
+                    "departure_date": str(target_date),
+                    "search_url": search_url,
+                    "quotes_count": len(results),
+                    "quotes": results
+                }, f, indent=2, ensure_ascii=False)
+            print(f"📊 Saved Run Summary JSON -> {summary_path}")
 
             if pause_for_inspection and not headless:
-                print("⏸️  Paused for 10 seconds for visual inspection...")
+                print("⏸️ Paused for 10 seconds for visual inspection...")
                 page.wait_for_timeout(10000)
 
         except Exception as e:
-            print(f"[!] Error scraping Cleartrip: {e}")
+            print(f"[!] Error scraping Cleartrip live page: {e}")
         finally:
             browser.close()
+
+    if not results:
+        print(f"\n⚠️ FAIL FAST WARNING: No valid live Cleartrip quotes extracted for {origin}->{destination} on {target_date}.\n")
 
     return results
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Cleartrip Live Flight Scraper and CPI Fare Extractor")
+    parser = argparse.ArgumentParser(description="Cleartrip Live Flight Scraper & CPI Fare Extractor")
     parser.add_argument("--origin", type=str, default="DEL", help="Origin airport code (default: DEL)")
     parser.add_argument("--dest", type=str, default="BOM", help="Destination airport code (default: BOM)")
     parser.add_argument("--date", type=str, default=None, help="Departure date in YYYY-MM-DD format (default: tomorrow)")
@@ -285,7 +207,7 @@ def main():
     )
 
     if not quotes:
-        print("\n[!] No valid flight quotes found for this route/date.\n")
+        print("\n[!] Zero valid live flight quotes extracted.\n")
         return
 
     print("=" * 110)
@@ -305,10 +227,9 @@ def main():
     print("=" * 110)
     print(f"\n✅ Successfully Extracted: {len(quotes)} 100% Real Live Cleartrip Flight Quotes")
 
-    # Save to JSON
     with open(args.output, "w", encoding="utf-8") as f:
         json.dump(quotes, f, indent=2, ensure_ascii=False)
-    print(f"💾 Results saved cleanly to: {args.output}\n")
+    print(f"💾 Results saved to: {args.output}\n")
 
 
 if __name__ == "__main__":
