@@ -118,7 +118,7 @@ def run_unified_scraper(
         print(f"\n[!] Zero live quotes returned from {source} for {origin}->{destination} on {target_date}.")
         return
 
-    raw_dicts = [q.model_dump() for q in quotes]
+    raw_dicts = [q.model_dump(mode="json") for q in quotes]
     save_run_artifact(run_dir, "flight_quotes.json", raw_dicts)
 
     print("\n" + "=" * 105)
