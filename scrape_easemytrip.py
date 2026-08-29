@@ -288,18 +288,26 @@ def scrape_easemytrip(
                         }""")
                         checkout_page.wait_for_timeout(6000)
 
-                        # Dismiss any leftover modal popups
+                        # Handle any 'Skip' / 'Skip to Payment' or add-on popups
+                        print("  * Checking and dismissing any 'Skip' / 'Skip to Payment' modals...")
                         checkout_page.evaluate("""() => {
-                            const btns = Array.from(document.querySelectorAll('a, button, div'));
-                            const continueAnyway = btns.find(el => el.innerText && el.innerText.includes('Continue Anyway'));
-                            if (continueAnyway) continueAnyway.click();
+                            // Find and click any Skip or Skip to Payment buttons
+                            const skipBtn = document.querySelector('#skipPop') || 
+                                            document.querySelector('._skipot') || 
+                                            Array.from(document.querySelectorAll('a, button, div')).find(el => {
+                                                const t = (el.innerText || '').toLowerCase().trim();
+                                                return t === 'skip' || t.includes('skip to payment') || t.includes('skip & continue');
+                                            });
+                            if (skipBtn) {
+                                skipBtn.click();
+                            }
                         }""")
                         checkout_page.wait_for_timeout(3000)
 
-                        # Capture Seat Map Proof Screenshot
+                        # Capture updated proof screenshot after clicking Skip
                         seat_screenshot = "live_seat_matrix_screenshot.png"
                         checkout_page.screenshot(path=seat_screenshot, full_page=True)
-                        print(f"📸 Live Aircraft Seat Map Screenshot Captured -> {seat_screenshot}")
+                        print(f"📸 Updated Proof Screenshot Captured (After Skip) -> {seat_screenshot}")
 
                         # Extract Seat Matrix Data
                         seat_matrix = checkout_page.evaluate("""() => {
