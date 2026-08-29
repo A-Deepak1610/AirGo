@@ -1,52 +1,64 @@
 import React from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useRole } from '../../context/RoleContext';
 import { Calendar, Clock, Bell, ChevronDown, Sparkles } from 'lucide-react';
 
-export const Header = ({ activeTab, setActiveTab }) => {
+export const Header = () => {
   const { currentRole, setIsRoleModalOpen } = useRole();
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  const getPageTitle = () => {
-    switch (activeTab) {
-      case 'route_intelligence':
-        return 'DGCA Domestic Route Basket & Index Weights';
-      case 'passenger_demand':
-        return 'Passenger Demand & Traffic Weighting';
-      case 'airfare_index':
-        return 'Airfare Price Index (APIx)';
+  const getPageInfo = () => {
+    switch (location.pathname) {
+      case '/route-intelligence':
+        return { title: 'DGCA Domestic Route Basket & Index Weights', crumb: 'Route Basket & Weights' };
+      case '/airfare-index':
+        return { title: 'Airfare Price Index (APIx) Series', crumb: 'Airfare Index' };
+      case '/fare-analytics':
+        return { title: 'Fare Analytics & Dynamic Pricing', crumb: 'Fare Analytics' };
+      case '/passenger-demand':
+        return { title: 'DGCA Passenger Demand Analysis', crumb: 'Passenger Demand' };
+      case '/anomaly-detection':
+        return { title: 'Surge & Price Anomaly Detection', crumb: 'Anomaly Detection' };
+      case '/data-sources':
+        return { title: 'Data Sources & Connector Health', crumb: 'Data Sources' };
+      case '/scraping-monitor':
+        return { title: 'Scraping Monitor & Evidence Audit', crumb: 'Scraping Monitor' };
+      case '/data-quality':
+        return { title: 'Data Quality & Zero-Dummy Assurance', crumb: 'Data Quality' };
+      case '/historical-data':
+        return { title: 'Historical Airfare & CPI Time Series', crumb: 'Historical Data' };
+      case '/govt-reports':
+        return { title: 'Government & Regulatory Reports', crumb: 'Government Reports' };
+      case '/export-centre':
+        return { title: 'Data Export Centre', crumb: 'Export Centre' };
+      case '/users-roles':
+        return { title: 'Users & Roles (RBAC Management)', crumb: 'Users & Roles' };
+      case '/system-settings':
+        return { title: 'System Settings & Scraper Tuning', crumb: 'System Settings' };
       default:
-        return 'National Airfare Intelligence';
+        return { title: 'National Airfare Intelligence', crumb: 'Dashboard' };
     }
   };
 
-  const getBreadcrumb = () => {
-    switch (activeTab) {
-      case 'route_intelligence':
-        return 'Route Basket & Weights';
-      case 'passenger_demand':
-        return 'Passenger Demand';
-      case 'airfare_index':
-        return 'Airfare Index';
-      default:
-        return 'Dashboard';
-    }
-  };
+  const { title, crumb } = getPageInfo();
 
   return (
     <header className="bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between sticky top-0 z-20 shadow-xs">
       {/* Title & Breadcrumbs */}
       <div>
         <h1 className="text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
-          {getPageTitle()}
+          {title}
         </h1>
         <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
           <button 
-            onClick={() => setActiveTab && setActiveTab('dashboard')}
-            className="hover:text-blue-600 transition-colors"
+            onClick={() => navigate('/')}
+            className="hover:text-blue-600 transition-colors cursor-pointer"
           >
             Home
           </button>
           <span>/</span>
-          <span className="text-slate-800 font-semibold">{getBreadcrumb()}</span>
+          <span className="text-slate-800 font-semibold">{crumb}</span>
         </div>
       </div>
 

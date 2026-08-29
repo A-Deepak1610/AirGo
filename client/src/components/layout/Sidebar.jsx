@@ -1,14 +1,20 @@
 import React from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useRole } from '../../context/RoleContext';
 import { Plane, ChevronRight, RefreshCw, UserCheck, Shield } from 'lucide-react';
 
-export const Sidebar = ({ activeTab, setActiveTab }) => {
+export const Sidebar = () => {
   const { currentRole, setIsRoleModalOpen } = useRole();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   return (
     <aside className="w-64 bg-[#111827] text-slate-300 flex flex-col h-screen sticky top-0 border-r border-slate-800/80 select-none z-30 shrink-0">
       {/* Brand Header */}
-      <div className="p-5 flex items-center gap-3 border-b border-slate-800/80 bg-[#0d131f]">
+      <div 
+        onClick={() => navigate('/')}
+        className="p-5 flex items-center gap-3 border-b border-slate-800/80 bg-[#0d131f] cursor-pointer hover:bg-[#121927] transition-colors"
+      >
         <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-sm shadow-md shadow-blue-500/20">
           AII
         </div>
@@ -32,13 +38,15 @@ export const Sidebar = ({ activeTab, setActiveTab }) => {
             <div className="space-y-0.5 mt-1.5">
               {section.items.map((item) => {
                 const IconComponent = item.icon;
-                const isActive = activeTab === item.id || (activeTab === 'dashboard' && item.id === 'dashboard');
+                const isActive = 
+                  location.pathname === item.path || 
+                  (item.path === '/' && (location.pathname === '' || location.pathname === '/dashboard'));
 
                 return (
                   <button
                     key={item.id}
-                    onClick={() => setActiveTab(item.id)}
-                    className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-xs font-medium transition-colors ${
+                    onClick={() => navigate(item.path)}
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-xs font-medium transition-colors cursor-pointer ${
                       isActive
                         ? 'bg-blue-600 text-white font-semibold shadow-sm'
                         : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
