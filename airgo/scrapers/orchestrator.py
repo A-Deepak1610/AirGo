@@ -7,6 +7,7 @@ from airgo.pipeline.models import RawQuoteSchema, RawQuoteDB, ScraperLogDB
 from airgo.pipeline.db import get_db_session
 from airgo.engine.dgca_weights import DGCA_ROUTES, ADVANCE_WINDOWS
 from airgo.scrapers.playwright_scraper import PlaywrightFlightScraper
+from airgo.scrapers.cleartrip_scraper import CleartripScraper
 from airgo.scrapers.easemytrip_scraper import EaseMyTripScraper
 from airgo.scrapers.ixigo_scraper import IxigoScraper
 
@@ -15,12 +16,13 @@ logger = logging.getLogger("AirGo.Orchestrator")
 
 class ScrapingOrchestrator:
     """
-    Coordinates 100% Real Live Multi-Source Web Scraping in Visible (Non-Headless) Browser Mode.
-    Opens real Chromium browser windows directly on your screen.
+    Coordinates 100% Real Live Multi-Source Web Scraping (Cleartrip, EaseMyTrip, Google Flights, Ixigo).
+    Extracts real airline quotes across DGCA key sectors and advance-purchase windows.
     """
 
     def __init__(self, headless: bool = False):
         self.headless = headless
+        self.cleartrip_scraper = CleartripScraper(headless=headless, rate_limit_secs=0.8)
         self.playwright_scraper = PlaywrightFlightScraper(headless=headless, rate_limit_secs=1.0)
         self.easemytrip_scraper = EaseMyTripScraper(rate_limit_secs=0.8)
         self.ixigo_scraper = IxigoScraper(rate_limit_secs=0.8)
@@ -32,7 +34,7 @@ class ScrapingOrchestrator:
         max_routes: int = 4
     ) -> Dict[str, Any]:
         """
-        Execute live web scrape across target routes x advance-purchase windows with visible browser window.
+        Execute live web scrape across target routes x advance-purchase windows with multi-source fallback.
         """
         run_id = f"RUN-{uuid.uuid4().hex[:8].upper()}"
         start_time = time.time()
@@ -40,7 +42,7 @@ class ScrapingOrchestrator:
         target_routes = routes or list(DGCA_ROUTES.keys())[:max_routes]
         target_windows = windows or list(ADVANCE_WINDOWS.keys())
 
-        logger.info(f"🚀 [Orchestrator] Starting VISIBLE BROWSER Scrape {run_id} | Routes: {len(target_routes)} | Windows: {len(target_windows)}")
+        logger.info(f"🚀 [Orchestrator] Starting Multi-Source Scrape {run_id} | Routes: {len(target_routes)} | Windows: {len(target_windows)}")
         
         total_quotes: List[RawQuoteSchema] = []
         today = date.today()
@@ -59,7 +61,8 @@ class ScrapingOrchestrator:
 
                 t0 = time.time()
                 try:
-                    quotes = self.playwright_scraper.fetch_quotes(
+                    # 1. Primary: Cleartrip OTA Live Scraper
+                    quotes = self.cleartrip_scraper.run_safe(
                         origin=origin,
                         destination=destination,
                         departure_date=departure_date,
@@ -67,6 +70,17 @@ class ScrapingOrchestrator:
                         advance_days=lead_days
                     )
                     
+                    # 2. Secondary: Playwright Browser Engine
+                    if not quotes:
+                        quotes = self.playwright_scraper.fetch_quotes(
+                            origin=origin,
+                            destination=destination,
+                            departure_date=departure_date,
+                            advance_window=win_code,
+                            advance_days=lead_days
+                        )
+
+                    # 3. Tertiary: EaseMyTrip Gateway
                     if not quotes:
                         quotes = self.easemytrip_scraper.run_safe(
                             origin=origin,
@@ -79,7 +93,7 @@ class ScrapingOrchestrator:
                     duration_ms = int((time.time() - t0) * 1000)
                     status = "SUCCESS" if quotes else "EMPTY"
                     
-                    self._save_log(run_id, "Playwright Visible Chromium", route_code, win_code, departure_date, status, len(quotes), duration_ms)
+                    self._save_log(run_id, "Cleartrip/Playwright Multi-Source", route_code, win_code, departure_date, status, len(quotes), duration_ms)
                     total_quotes.extend(quotes)
                 except Exception as e:
                     duration_ms = int((time.time() - t0) * 1000)
