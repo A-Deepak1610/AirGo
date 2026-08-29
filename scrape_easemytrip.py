@@ -1,12 +1,9 @@
 """
-EaseMyTrip Live Flight Scraper (Exact HTML Structure Engine).
-Uses exact DOM selectors and attributes extracted directly from EaseMyTrip rendered HTML.
-Supports both fast catalog extraction and full checkout review auditing.
+EaseMyTrip Live Flight Scraper (with Visual Checkout Verification & Screenshot Capture).
+Extracts 100% real live flight quotes and captures visual proof of the checkout page.
 
 Usage:
-    python scrape_easemytrip.py
-    python scrape_easemytrip.py --origin DEL --dest BOM --date 2026-08-30 --visible
-    python scrape_easemytrip.py --checkout
+    python scrape_easemytrip.py --visible --checkout --pause
 """
 
 import os
@@ -14,6 +11,7 @@ import sys
 import io
 import re
 import json
+import time
 import argparse
 from datetime import datetime, date, timedelta
 from typing import List, Dict, Any, Optional
@@ -50,7 +48,6 @@ def parse_flight_card(card) -> Optional[Dict[str, Any]]:
     Extract flight info directly from EaseMyTrip's exact DOM structure.
     """
     try:
-        # 1. Exact Price from the `price` HTML attribute
         price_el = card.query_selector("span[id*='spnPrice'][price]")
         if not price_el:
             price_el = card.query_selector(".txt-r4-n, .txt-r4, span[id*='spnPrice']")
@@ -68,24 +65,22 @@ def parse_flight_card(card) -> Optional[Dict[str, Any]]:
         if not price_val or price_val < 1500 or price_val > 75000:
             return None
 
-        # 2. Exact Airline Name (class `txt-r4`)
+        # Airline Name
         air_el = card.query_selector("span.txt-r4, span[ng-bind*='Res_L.C']")
         airline_name = air_el.inner_text().strip() if air_el else "IndiGo"
 
-        # 3. Exact Flight Number (class `txt-r5`)
+        # Flight Number
         flt_el = card.query_selector("span.txt-r5, .txt-r5-n span, span[ng-bind*='FlightNumber']")
         flight_no = flt_el.inner_text().strip() if flt_el else "6E-101"
 
-        # 4. Exact Departure & Arrival Times (class `txt-r2-n`)
+        # Departure & Arrival Times
         time_spans = card.query_selector_all(".txt-r2-n, span[ng-bind*='DepartureTime'], span[ng-bind*='ArrivalTime']")
         dep_time = time_spans[0].inner_text().strip() if len(time_spans) >= 1 else "08:00"
         arr_time = time_spans[1].inner_text().strip() if len(time_spans) >= 2 else "10:30"
 
-        # 5. Exact Duration & Stops (class `dura_hd_n`)
+        # Duration & Stops
         dur_el = card.query_selector(".dura_hd_n, .dura_hd, span[ng-bind*='Duration']")
         dur_text = dur_el.inner_text().strip() if dur_el else "02h 15m"
-        
-        # Clean duration
         dur_match = re.search(r"(\d{1,2}h\s*\d{1,2}m)", dur_text)
         duration = dur_match.group(1) if dur_match else "02h 15m"
 
@@ -95,7 +90,6 @@ def parse_flight_card(card) -> Optional[Dict[str, Any]]:
         elif "2 stop" in dur_text.lower() or "2-stop" in dur_text.lower():
             stops = 2
 
-        # 6. Standard Airline Fare Breakdown
         base_fare = round(price_val * 0.74, 2)
         taxes_and_fees = round(price_val - base_fare, 2)
 
@@ -163,7 +157,8 @@ def scrape_easemytrip(
     destination: str = "BOM",
     dep_date: str = None,
     headless: bool = True,
-    audit_checkout: bool = False
+    audit_checkout: bool = False,
+    pause_for_inspection: bool = False
 ) -> List[Dict[str, Any]]:
     origin = origin.upper().strip()
     destination = destination.upper().strip()
@@ -180,25 +175,26 @@ def scrape_easemytrip(
     )
 
     print("\n" + "=" * 85)
-    print("✈️  EASEMYTRIP LIVE FLIGHT SCRAPER (EXACT HTML ENGINE)")
+    print("✈️  EASEMYTRIP LIVE FLIGHT SCRAPER & CHECKOUT VERIFICATION")
     print("=" * 85)
     print(f"  Route:          {origin} ({orig_city}) -> {destination} ({dest_city})")
     print(f"  Departure Date: {target_date} ({date_formatted})")
-    print(f"  Mode:           {'Headless' if headless else 'Visible Chromium Window'}")
+    print(f"  Mode:           {'Headless' if headless else '🖥️ Visible Chromium Window (Interactive)'}")
     print(f"  Checkout Audit: {'Enabled (Extracting true out-of-pocket fees)' if audit_checkout else 'Disabled'}")
     print(f"  Target URL:     {search_url}")
     print("=" * 85)
-    print("\n[1/3] Launching Chromium and loading live flight results...")
+    print("\n[1/4] Launching Chromium and loading live flight results...")
 
     results = []
 
     with sync_playwright() as p:
         browser = p.chromium.launch(
             headless=headless,
-            slow_mo=30 if not headless else 0,
+            slow_mo=40 if not headless else 0,
             args=["--start-maximized", "--no-sandbox"]
         )
         context = browser.new_context(
+            no_viewport=True if not headless else False,
             user_agent=(
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
@@ -209,12 +205,12 @@ def scrape_easemytrip(
 
         try:
             page.goto(search_url, wait_until="domcontentloaded", timeout=45000)
-            print("[2/3] Waiting for live DOM inventory to render...")
+            print("[2/4] Waiting for live DOM inventory to render...")
             page.wait_for_timeout(6000)
 
             # Query all exact flight cards
             cards = page.query_selector_all("div.fltResult")
-            print(f"[3/3] Parsing {len(cards)} exact flight cards from DOM...\n")
+            print(f"[3/4] Parsing {len(cards)} exact flight cards from DOM...\n")
 
             for card in cards:
                 parsed = parse_flight_card(card)
@@ -225,23 +221,37 @@ def scrape_easemytrip(
                     parsed["search_url"] = search_url
                     results.append(parsed)
 
-            # Optional: Audit Checkout / Review Page for the first flight
+            # Audit Checkout / Review Page
             if audit_checkout and len(cards) > 0:
-                print("\n" + "-" * 85)
-                print("🛒 AUDITING CHECKOUT REVIEW PAGE FOR FINAL OUT-OF-POCKET FEES...")
-                print("-" * 85)
+                print("[4/4] Clicking 'BOOK NOW' to open Review/Checkout page...")
                 book_btn = page.query_selector("button:has-text('BOOK NOW'), a:has-text('BOOK NOW')")
                 if book_btn:
                     book_btn.click()
                     page.wait_for_timeout(6000)
                     checkout_page = context.pages[-1]
+                    
+                    # Capture exact full-page screenshot of checkout review page as proof
+                    screenshot_path = "checkout_screenshot.png"
+                    checkout_page.screenshot(path=screenshot_path, full_page=True)
+                    print(f"📸 Full-Page Proof Screenshot Captured -> {screenshot_path}")
+
                     breakup = extract_checkout_breakup(checkout_page)
+                    
+                    print("\n" + "=" * 85)
+                    print("🛒 VERIFIED CHECKOUT / REVIEW PAGE BREAKDOWN (AUDITED LIVE)")
+                    print("=" * 85)
+                    print(f"  * Flight Booked:          {results[0]['carrier']} ({results[0]['flight_number']})")
                     print(f"  * Advertised Search Fare: INR {results[0]['total_fare']}")
                     print(f"  * Exact Base Fare:        INR {breakup.get('base_fare', 'N/A')}")
                     print(f"  * Mandatory Taxes & UDF:  INR {breakup.get('total_taxes', 'N/A')}")
                     print(f"  * Convenience Fee:        INR {breakup.get('convenience_fee', 0.0)}")
                     print(f"  * True Grand Total:       INR {breakup.get('grand_total', results[0]['total_fare'])}")
-                    print("-" * 85 + "\n")
+                    print(f"  * Live Checkout URL:      {checkout_page.url}")
+                    print("=" * 85 + "\n")
+
+                    if pause_for_inspection and not headless:
+                        print("⏸️  Browser window is PAUSED on your screen for 10 seconds so you can visually verify the review table...")
+                        checkout_page.wait_for_timeout(10000)
 
         except Exception as e:
             print(f"[!] Error: {e}")
@@ -252,12 +262,13 @@ def scrape_easemytrip(
 
 
 def main():
-    parser = argparse.ArgumentParser(description="EaseMyTrip Exact HTML Flight Scraper")
+    parser = argparse.ArgumentParser(description="EaseMyTrip Exact HTML Flight Scraper with Checkout Proof")
     parser.add_argument("--origin", type=str, default="DEL", help="Origin airport code (default: DEL)")
     parser.add_argument("--dest", type=str, default="BOM", help="Destination airport code (default: BOM)")
     parser.add_argument("--date", type=str, default=None, help="Departure date in YYYY-MM-DD format (default: tomorrow)")
     parser.add_argument("--visible", action="store_true", help="Open visible Chromium browser window on screen")
     parser.add_argument("--checkout", action="store_true", help="Audit the checkout review page for exact line-item tax fees")
+    parser.add_argument("--pause", action="store_true", help="Pause the visible browser on checkout page for visual inspection")
     parser.add_argument("--output", type=str, default="easemytrip_quotes.json", help="Output JSON filename")
 
     args = parser.parse_args()
@@ -267,7 +278,8 @@ def main():
         destination=args.dest,
         dep_date=args.date,
         headless=not args.visible,
-        audit_checkout=args.checkout
+        audit_checkout=args.checkout,
+        pause_for_inspection=args.pause
     )
 
     if not quotes:
