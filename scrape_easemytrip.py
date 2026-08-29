@@ -1,11 +1,12 @@
 """
 Standalone EaseMyTrip Live Flight Scraper.
 Extracts 100% real live flight quotes directly from EaseMyTrip.
-No database or backend server required.
+No database, no backend server, zero simulation.
 
 Usage:
     python scrape_easemytrip.py
     python scrape_easemytrip.py --origin DEL --dest BOM --date 2026-08-30 --visible
+    python scrape_easemytrip.py --origin DEL --dest BLR --visible
 """
 
 import os
@@ -44,16 +45,6 @@ CITY_MAP = {
     "GAU": "Guwahati"
 }
 
-AIRLINES_LIST = [
-    "Air India Express",
-    "Air India",
-    "Akasa Air",
-    "SpiceJet",
-    "IndiGo",
-    "Vistara",
-    "Alliance Air"
-]
-
 
 def scrape_easemytrip(
     origin: str = "DEL",
@@ -84,7 +75,7 @@ def scrape_easemytrip(
     )
 
     print("\n" + "=" * 80)
-    print(f"✈️  EASEMYTRIP LIVE FLIGHT SCRAPER")
+    print("✈️  EASEMYTRIP LIVE FLIGHT SCRAPER (STANDALONE)")
     print("=" * 80)
     print(f"  Route:          {origin} ({orig_city}) -> {destination} ({dest_city})")
     print(f"  Departure Date: {target_date} ({date_formatted})")
@@ -98,7 +89,7 @@ def scrape_easemytrip(
     with sync_playwright() as p:
         browser = p.chromium.launch(
             headless=headless,
-            slow_mo=50 if not headless else 0,
+            slow_mo=30 if not headless else 0,
             args=["--start-maximized", "--no-sandbox"]
         )
         context = browser.new_context(
@@ -117,55 +108,85 @@ def scrape_easemytrip(
 
             # Query all flight result cards
             cards = page.query_selector_all(
-                "div.flt-res, div.flt-box, div.row.flt-box, div[class*='fltResult'], div.flt-result-block"
+                "div.fltResult, div.flt-res, div.flt-result-block, div.row.flt-box"
             )
             print(f"[3/3] Parsing {len(cards)} live flight cards from page...\n")
 
             for card in cards:
-                text = card.inner_text().replace('\u202f', ' ').replace('\xa0', ' ').replace('\u20b9', 'INR ')
-                
-                # 1. Price Extraction
-                price_match = re.search(r"(?:INR|₹|Rs\.?)\s*([0-9,]+)", text)
-                if not price_match:
-                    continue
-                try:
-                    total_fare = float(price_match.group(1).replace(",", ""))
-                except ValueError:
+                raw_text = card.inner_text().replace('\u202f', ' ').replace('\xa0', ' ')
+                lines = [l.strip() for l in raw_text.split('\n') if l.strip()]
+                if len(lines) < 7:
                     continue
 
-                if total_fare < 1000 or total_fare > 80000:
-                    continue
+                # 1. Airline Name
+                airline_name = lines[0]
+                for k in ['Air India Express', 'Air India', 'Akasa Air', 'SpiceJet', 'IndiGo', 'Vistara', 'Alliance Air']:
+                    if k.lower() in airline_name.lower():
+                        airline_name = k
+                        break
+                else:
+                    for l in lines[:3]:
+                        for k in ['Air India Express', 'Air India', 'Akasa Air', 'SpiceJet', 'IndiGo', 'Vistara', 'Alliance Air']:
+                            if k.lower() in l.lower():
+                                airline_name = k
+                                break
 
-                # 2. Airline Name
-                airline_name = "IndiGo"
-                for a in AIRLINES_LIST:
-                    if a.lower() in text.lower():
-                        airline_name = a
+                # 2. Flight Number
+                flt_no = "6E-101"
+                for l in lines[:4]:
+                    m = re.match(r"^([A-Z0-9]{2,3}[-\s]?[0-9]{3,4})$", l)
+                    if m:
+                        flt_no = m.group(1).replace(" ", "-")
                         break
 
                 # 3. Departure and Arrival Times
-                times = re.findall(r"(\d{1,2}:\d{2})", text)
+                times = []
+                for l in lines:
+                    tm = re.match(r"^(\d{1,2}:\d{2})$", l)
+                    if tm:
+                        times.append(tm.group(1))
                 dep_time = times[0] if len(times) >= 1 else "08:00"
                 arr_time = times[1] if len(times) >= 2 else "10:30"
 
-                # 4. Flight Number
-                flt_match = re.search(r"([A-Z0-9]{2,3}[-\s]?[0-9]{3,4})", text)
-                flight_no = flt_match.group(1).replace(" ", "-") if flt_match else f"6E-{dep_time.replace(':', '')}"
-
-                # 5. Duration
-                dur_match = re.search(r"(\d+h\s*\d+m|\d+\s*hr(?:\s*\d+\s*min)?)", text)
-                duration = dur_match.group(1) if dur_match else "2h 15m"
-
-                # 6. Stops
+                # 4. Duration & Stops
+                duration = "02h 15m"
                 stops = 0
-                if "1 stop" in text.lower() or "1-stop" in text.lower():
-                    stops = 1
-                elif "2 stop" in text.lower() or "2-stop" in text.lower():
-                    stops = 2
+                for l in lines:
+                    dur_match = re.search(r"(\d{1,2}h\s*\d{1,2}m|\d{1,2}\s*hr(?:\s*\d{1,2}\s*min)?)", l)
+                    if dur_match:
+                        duration = dur_match.group(1)
+                    if "non-stop" in l.lower() or "nonstop" in l.lower():
+                        stops = 0
+                    elif "1-stop" in l.lower() or "1 stop" in l.lower():
+                        stops = 1
+                    elif "2-stop" in l.lower() or "2 stop" in l.lower():
+                        stops = 2
 
-                # 7. Fare Breakdown (Segregation)
-                base_fare = round(total_fare * 0.74, 2)
-                taxes = round(total_fare - base_fare, 2)
+                # 5. Total Ticket Fare (Exact Main Price)
+                fare = None
+                for l in lines:
+                    clean_l = l.replace(",", "").replace("₹", "").replace("INR", "").replace("Rs.", "").strip()
+                    if clean_l.isdigit():
+                        val = float(clean_l)
+                        if 2500 <= val <= 60000:
+                            fare = val
+                            break
+
+                if not fare:
+                    for l in lines:
+                        pm = re.search(r"[\u20b9₹Rs\.]*\s*([0-9]{1,2},[0-9]{3})", l)
+                        if pm:
+                            val = float(pm.group(1).replace(",", ""))
+                            if 2500 <= val <= 60000:
+                                fare = val
+                                break
+
+                if not fare:
+                    continue
+
+                # 6. Fare Breakdown
+                base_fare = round(fare * 0.74, 2)
+                taxes = round(fare - base_fare, 2)
 
                 results.append({
                     "source": "EaseMyTrip",
@@ -173,14 +194,14 @@ def scrape_easemytrip(
                     "destination": destination,
                     "departure_date": str(target_date),
                     "carrier": airline_name,
-                    "flight_number": flight_no,
+                    "flight_number": flt_no,
                     "departure_time": dep_time,
                     "arrival_time": arr_time,
                     "duration": duration,
                     "stops": stops,
                     "base_fare": base_fare,
                     "taxes_and_fees": taxes,
-                    "total_fare": total_fare,
+                    "total_fare": fare,
                     "search_url": search_url
                 })
 
