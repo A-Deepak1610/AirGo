@@ -1,10 +1,10 @@
 """
 EaseMyTrip 100% Real Live Seat Data & Payment Extraction Engine.
 STRICT ZERO-SYNTHETIC DATA RULE:
-- Accurately targets the modal popup and clicks 'Let Me Choose Myself'
-- Loads the full interactive aircraft cabin seat map
-- Extracts 100% genuine DOM seat numbers and live seat inventory
-- Saves all artifacts into a timestamped folder (runs/YYYY-MM-DD_HH-MM-SS_<prefix>/)
+- Extracts full flight quotes, checkout fare breakup, and live cabin seats directly from live DOM.
+- Accurately targets the modal popup and clicks 'Let Me Choose Myself'.
+- Stores flight_quotes.json, checkout_fare_breakup.json, real_live_seat_data.json,
+  and run_summary.json cleanly in runs/YYYY-MM-DD_HH-MM-SS_<prefix>/.
 """
 
 import os
@@ -14,6 +14,7 @@ import re
 import json
 import argparse
 from datetime import datetime
+from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 
 from airgo.utils.run_manager import create_run_directory, save_run_artifact
@@ -24,6 +25,113 @@ if sys.stdout.encoding != "utf-8":
         sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
     except Exception:
         pass
+
+
+def parse_flight_cards(html_content: str, origin: str = "DEL", destination: str = "BOM", dep_date: str = "30/08/2026"):
+    """
+    Parses exact flight cards from rendered search DOM.
+    """
+    soup = BeautifulSoup(html_content, "html.parser")
+    cards = soup.select("div.fltResult")
+    flights = []
+
+    for card in cards:
+        # Airline Name
+        airline_el = card.select_one("span.txt-r4") or card.select_one("span.air-name")
+        airline = airline_el.get_text(strip=True) if airline_el else "Unknown"
+
+        # Flight Number
+        flt_num_el = card.select_one("span.txt-r5") or card.select_one("span.flt-num")
+        flt_num = flt_num_el.get_text(strip=True) if flt_num_el else "N/A"
+
+        # Times
+        times = [t.get_text(strip=True) for t in card.select("span.txt-r2-n")]
+        dep_time = times[0] if len(times) > 0 else "N/A"
+        arr_time = times[1] if len(times) > 1 else "N/A"
+
+        # Duration
+        dur_el = card.select_one("span.dura_md") or card.select_one("span.non-stop")
+        duration = dur_el.get_text(strip=True) if dur_el else "N/A"
+
+        # Price tag
+        price_el = card.select_one("span[id*='spnPrice']") or card.select_one("div.col-md-2 span[price]")
+        total_fare = None
+        if price_el:
+            if price_el.has_attr("price"):
+                try:
+                    total_fare = float(price_el["price"])
+                except Exception:
+                    pass
+            if total_fare is None:
+                clean_txt = re.sub(r"[^\d.]", "", price_el.get_text())
+                if clean_txt:
+                    total_fare = float(clean_txt)
+
+        if total_fare is not None:
+            flights.append({
+                "carrier": airline,
+                "flight_number": flt_num,
+                "origin": origin,
+                "destination": destination,
+                "departure_date": dep_date,
+                "departure_time": dep_time,
+                "arrival_time": arr_time,
+                "duration": duration,
+                "total_fare": total_fare
+            })
+
+    return flights
+
+
+def extract_checkout_breakup_from_page(checkout_page):
+    """
+    Extracts base fare, taxes, and grand total directly from the live DOM.
+    """
+    return checkout_page.evaluate(r"""() => {
+        let baseFare = null;
+        let totalTaxes = null;
+        let grandTotal = null;
+
+        // Base fare
+        const baseEl = document.querySelector('#spnBasePrice') || document.querySelector('.base-fare-price');
+        if (baseEl) {
+            const clean = baseEl.innerText.replace(/[^0-9.]/g, '');
+            if (clean) baseFare = parseFloat(clean);
+        }
+
+        // Taxes
+        const taxEl = document.querySelector('#spnTax') || document.querySelector('.tax-price');
+        if (taxEl) {
+            const clean = taxEl.innerText.replace(/[^0-9.]/g, '');
+            if (clean) totalTaxes = parseFloat(clean);
+        }
+
+        // Grand Total
+        const grandEl = document.querySelector('#spnGrandTotal') || document.querySelector('#spnTotal') || document.querySelector('.totl-fre');
+        if (grandEl) {
+            const clean = grandEl.innerText.replace(/[^0-9.]/g, '');
+            if (clean) grandTotal = parseFloat(clean);
+        }
+
+        // Fallback: parse text blocks
+        if (baseFare === null || totalTaxes === null || grandTotal === null) {
+            const allText = document.body.innerText;
+            const bMatch = allText.match(/Base Fare[^\d]*([\d,]+(?:\.\d+)?)/i);
+            if (bMatch && baseFare === null) baseFare = parseFloat(bMatch[1].replace(/,/g, ''));
+
+            const tMatch = allText.match(/(?:Taxes|Fee & Surcharges|Other Surcharges)[^\d]*([\d,]+(?:\.\d+)?)/i);
+            if (tMatch && totalTaxes === null) totalTaxes = parseFloat(tMatch[1].replace(/,/g, ''));
+
+            const gMatch = allText.match(/Grand Total[^\d]*([\d,]+(?:\.\d+)?)/i);
+            if (gMatch && grandTotal === null) grandTotal = parseFloat(gMatch[1].replace(/,/g, ''));
+        }
+
+        return {
+            base_fare: baseFare,
+            total_taxes: totalTaxes,
+            grand_total: grandTotal
+        };
+    }""")
 
 
 def run_live_seat_extractor(visible: bool = False, pause: bool = False):
@@ -53,14 +161,22 @@ def run_live_seat_extractor(visible: bool = False, pause: bool = False):
         )
         page = context.new_page()
 
-        search_url = "https://flight.easemytrip.com/FlightList/Index?srch=DEL-Delhi-India|BOM-Mumbai-India|30/08/2026&px=1-0-0&cbn=0&ar=undefined&isDM=true&IsDoubleSeat=false&C=IN"
+        origin = "DEL"
+        destination = "BOM"
+        dep_date = "30/08/2026"
+        search_url = f"https://flight.easemytrip.com/FlightList/Index?srch={origin}-Delhi-India|{destination}-Mumbai-India|{dep_date}&px=1-0-0&cbn=0&ar=undefined&isDM=true&IsDoubleSeat=false&C=IN"
+        
         print("\n[1/5] Loading live flight search...")
         page.goto(search_url, wait_until="domcontentloaded", timeout=45000)
         page.wait_for_timeout(6000)
 
-        # Save rendered search DOM
+        # Save rendered search DOM & Parse Flight Quotes
         search_html = page.content()
         save_run_artifact(run_dir, "search_results.html", search_html)
+        
+        flight_quotes = parse_flight_cards(search_html, origin, destination, dep_date)
+        save_run_artifact(run_dir, "flight_quotes.json", flight_quotes)
+        print(f"  ✓ Parsed {len(flight_quotes)} genuine live flight quotes -> {os.path.join(run_dir, 'flight_quotes.json')}")
 
         # 1. Click Book Now
         print("[2/5] Navigating to Review/Checkout...")
@@ -77,8 +193,13 @@ def run_live_seat_extractor(visible: bool = False, pause: bool = False):
         checkout_page.wait_for_load_state("domcontentloaded")
         checkout_page.wait_for_timeout(3000)
 
-        # Save review DOM
-        save_run_artifact(run_dir, "checkout_review.html", checkout_page.content())
+        # Save review DOM & Parse Checkout Fare Breakup
+        checkout_html = checkout_page.content()
+        save_run_artifact(run_dir, "checkout_review.html", checkout_html)
+
+        fare_breakup = extract_checkout_breakup_from_page(checkout_page)
+        save_run_artifact(run_dir, "checkout_fare_breakup.json", fare_breakup)
+        print(f"  ✓ Parsed live checkout fare breakup -> {os.path.join(run_dir, 'checkout_fare_breakup.json')}")
 
         # 2. Fill Guest Contact & Passenger info
         print("[3/5] Auto-filling passenger form...")
@@ -146,7 +267,8 @@ def run_live_seat_extractor(visible: bool = False, pause: bool = False):
                 const title = el.getAttribute('title') || el.innerText || '';
                 const cls = el.className || '';
 
-                let seatNo = id.replace(/^[A-Z0-9]+_[A-Z0-9]+/, '');
+                // Clean real seat number correctly by stripping origin_destination prefix (e.g. DEL_BOM9-D -> 9-D)
+                let seatNo = id.replace(/^[A-Z]{3}_[A-Z]{3}/, '');
                 if (!seatNo || seatNo.length < 2) {
                     seatNo = el.innerText.trim();
                 }
@@ -204,19 +326,24 @@ def run_live_seat_extractor(visible: bool = False, pause: bool = False):
             print("=" * 90 + "\n")
 
             save_run_artifact(run_dir, "real_live_seat_data.json", real_seat_result)
-            print(f"💾 100% Real Live Seat Data Saved -> {os.path.join(run_dir, 'real_live_seat_data.json')}\n")
+            print(f"💾 100% Real Live Seat Data Saved -> {os.path.join(run_dir, 'real_live_seat_data.json')}")
 
-        # Save run summary metadata
+        # Save run summary metadata with origin, destination, and fare summary
         summary_metadata = {
             "run_timestamp": datetime.now().isoformat(),
             "run_directory": run_dir,
-            "route": "DEL -> BOM",
-            "date": "30/08/2026",
+            "route": f"{origin} -> {destination}",
+            "origin": origin,
+            "destination": destination,
+            "departure_date": dep_date,
+            "total_flights_scraped": len(flight_quotes),
+            "fare_breakup": fare_breakup,
             "available_seats_count": real_seat_result.get("totalLiveAvailableSeats"),
             "selected_seat": real_seat_result.get("clickedSeatNumber"),
             "selected_dom_id": real_seat_result.get("clickedSeatRawId")
         }
         save_run_artifact(run_dir, "run_summary.json", summary_metadata)
+        print(f"💾 Run Summary Saved -> {os.path.join(run_dir, 'run_summary.json')}\n")
 
         if pause and visible:
             print("⏸️  Browser window is PAUSED on your screen for 20 seconds so you can see the full seat map...")
