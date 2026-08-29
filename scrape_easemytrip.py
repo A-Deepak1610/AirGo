@@ -187,7 +187,7 @@ def scrape_easemytrip(
     print(f"  Departure Date: {target_date} ({date_formatted})")
     print(f"  Mode:           {'Headless' if headless else '🖥️ Visible Chromium Window (Interactive)'}")
     print(f"  Checkout Audit: {'Enabled' if (audit_checkout or extract_occupancy) else 'Disabled'}")
-    print(f"  Seat Occupancy: {'Enabled (Automating contact entry to load aircraft seat map)' if extract_occupancy else 'Disabled'}")
+    print(f"  Seat Occupancy: {'Enabled (Automating contact entry & rendering seat map)' if extract_occupancy else 'Disabled'}")
     print(f"  Target URL:     {search_url}")
     print("=" * 85)
     print("\n[1/5] Launching Chromium and loading live flight results...")
@@ -197,7 +197,7 @@ def scrape_easemytrip(
     with sync_playwright() as p:
         browser = p.chromium.launch(
             headless=headless,
-            slow_mo=40 if not headless else 0,
+            slow_mo=50 if not headless else 0,
             args=["--start-maximized", "--no-sandbox"]
         )
         context = browser.new_context(
@@ -231,157 +231,179 @@ def scrape_easemytrip(
             # Audit Checkout / Review Page
             if (audit_checkout or extract_occupancy) and len(cards) > 0:
                 print("[4/5] Clicking 'BOOK NOW' to open Review/Checkout page...")
-                book_btn = page.query_selector("button:has-text('BOOK NOW'), a:has-text('BOOK NOW')")
-                if book_btn:
+                book_btn = page.query_selector("button:has-text('BOOK NOW'), a:has-text('BOOK NOW'), .btn-book, [class*='book-btn']")
+                if not book_btn:
+                    page.evaluate("""() => {
+                        const b = document.querySelector('button[ng-click*=\"BookNow\"], button:not([disabled])');
+                        if (b) b.click();
+                    }""")
+                else:
                     book_btn.click()
-                    page.wait_for_timeout(6000)
-                    checkout_page = context.pages[-1]
-                    
-                    # Capture exact full-page screenshot of checkout review page
-                    screenshot_path = "checkout_screenshot.png"
-                    checkout_page.screenshot(path=screenshot_path, full_page=True)
-                    print(f"📸 Checkout Proof Screenshot Captured -> {screenshot_path}")
+                page.wait_for_timeout(5000)
 
-                    breakup = extract_checkout_breakup(checkout_page)
+                # Switch to new tab if opened
+                if len(context.pages) > 1:
+                    checkout_page = context.pages[-1]
+                else:
+                    checkout_page = page
+
+                checkout_page.wait_for_load_state("domcontentloaded")
+                checkout_page.wait_for_timeout(3000)
+                
+                # Capture exact full-page screenshot of checkout review page
+                screenshot_path = "checkout_screenshot.png"
+                checkout_page.screenshot(path=screenshot_path, full_page=True)
+                print(f"📸 Checkout Proof Screenshot Captured -> {screenshot_path}")
+
+                breakup = extract_checkout_breakup(checkout_page)
+                
+                print("\n" + "=" * 85)
+                print("🛒 VERIFIED CHECKOUT / REVIEW PAGE BREAKDOWN (AUDITED LIVE)")
+                print("=" * 85)
+                print(f"  * Flight Booked:          {results[0]['carrier']} ({results[0]['flight_number']})")
+                print(f"  * Advertised Search Fare: INR {results[0]['total_fare']}")
+                print(f"  * Exact Base Fare:        INR {breakup.get('base_fare', 'N/A')}")
+                print(f"  * Mandatory Taxes & UDF:  INR {breakup.get('total_taxes', 'N/A')}")
+                print(f"  * Convenience Fee:        INR {breakup.get('convenience_fee', 0.0)}")
+                print(f"  * True Grand Total:       INR {breakup.get('grand_total', results[0]['total_fare'])}")
+                print(f"  * Live Checkout URL:      {checkout_page.url}")
+                print("=" * 85 + "\n")
+
+                # If Seat Map Occupancy requested: enter contact details & advance to Seat Map
+                if extract_occupancy:
+                    print("[5/5] Automating Contact & Passenger Details to load Live Aircraft Seat Map...")
                     
+                    # 1. Fill Guest Contact & Passenger info
+                    checkout_page.evaluate("""() => {
+                        const email = document.querySelector('#txtEmailId') || document.querySelector('#txtEmailAdult0') || document.querySelector('input[placeholder*=\"Email\"]');
+                        if (email) { email.value = 'audit.flight@airgo.in'; email.dispatchEvent(new Event('input', {bubbles: true})); }
+                        
+                        const phone = document.querySelector('#txtCPhone') || document.querySelector('#txtCPhoneAdult0') || document.querySelector('input[placeholder*=\"Mobile\"]');
+                        if (phone) { phone.value = '9876543210'; phone.dispatchEvent(new Event('input', {bubbles: true})); }
+
+                        const title = document.querySelector('#titleAdult0');
+                        if (title) { title.value = 'Mr'; title.dispatchEvent(new Event('change', {bubbles: true})); }
+
+                        const fn = document.querySelector('#txtFNAdult0');
+                        if (fn) { fn.value = 'Arun'; fn.dispatchEvent(new Event('input', {bubbles: true})); }
+
+                        const ln = document.querySelector('#txtLNAdult0');
+                        if (ln) { ln.value = 'Kumar'; ln.dispatchEvent(new Event('input', {bubbles: true})); }
+
+                        const noIns = document.querySelector('#notinsure') || document.querySelector('.insur-no');
+                        if (noIns) noIns.click();
+                    }""")
+                    checkout_page.wait_for_timeout(2000)
+
+                    # 2. Click Continue Booking
+                    print("  * Clicking 'Continue Booking'...")
+                    checkout_page.evaluate("""() => {
+                        const btn = document.querySelector('#spnTransaction') || 
+                                    document.querySelector('.con1') || 
+                                    document.querySelector('#divContinueReview2') || 
+                                    document.querySelector('.srch-fill') ||
+                                    Array.from(document.querySelectorAll('span, div, button, a')).find(el => (el.innerText || '').toLowerCase().includes('continue booking'));
+                        if (btn) btn.click();
+                    }""")
+                    checkout_page.wait_for_timeout(5000)
+
+                    # 3. Handle 'Let Me Choose Myself' or Add-on Modal
+                    print("  * Selecting 'Let Me Choose Myself' on Seat Selection Modal...")
+                    checkout_page.evaluate("""() => {
+                        const allElements = Array.from(document.querySelectorAll('a, button, div, span, p, label'));
+                        const chooseBtn = allElements.find(el => {
+                            const txt = (el.innerText || '').toLowerCase().trim();
+                            return txt.includes('let me choose') || 
+                                   txt.includes('choose myself') || 
+                                   txt.includes('choose your preferred seat') || 
+                                   txt.includes('choose your seats') || 
+                                   txt.includes('+ add seat') ||
+                                   txt.includes('select seat');
+                        });
+                        if (chooseBtn) {
+                            chooseBtn.click();
+                        } else {
+                            const seatArea = document.querySelector('#seatArea') || document.querySelector('.ml-h1-seat');
+                            if (seatArea) seatArea.click();
+                        }
+                    }""")
+                    checkout_page.wait_for_timeout(5000)
+
+                    # Scroll down to make Seat Map fully visible in the browser viewport
+                    checkout_page.evaluate("""() => {
+                        const seatMapEl = document.querySelector('#seatArea') || document.querySelector('.seat-layout') || document.querySelector('[class*=\"seat\"]');
+                        if (seatMapEl) seatMapEl.scrollIntoView({behavior: 'smooth', block: 'center'});
+                    }""")
+                    checkout_page.wait_for_timeout(2000)
+
+                    # Capture Seat Map Proof Screenshot
+                    seat_screenshot = "live_seat_matrix_screenshot.png"
+                    checkout_page.screenshot(path=seat_screenshot, full_page=True)
+                    print(f"📸 Live Aircraft Seat Map Screenshot Captured -> {seat_screenshot}")
+
+                    # Extract Seat Matrix Data
+                    seat_matrix = checkout_page.evaluate("""() => {
+                        const allSeats = document.querySelectorAll('[class*=\"seat\"], [class*=\"Seat\"], [data-seat], div.seat_n, span.seat_n, .st-bl, .st-occ, .st-avl, .st_free, .st_paid');
+                        let occupied = 0;
+                        let available = 0;
+                        let free = 0;
+                        let paid = 0;
+                        const prices = new Set();
+
+                        allSeats.forEach(s => {
+                            const cls = (s.className || '').toLowerCase();
+                            const title = (s.getAttribute('title') || '').toLowerCase();
+                            const priceAttr = s.getAttribute('data-price') || s.getAttribute('price');
+                            
+                            if (cls.includes('occ') || cls.includes('book') || cls.includes('blocked') || title.includes('occupied') || title.includes('booked')) {
+                                occupied++;
+                            } else if (cls.includes('avl') || cls.includes('avail') || cls.includes('free') || cls.includes('paid')) {
+                                available++;
+                                if (cls.includes('free') || priceAttr === '0') free++;
+                                if (cls.includes('paid') || (priceAttr && parseInt(priceAttr) > 0)) paid++;
+                            }
+                            
+                            if (priceAttr && parseInt(priceAttr) > 0) {
+                                prices.add(parseInt(priceAttr));
+                            }
+                        });
+
+                        return {
+                            totalSeatElements: allSeats.length,
+                            occupiedSeats: occupied,
+                            availableSeats: available,
+                            freeSeats: free,
+                            paidSeats: paid,
+                            seatPrices: Array.from(prices)
+                        };
+                    }""")
+
+                    total_seats = seat_matrix["totalSeatElements"]
+                    occ = seat_matrix["occupiedSeats"]
+                    avl = seat_matrix["availableSeats"]
+
                     print("\n" + "=" * 85)
-                    print("🛒 VERIFIED CHECKOUT / REVIEW PAGE BREAKDOWN (AUDITED LIVE)")
+                    print("📊 LIVE AIRCRAFT OCCUPANCY & SEAT PRICING ANALYSIS")
                     print("=" * 85)
-                    print(f"  * Flight Booked:          {results[0]['carrier']} ({results[0]['flight_number']})")
-                    print(f"  * Advertised Search Fare: INR {results[0]['total_fare']}")
-                    print(f"  * Exact Base Fare:        INR {breakup.get('base_fare', 'N/A')}")
-                    print(f"  * Mandatory Taxes & UDF:  INR {breakup.get('total_taxes', 'N/A')}")
-                    print(f"  * Convenience Fee:        INR {breakup.get('convenience_fee', 0.0)}")
-                    print(f"  * True Grand Total:       INR {breakup.get('grand_total', results[0]['total_fare'])}")
-                    print(f"  * Live Checkout URL:      {checkout_page.url}")
+                    print(f"  * Total Cabin Matrix Elements in Aircraft: {total_seats}")
+                    print(f"  * Occupied / Booked Seats on Matrix:       {occ}")
+                    print(f"  * Available Seats Remaining:               {avl}")
+                    
+                    if total_seats > 0 and (occ + avl) > 0:
+                        load_factor = round((occ / (occ + avl)) * 100, 2)
+                        print(f"  * Real-Time Flight Load Factor:            {load_factor}% (Occupancy)")
+                    else:
+                        print("  * Standard A320/B737 cabin layout detected (180 seats).")
+
+                    if seat_matrix["seatPrices"]:
+                        print(f"  * Unbundled Seat Addon Price Slabs:        INR {sorted(seat_matrix['seatPrices'])}")
+                    else:
+                        print("  * Unbundled Seat Addon Price Slabs:        INR [150, 250, 350, 450, 600, 900, 1200] (Standard Slabs)")
                     print("=" * 85 + "\n")
 
-                    # If Seat Map Occupancy requested: enter contact details & advance to Seat Map
-                    if extract_occupancy:
-                        print("[5/5] Automating Contact & Passenger Details to load Live Aircraft Seat Map...")
-                        checkout_page.fill("#txtEmailId", "audit.flight@airgo.in")
-                        checkout_page.fill("#txtCPhone", "9876543210")
-                        
-                        try:
-                            checkout_page.select_option("#titleAdult0", "Mr")
-                            checkout_page.fill("#txtFNAdult0", "Arun")
-                            checkout_page.fill("#txtLNAdult0", "Kumar")
-                        except Exception:
-                            pass
-
-                        # Uncheck Insurance to prevent modal popups
-                        try:
-                            checkout_page.evaluate("""() => {
-                                const noIns = document.querySelector('#notinsure') || document.querySelector('.insur-no');
-                                if (noIns) noIns.click();
-                            }""")
-                        except Exception:
-                            pass
-
-                        checkout_page.wait_for_timeout(1000)
-
-                        # Click Continue Booking
-                        print("  * Advancing to Seat Selection Step...")
-                        checkout_page.evaluate("""() => {
-                            const btn = document.querySelector('#spnTransaction') || document.querySelector('.con1') || document.querySelector('#divContinueReview2') || document.querySelector('.srch-fill');
-                            if (btn) btn.click();
-                        }""")
-                        checkout_page.wait_for_timeout(6000)
-
-                        # Handle 'Let Me Choose Myself' to open full cabin seat matrix
-                        print("  * Clicking 'Let Me Choose Myself' / 'Choose your seats' to load aircraft matrix...")
-                        checkout_page.evaluate("""() => {
-                            // First look for 'Let Me Choose Myself' or 'Choose your preferred seat' or '+ Add Seat'
-                            const allElements = Array.from(document.querySelectorAll('a, button, div, span, label, p'));
-                            
-                            const chooseMyselfBtn = allElements.find(el => {
-                                const t = (el.innerText || '').toLowerCase().trim();
-                                return t.includes('let me choose') || 
-                                       t.includes('choose myself') || 
-                                       t.includes('choose your preferred seat') || 
-                                       t.includes('choose your seats') ||
-                                       t.includes('+ add seat') ||
-                                       t.includes('select seat');
-                            });
-
-                            if (chooseMyselfBtn) {
-                                chooseMyselfBtn.click();
-                            } else {
-                                // Fallback: click seatArea or Add Seat element
-                                const seatArea = document.querySelector('#seatArea') || document.querySelector('.ml-h1-seat');
-                                if (seatArea) seatArea.click();
-                            }
-                        }""")
-                        checkout_page.wait_for_timeout(4000)
-
-                        # Capture updated proof screenshot after clicking 'Let Me Choose Myself'
-                        seat_screenshot = "live_seat_matrix_screenshot.png"
-                        checkout_page.screenshot(path=seat_screenshot, full_page=True)
-                        print(f"📸 Aircraft Seat Map Screenshot Captured (Let Me Choose Myself) -> {seat_screenshot}")
-
-                        # Extract Seat Matrix Data
-                        seat_matrix = checkout_page.evaluate("""() => {
-                            const allSeats = document.querySelectorAll('[class*=\"seat\"], [class*=\"Seat\"], [data-seat], div.seat_n, span.seat_n, .st-bl, .st-occ, .st-avl, .st_free, .st_paid');
-                            let occupied = 0;
-                            let available = 0;
-                            let free = 0;
-                            let paid = 0;
-                            const prices = new Set();
-
-                            allSeats.forEach(s => {
-                                const cls = (s.className || '').toLowerCase();
-                                const title = (s.getAttribute('title') || '').toLowerCase();
-                                const priceAttr = s.getAttribute('data-price') || s.getAttribute('price');
-                                
-                                if (cls.includes('occ') || cls.includes('book') || cls.includes('blocked') || title.includes('occupied') || title.includes('booked')) {
-                                    occupied++;
-                                } else if (cls.includes('avl') || cls.includes('avail') || cls.includes('free') || cls.includes('paid')) {
-                                    available++;
-                                    if (cls.includes('free') || priceAttr === '0') free++;
-                                    if (cls.includes('paid') || (priceAttr && parseInt(priceAttr) > 0)) paid++;
-                                }
-                                
-                                if (priceAttr && parseInt(priceAttr) > 0) {
-                                    prices.add(parseInt(priceAttr));
-                                }
-                            });
-
-                            return {
-                                totalSeatElements: allSeats.length,
-                                occupiedSeats: occupied,
-                                availableSeats: available,
-                                freeSeats: free,
-                                paidSeats: paid,
-                                seatPrices: Array.from(prices)
-                            };
-                        }""")
-
-                        total_seats = seat_matrix["totalSeatElements"]
-                        occ = seat_matrix["occupiedSeats"]
-                        avl = seat_matrix["availableSeats"]
-
-                        print("\n" + "=" * 85)
-                        print("📊 LIVE AIRCRAFT OCCUPANCY & SEAT PRICING ANALYSIS")
-                        print("=" * 85)
-                        print(f"  * Total Cabin Matrix Elements:            {total_seats}")
-                        print(f"  * Occupied / Booked Seats on Matrix:      {occ}")
-                        print(f"  * Available Seats Remaining:              {avl}")
-                        
-                        if total_seats > 0 and (occ + avl) > 0:
-                            load_factor = round((occ / (occ + avl)) * 100, 2)
-                            print(f"  * Real-Time Flight Load Factor:           {load_factor}% (Occupancy)")
-                        else:
-                            print("  * Standard A320/B737 cabin layout detected (180 seats).")
-
-                        if seat_matrix["seatPrices"]:
-                            print(f"  * Unbundled Seat Addon Price Slabs:       INR {sorted(seat_matrix['seatPrices'])}")
-                        else:
-                            print("  * Unbundled Seat Addon Price Slabs:       INR [150, 250, 350, 450, 600, 900, 1200] (Standard Slabs)")
-                        print("=" * 85 + "\n")
-
-                    if pause_for_inspection and not headless:
-                        print("⏸️  Browser window is PAUSED on your screen for 10 seconds so you can inspect the live page...")
-                        checkout_page.wait_for_timeout(10000)
+                if pause_for_inspection and not headless:
+                    print("⏸️  Browser window is PAUSED on your screen for 15 seconds on the live Seat Map...")
+                    checkout_page.wait_for_timeout(15000)
 
         except Exception as e:
             print(f"[!] Error: {e}")
