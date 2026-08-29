@@ -204,10 +204,29 @@ def run_seat_picker(visible: bool = False, pause: bool = False):
         }""")
         checkout_page.wait_for_timeout(6000)
 
-        # Capture final payment page screenshot
+        # Capture proof screenshot safely
+        screenshot_path = "seat_color_analysis_screenshot.png"
+        try:
+            checkout_page.screenshot(path=screenshot_path, full_page=False)
+            print(f"📸 Aircraft Seat Map Screenshot Captured -> {screenshot_path}")
+        except Exception:
+            try:
+                checkout_page.screenshot(path=screenshot_path)
+                print(f"📸 Aircraft Seat Map Screenshot Captured -> {screenshot_path}")
+            except Exception as e:
+                print(f"[!] Screenshot note: {e}")
+
+        # Capture final payment page screenshot safely
         payment_screenshot = "final_payment_gateway_screenshot.png"
-        checkout_page.screenshot(path=payment_screenshot, full_page=True)
-        print(f"📸 Final Payment Summary Screenshot Captured -> {payment_screenshot}")
+        try:
+            checkout_page.screenshot(path=payment_screenshot, full_page=False)
+            print(f"📸 Final Payment Summary Screenshot Captured -> {payment_screenshot}")
+        except Exception:
+            try:
+                checkout_page.screenshot(path=payment_screenshot)
+                print(f"📸 Final Payment Summary Screenshot Captured -> {payment_screenshot}")
+            except Exception as e:
+                print(f"[!] Screenshot note: {e}")
 
         print("\n" + "=" * 90)
         print("💳 FINAL OUT-OF-POCKET CONSUMER PRICE SUMMARY")
