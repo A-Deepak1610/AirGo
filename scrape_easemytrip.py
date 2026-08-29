@@ -288,26 +288,36 @@ def scrape_easemytrip(
                         }""")
                         checkout_page.wait_for_timeout(6000)
 
-                        # Handle any 'Skip' / 'Skip to Payment' or add-on popups
-                        print("  * Checking and dismissing any 'Skip' / 'Skip to Payment' modals...")
+                        # Handle 'Let Me Choose Myself' to open full cabin seat matrix
+                        print("  * Clicking 'Let Me Choose Myself' / 'Choose your seats' to load aircraft matrix...")
                         checkout_page.evaluate("""() => {
-                            // Find and click any Skip or Skip to Payment buttons
-                            const skipBtn = document.querySelector('#skipPop') || 
-                                            document.querySelector('._skipot') || 
-                                            Array.from(document.querySelectorAll('a, button, div')).find(el => {
-                                                const t = (el.innerText || '').toLowerCase().trim();
-                                                return t === 'skip' || t.includes('skip to payment') || t.includes('skip & continue');
-                                            });
-                            if (skipBtn) {
-                                skipBtn.click();
+                            // First look for 'Let Me Choose Myself' or 'Choose your preferred seat' or '+ Add Seat'
+                            const allElements = Array.from(document.querySelectorAll('a, button, div, span, label, p'));
+                            
+                            const chooseMyselfBtn = allElements.find(el => {
+                                const t = (el.innerText || '').toLowerCase().trim();
+                                return t.includes('let me choose') || 
+                                       t.includes('choose myself') || 
+                                       t.includes('choose your preferred seat') || 
+                                       t.includes('choose your seats') ||
+                                       t.includes('+ add seat') ||
+                                       t.includes('select seat');
+                            });
+
+                            if (chooseMyselfBtn) {
+                                chooseMyselfBtn.click();
+                            } else {
+                                // Fallback: click seatArea or Add Seat element
+                                const seatArea = document.querySelector('#seatArea') || document.querySelector('.ml-h1-seat');
+                                if (seatArea) seatArea.click();
                             }
                         }""")
-                        checkout_page.wait_for_timeout(3000)
+                        checkout_page.wait_for_timeout(4000)
 
-                        # Capture updated proof screenshot after clicking Skip
+                        # Capture updated proof screenshot after clicking 'Let Me Choose Myself'
                         seat_screenshot = "live_seat_matrix_screenshot.png"
                         checkout_page.screenshot(path=seat_screenshot, full_page=True)
-                        print(f"📸 Updated Proof Screenshot Captured (After Skip) -> {seat_screenshot}")
+                        print(f"📸 Aircraft Seat Map Screenshot Captured (Let Me Choose Myself) -> {seat_screenshot}")
 
                         # Extract Seat Matrix Data
                         seat_matrix = checkout_page.evaluate("""() => {
