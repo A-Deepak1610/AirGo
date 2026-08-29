@@ -11,3 +11,7 @@ runs/
 *.html
 *.png
 *.json
+client/node_modules/
+client/dist/
+test_*.json
+scratch/
