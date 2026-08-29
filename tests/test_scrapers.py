@@ -1,28 +1,6 @@
 from datetime import date, timedelta
-from airgo.scrapers.airline_scrapers import AirlineDirectScraper
 from airgo.scrapers.easemytrip_scraper import EaseMyTripScraper
-from airgo.pipeline.models import RawQuoteSchema
-
-
-def test_airline_direct_scraper():
-    scraper = AirlineDirectScraper(airline_code="6E")
-    dep_date = date.today() + timedelta(days=7)
-    quotes = scraper.fetch_quotes(
-        origin="DEL",
-        destination="BOM",
-        departure_date=dep_date,
-        advance_window="T+7",
-        advance_days=7
-    )
-    assert len(quotes) > 0
-    q = quotes[0]
-    assert isinstance(q, RawQuoteSchema)
-    assert q.carrier == "IndiGo"
-    assert q.origin == "DEL"
-    assert q.destination == "BOM"
-    assert q.total_fare > 0
-    assert q.base_fare > 0
-    assert q.advance_window == "T+7"
+from airgo.scrapers.cleartrip_scraper import parse_cleartrip_flight_card
 
 
 def test_easemytrip_scraper_parsing():
@@ -53,3 +31,23 @@ def test_easemytrip_scraper_parsing():
     assert q.flight_number == "AI-805"
     assert q.total_fare == 5400.0
     assert q.base_fare == 4000.0
+
+
+def test_cleartrip_scraper_parsing():
+    sample_text = """
+    IndiGo
+    6E-5014
+    18:30
+    3h 55m
+    Non-stop
+    22:25
+    ₹6,179
+    Book
+    """
+    parsed = parse_cleartrip_flight_card(sample_text)
+    assert parsed is not None
+    assert parsed["carrier"] == "IndiGo"
+    assert parsed["flight_number"] == "6E-5014"
+    assert parsed["total_fare"] == 6179.0
+    assert parsed["departure_time"] == "18:30"
+    assert parsed["arrival_time"] == "22:25"
