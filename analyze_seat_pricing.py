@@ -185,21 +185,43 @@ def run_seat_picker(visible: bool = False, pause: bool = False):
         checkout_page.wait_for_timeout(3000)
 
         # 6. Click Continue Booking / Proceed to Payment after picking seat!
-        print("\n[6/6] 🚀 Clicking 'Continue Booking' to Advance to Final Payment...")
+        print("\n[6/6] 🚀 Advancing to Final Payment Gateway...")
         checkout_page.evaluate("""() => {
-            // Find the Continue / Proceed button at the bottom of the seat map
+            // 1. Try invoking EaseMyTrip's exact transition handlers
+            if (typeof AddAncillaryPreTransaction === 'function') {
+                try { AddAncillaryPreTransaction(); } catch(e) {}
+            }
+            if (typeof CreateTransaction_NewRpc === 'function') {
+                try { CreateTransaction_NewRpc('', 'CreateTransaction', ''); } catch(e) {}
+            }
+
+            // 2. Click all active transaction / continue buttons
+            const targetBtns = [
+                document.querySelector('#spnTransaction_2_cnt'),
+                document.querySelector('#DivContinueAncillary'),
+                document.querySelector('#divContinueTransactionAddon'),
+                document.querySelector('#skipPop'),
+                document.querySelector('._skipot'),
+                document.querySelector('#spnTransaction')
+            ];
+
+            for (const b of targetBtns) {
+                if (b) {
+                    try { b.scrollIntoView(); b.click(); break; } catch(e) {}
+                }
+            }
+
+            // 3. Fallback: query visible continue / payment buttons
             const allBtns = Array.from(document.querySelectorAll('a, button, div, span, input[type=\"button\"]'));
             const proceedBtn = allBtns.find(el => {
                 const txt = (el.innerText || el.value || '').toLowerCase().trim();
-                return txt === 'continue' || 
-                       txt.includes('continue booking') || 
+                return txt.includes('continue booking') || 
                        txt.includes('proceed to payment') || 
-                       txt.includes('continue to payment') || 
-                       txt.includes('skip to payment');
+                       txt.includes('skip to payment') ||
+                       txt.includes('make payment');
             });
             if (proceedBtn) {
-                proceedBtn.scrollIntoView();
-                proceedBtn.click();
+                try { proceedBtn.click(); } catch(e) {}
             }
         }""")
         checkout_page.wait_for_timeout(6000)
