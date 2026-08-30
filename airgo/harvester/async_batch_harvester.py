@@ -338,75 +338,89 @@ async def audit_single_flight_checkout(
         seat_map_img_path = os.path.join(flight_dir, "02_aircraft_seat_map.png")
         await safe_capture_screenshot(checkout_page, seat_map_img_path, full_page=True)
 
-        # Select a genuine FREE seat (INR 0.00) using .lightgreen-bg
+        # Select FREE (lightgreen-bg) or next cheapest (lightblue-bg) seat
         selected_seat_info = await checkout_page.evaluate(r"""() => {
-            // 1. Direct match on EaseMyTrip's lightgreen-bg free seat class
-            const lightGreenSeats = Array.from(document.querySelectorAll('label.lightgreen-bg, label[class*="lightgreen"], label.s_seat_avl.lightgreen-bg'));
-            
-            for (const el of lightGreenSeats) {
+            const availableSeats = [];
+            const seatLabels = Array.from(document.querySelectorAll('label[ng-click*="SelectedV2"], label.s_seat_avl'));
+
+            for (const el of seatLabels) {
                 const cls = el.className || '';
-                if (cls.includes('s_seat_ocu') || cls.includes('occ') || cls.includes('book')) continue;
-                
                 const id = el.id || '';
                 const forAttr = el.getAttribute('for') || '';
-                let seatNo = forAttr || id.replace(/^[A-Z]{3}_[A-Z]{3}/, '') || el.innerText.trim();
-                
-                el.scrollIntoView({behavior: 'instant', block: 'center'});
-                el.click();
-                return {
-                    seatNo: seatNo,
-                    rawId: id,
-                    price: 0.0
-                };
-            }
-
-            // 2. Fallback: Any available seat label with TotalFare<=0 or free markers
-            const seatLabels = Array.from(document.querySelectorAll('label[ng-click*="SelectedV2"], label.s_seat_avl'));
-            for (const el of seatLabels) {
-                const id = el.id || '';
-                const cls = el.className || '';
+                const ngClick = el.getAttribute('ng-click') || '';
                 const title = el.getAttribute('title') || el.getAttribute('data-original-title') || '';
                 const ngIf = el.getAttribute('ng-if') || '';
-                
+
+                // Filter out occupied/booked seats
                 if (cls.includes('s_seat_ocu') || cls.includes('occ') || cls.includes('book') || !id.includes('_')) {
                     continue;
                 }
 
-                if (cls.includes('lightgreen') || cls.includes('free') || ngIf.includes('TotalFare<=0') || /free/i.test(title)) {
-                    let seatNo = el.getAttribute('for') || id.replace(/^[A-Z]{3}_[A-Z]{3}/, '') || el.innerText.trim();
-                    el.scrollIntoView({behavior: 'instant', block: 'center'});
-                    el.click();
-                    return { seatNo: seatNo, rawId: id, price: 0.0 };
+                let seatNo = forAttr || id.replace(/^[A-Z]{3}_[A-Z]{3}/, '') || el.innerText.trim();
+                let price = null;
+
+                // 1. Extract exact price from ng-click="SelectedV2(seatNo, price, ...)"
+                const ngClickMatch = ngClick.match(/SelectedV2\s*\([^,]+,\s*([\d.]+)/);
+                if (ngClickMatch) {
+                    price = parseFloat(ngClickMatch[1]);
                 }
+
+                // 2. Extract from price / data-price attribute
+                if (price === null) {
+                    const attrPrice = el.getAttribute('price') || el.getAttribute('data-price');
+                    if (attrPrice !== null && attrPrice !== '') price = parseFloat(attrPrice);
+                }
+
+                // 3. Extract from color classes & ng-if
+                let tierRank = 99;
+                if (cls.includes('lightgreen') || ngIf.includes('TotalFare<=0') || /free/i.test(title)) {
+                    price = 0.0;
+                    tierRank = 1; // Highest priority: Free
+                } else if (cls.includes('lightblue') || cls.includes('sky-blue') || cls.includes('blue-lt')) {
+                    if (price === null) price = 150.0;
+                    tierRank = 2; // Second priority: Light Blue (Cheapest paid: 0-200)
+                } else if (cls.includes('darkblue') || cls.includes('blue-bg')) {
+                    if (price === null) price = 350.0;
+                    tierRank = 3;
+                } else {
+                    if (price === null) price = 500.0;
+                    tierRank = 4;
+                }
+
+                availableSeats.push({
+                    element: el,
+                    seatNo: seatNo,
+                    rawId: id,
+                    price: price,
+                    tierRank: tierRank
+                });
             }
 
-            // 3. Fallback: Check rear middle seats (Row 18-30 B & E)
-            for (const el of seatLabels) {
-                const id = el.id || '';
-                const cls = el.className || '';
-                if (cls.includes('s_seat_ocu') || cls.includes('occ') || cls.includes('book') || !id.includes('_')) continue;
-                
-                let seatNo = el.getAttribute('for') || id.replace(/^[A-Z]{3}_[A-Z]{3}/, '') || el.innerText.trim();
-                const rowMatch = seatNo.match(/^(\d+)([A-F])/);
-                if (rowMatch) {
-                    const row = parseInt(rowMatch[1]);
-                    const col = rowMatch[2];
-                    if (row >= 18 && (col === 'B' || col === 'E')) {
-                        el.scrollIntoView({behavior: 'instant', block: 'center'});
-                        el.click();
-                        return { seatNo: seatNo, rawId: id, price: 0.0 };
-                    }
-                }
+            if (availableSeats.length === 0) {
+                // If no clickable seat in DOM, skip seat selection so fee is 0.00
+                const skipBtn = document.querySelector('.skip-seat') || document.querySelector("a[ng-click*='Skip']") || document.querySelector('#spnSkipSeat');
+                if (skipBtn) skipBtn.click();
+                return { seatNo: "Free/Skipped", rawId: "N/A", price: 0.0 };
             }
 
-            // 4. If no free seat found in DOM, click Skip to Payment to guarantee INR 0.00 seat fee
-            const skipBtn = document.querySelector('.skip-seat') || document.querySelector("a[ng-click*='Skip']") || document.querySelector('#spnSkipSeat');
-            if (skipBtn) skipBtn.click();
+            // Sort: Priority 1 (lightgreen / Free) first, then Priority 2 (lightblue / Cheapest paid), then price ASC
+            availableSeats.sort((a, b) => {
+                if (a.tierRank !== b.tierRank) return a.tierRank - b.tierRank;
+                return a.price - b.price;
+            });
 
-            return { seatNo: "Free/Skipped", rawId: "N/A", price: 0.0 };
+            const bestSeat = availableSeats[0];
+            bestSeat.element.scrollIntoView({behavior: 'instant', block: 'center'});
+            bestSeat.element.click();
+
+            return {
+                seatNo: bestSeat.seatNo,
+                rawId: bestSeat.rawId,
+                price: bestSeat.price
+            };
         }""")
 
-        seat_fee = selected_seat_info.get("price", 0.0)
+        seat_fee = selected_seat_info.get("price", 0.0) if selected_seat_info else 0.0
         await checkout_page.wait_for_timeout(2000)
 
         # Advance to Final Payment Gateway Step
@@ -453,7 +467,7 @@ async def audit_single_flight_checkout(
             "audited_grand_total": grand_total,
             "selected_seat_number": selected_seat_info.get("seatNo", "Free/Skipped"),
             "selected_seat_raw_id": selected_seat_info.get("rawId", "N/A"),
-            "seat_selection_fee": 0.00,
+            "seat_selection_fee": round(seat_fee, 2),
             "final_payment_total": final_payment_total,
             "payment_gateway_url": checkout_page.url,
             "screenshot_search": os.path.relpath(os.path.join(os.path.dirname(flight_dir), "search_results.png"), run_dir),
@@ -464,7 +478,7 @@ async def audit_single_flight_checkout(
         }
 
         save_run_artifact(flight_dir, "audit_breakup.json", audit_item)
-        print(f"  [✅] Audited {carrier:<18} ({flight_num:<8}) | Base: INR {base_fare} | Taxes: INR {taxes} | Seat: {audit_item['selected_seat_number']} (INR 0.00) | Final Payment: INR {final_payment_total}")
+        print(f"  [✅] Audited {carrier:<18} ({flight_num:<8}) | Base: INR {base_fare} | Taxes: INR {taxes} | Seat: {audit_item['selected_seat_number']} (Fee: INR {seat_fee:.2f}) | Final Payment: INR {final_payment_total}")
         return audit_item
 
     except Exception as e:
