@@ -110,16 +110,34 @@ def build_easemytrip_url(origin: str, dest: str, date_dmy: str) -> str:
     )
 
 
-async def safe_capture_screenshot(page: Page, path: str):
+async def safe_capture_screenshot(page: Page, path: str, full_page: bool = True):
     """
-    Captures screenshot safely handling Chromium texture buffer boundaries.
+    Captures complete full-page screenshot after scrolling through the DOM to trigger lazy-loaded assets.
     """
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        await page.screenshot(path=path, full_page=False)
+        # Smooth scroll through the page to render all dynamic elements
+        await page.evaluate("""async () => {
+            await new Promise((resolve) => {
+                let totalHeight = 0;
+                const distance = 400;
+                const timer = setInterval(() => {
+                    const scrollHeight = document.body.scrollHeight;
+                    window.scrollBy(0, distance);
+                    totalHeight += distance;
+                    if (totalHeight >= scrollHeight) {
+                        clearInterval(timer);
+                        window.scrollTo(0, 0);
+                        resolve();
+                    }
+                }, 50);
+            });
+        }""")
+        await page.wait_for_timeout(500)
+        await page.screenshot(path=path, full_page=full_page)
     except Exception:
         try:
-            await page.screenshot(path=path)
+            await page.screenshot(path=path, full_page=False)
         except Exception as e:
             print(f"  [!] Screenshot note: {e}")
 
@@ -273,18 +291,9 @@ async def audit_multi_carrier_route(
             await checkout_page.wait_for_load_state("domcontentloaded")
             await checkout_page.wait_for_timeout(2500)
 
-            # Stage 2: Capture Review / Checkout Screenshot
+            # Stage 2: Capture Full Review / Checkout Screenshot
             checkout_img_path = os.path.join(flight_dir, "01_checkout_review.png")
-            try:
-                review_card = checkout_page.locator("#divFlightDetails, .flt-dtl, .review-left, .review-flt-dtl").first
-                if await review_card.is_visible():
-                    await review_card.screenshot(path=checkout_img_path)
-                else:
-                    await checkout_page.evaluate("window.scrollTo(0, 0)")
-                    await safe_capture_screenshot(checkout_page, checkout_img_path)
-            except Exception:
-                await checkout_page.evaluate("window.scrollTo(0, 0)")
-                await safe_capture_screenshot(checkout_page, checkout_img_path)
+            await safe_capture_screenshot(checkout_page, checkout_img_path, full_page=True)
 
             # Extract initial checkout breakup
             breakup = await checkout_page.evaluate(r"""() => {
@@ -382,20 +391,9 @@ async def audit_multi_carrier_route(
 
             await checkout_page.wait_for_timeout(3500)
 
-            # Stage 3: Capture Aircraft Cabin Seat Map Screenshot (Precisely scrolled to show plane layout)
+            # Stage 3: Capture Full Aircraft Cabin Seat Map Screenshot
             seat_map_img_path = os.path.join(flight_dir, "02_aircraft_seat_map.png")
-            try:
-                await checkout_page.evaluate("""() => {
-                    const seatEl = document.querySelector('div.seat_lay') || document.querySelector('#seat_parent') || document.querySelector('label[ng-click*="SelectedV2"]') || document.querySelector('#divSeatMap');
-                    if (seatEl) {
-                        const top = seatEl.getBoundingClientRect().top + window.scrollY - 120;
-                        window.scrollTo(0, Math.max(0, top));
-                    }
-                }""")
-                await checkout_page.wait_for_timeout(1000)
-                await safe_capture_screenshot(checkout_page, seat_map_img_path)
-            except Exception:
-                await safe_capture_screenshot(checkout_page, seat_map_img_path)
+            await safe_capture_screenshot(checkout_page, seat_map_img_path, full_page=True)
 
             # Select the CHEAPEST/FREE available seat directly from the DOM
             selected_seat_info = await checkout_page.evaluate(r"""() => {
@@ -484,20 +482,9 @@ async def audit_multi_carrier_route(
             }""")
             await checkout_page.wait_for_timeout(5000)
 
-            # Stage 4: Capture Final Payment Gateway Screenshot (Targeted payment options container)
+            # Stage 4: Capture Full Final Payment Gateway Screenshot
             payment_img_path = os.path.join(flight_dir, "03_final_payment_gateway.png")
-            try:
-                pay_container = checkout_page.locator(".payment-mode, #divPaymentOption, #PaymentGateway, .pay-box").first
-                if await pay_container.is_visible():
-                    await pay_container.screenshot(path=payment_img_path)
-                else:
-                    await checkout_page.evaluate("""() => {
-                        const p = document.querySelector('.payment-mode') || document.querySelector('#divPaymentOption') || document.querySelector('#PaymentGateway');
-                        if (p) p.scrollIntoView({behavior: 'instant', block: 'start'});
-                    }""")
-                    await safe_capture_screenshot(checkout_page, payment_img_path)
-            except Exception:
-                await safe_capture_screenshot(checkout_page, payment_img_path)
+            await safe_capture_screenshot(checkout_page, payment_img_path, full_page=True)
 
             # Final Grand Total at Payment Step
             final_payment_total = await checkout_page.evaluate(r"""() => {
