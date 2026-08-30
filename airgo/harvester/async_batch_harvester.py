@@ -148,49 +148,84 @@ async def audit_single_flight_checkout(
     timeout_ms: int = 45000
 ) -> Optional[Dict[str, Any]]:
     """
-    Audits ONE specific flight (identified deterministically by its unique flight number)
-    in a clean, isolated browser tab through the complete booking lifecycle.
+    Audits ONE specific flight in a clean, isolated browser tab through the complete booking lifecycle.
     """
     page = await context.new_page()
     carrier = target_flight["carrier"]
     flight_num = target_flight["flightNumber"]
-    clean_flt = re.sub(r'[^a-zA-Z0-9]', '', flight_num)
+    clean_target_num = re.sub(r'\s+', '', flight_num)
 
     try:
         # 1. Navigate to Search Page
         await page.goto(search_url, wait_until="domcontentloaded", timeout=timeout_ms)
         try:
-            await page.wait_for_selector(f"text='{flight_num}'", timeout=15000)
+            await page.wait_for_selector("div.fltResult", timeout=20000)
         except Exception:
-            await page.wait_for_timeout(3000)
+            await page.wait_for_timeout(4000)
 
-        # Extract numeric flight digits (e.g. '5095' from '6E-5095', '803' from 'SG- 803')
-        num_match = re.search(r'\d+', flight_num)
-        flight_digits = num_match.group(0) if num_match else flight_num
+        # 2. Deterministically find and click the EXACT flight card by matching flight number & carrier
+        click_result = await page.evaluate("""(target) => {
+            const cleanStr = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            const targetCarrierClean = cleanStr(target.carrier);
+            const targetNumClean = cleanStr(target.flightNum);
+            const targetDigits = cleanStr(target.digits);
 
-        # 2. Locate the EXACT flight card containing the airline carrier and flight digits
-        flight_card = page.locator("div.fltResult").filter(has_text=flight_digits).first
-        book_btn = flight_card.locator("button, a, [class*='book-btn']").filter(has_text="BOOK NOW").first
-        
-        try:
-            await book_btn.click(timeout=8000)
-        except Exception:
-            # Fallback: JavaScript click on the exact card containing the flight digits
-            await page.evaluate(f"""(digits) => {{
-                const cards = Array.from(document.querySelectorAll('div.fltResult'));
-                for (const c of cards) {{
-                    if (c.innerText.includes(digits)) {{
-                        const b = c.querySelector("button, a, .btn-book, [class*='book-btn']");
-                        if (b) {{ b.click(); return; }}
-                    }}
-                }}
-            }}""", flight_digits)
+            const cards = Array.from(document.querySelectorAll('div.fltResult'));
+            
+            // 1. Try matching both carrier and flight digits
+            let targetCard = cards.find(c => {
+                const air = cleanStr(c.querySelector('span.txt-r4, span.air-name')?.innerText);
+                const num = cleanStr(c.querySelector('span.txt-r5, span.flt-num')?.innerText);
+                return (air.includes(targetCarrierClean) || targetCarrierClean.includes(air)) && 
+                       (num.includes(targetDigits) || targetNumClean.includes(num));
+            });
 
-        await page.wait_for_timeout(4500)
+            // 2. Fallback: match by flight number/digits alone
+            if (!targetCard) {
+                targetCard = cards.find(c => {
+                    const num = cleanStr(c.querySelector('span.txt-r5, span.flt-num')?.innerText);
+                    return num.includes(targetDigits) || targetNumClean.includes(num);
+                });
+            }
 
-        # Switch to the opened Review/Checkout tab
+            // 3. Fallback: match by carrier alone
+            if (!targetCard) {
+                targetCard = cards.find(c => {
+                    const air = cleanStr(c.querySelector('span.txt-r4, span.air-name')?.innerText);
+                    return air.includes(targetCarrierClean) || targetCarrierClean.includes(air);
+                });
+            }
+
+            if (!targetCard) {
+                return { success: false, reason: 'Flight card not found in DOM' };
+            }
+
+            const btn = targetCard.querySelector("button, .btn-book, [ng-click*='BookNow']");
+            if (!btn) return { success: false, reason: 'Book Now button not found in card' };
+
+            btn.click();
+            return { success: true, matched: 'exact_carrier_and_digits' };
+        }""", {
+            "flightNum": flight_num,
+            "carrier": carrier,
+            "digits": re.search(r'\d+', flight_num).group(0) if re.search(r'\d+', flight_num) else flight_num
+        })
+
+        if not click_result.get("success"):
+            print(f"  [!] Card match note for {carrier} ({flight_num}): {click_result.get('reason')}")
+            # Try Playwright fallback click
+            card = page.locator("div.fltResult").filter(has_text=carrier).first
+            await card.locator("button, a, .btn-book").filter(has_text="BOOK NOW").first.click()
+
+        # Wait for navigation to Review/Checkout page (EaseMyTrip navigates same-tab or opens tab)
+        await page.wait_for_timeout(4000)
         pages = context.pages
         checkout_page = pages[-1] if len(pages) > 1 else page
+        try:
+            await checkout_page.wait_for_url("**/Review/CheckOut**", timeout=15000)
+        except Exception:
+            pass
+
         await checkout_page.wait_for_load_state("domcontentloaded")
         await checkout_page.wait_for_timeout(2500)
 
@@ -251,7 +286,7 @@ async def audit_single_flight_checkout(
         if base_fare is None and grand_total and taxes:
             base_fare = round(grand_total - taxes, 2)
 
-        # 3. Fill passenger form & proceed
+        # 3. Fill passenger form & explicitly opt OUT of add-on insurance
         await checkout_page.evaluate("""() => {
             const email = document.querySelector('#txtEmailId') || document.querySelector('#txtEmailAdult0');
             if (email) { email.value = 'audit.flight@airgo.in'; email.dispatchEvent(new Event('input', {bubbles: true})); }
@@ -268,7 +303,12 @@ async def audit_single_flight_checkout(
             const ln = document.querySelector('#txtLNAdult0');
             if (ln) { ln.value = 'Kumar'; ln.dispatchEvent(new Event('input', {bubbles: true})); }
 
-            const noIns = document.querySelector('#notinsure') || document.querySelector('.insur-no');
+            // Explicitly click 'No, I do not want to insure my trip'
+            const noInsRadios = Array.from(document.querySelectorAll('input[type="radio"], label'));
+            const noIns = noInsRadios.find(el => {
+                const text = el.innerText || el.getAttribute('value') || '';
+                return el.id === 'notinsure' || text.toLowerCase().includes('do not want to insure') || text.toLowerCase().includes('no, i do not');
+            });
             if (noIns) noIns.click();
         }""")
         await checkout_page.wait_for_timeout(1500)
@@ -298,53 +338,68 @@ async def audit_single_flight_checkout(
         seat_map_img_path = os.path.join(flight_dir, "02_aircraft_seat_map.png")
         await safe_capture_screenshot(checkout_page, seat_map_img_path, full_page=True)
 
-        # Select a genuine FREE seat (INR 0.00) or skip seat surcharge
+        # Select a genuine FREE seat (INR 0.00) using .lightgreen-bg
         selected_seat_info = await checkout_page.evaluate(r"""() => {
-            const seatLabels = Array.from(document.querySelectorAll('label[ng-click*="SelectedV2"], label.s_seat_avl'));
+            // 1. Direct match on EaseMyTrip's lightgreen-bg free seat class
+            const lightGreenSeats = Array.from(document.querySelectorAll('label.lightgreen-bg, label[class*="lightgreen"], label.s_seat_avl.lightgreen-bg'));
             
-            let freeSeat = null;
+            for (const el of lightGreenSeats) {
+                const cls = el.className || '';
+                if (cls.includes('s_seat_ocu') || cls.includes('occ') || cls.includes('book')) continue;
+                
+                const id = el.id || '';
+                const forAttr = el.getAttribute('for') || '';
+                let seatNo = forAttr || id.replace(/^[A-Z]{3}_[A-Z]{3}/, '') || el.innerText.trim();
+                
+                el.scrollIntoView({behavior: 'instant', block: 'center'});
+                el.click();
+                return {
+                    seatNo: seatNo,
+                    rawId: id,
+                    price: 0.0
+                };
+            }
 
+            // 2. Fallback: Any available seat label with TotalFare<=0 or free markers
+            const seatLabels = Array.from(document.querySelectorAll('label[ng-click*="SelectedV2"], label.s_seat_avl'));
             for (const el of seatLabels) {
                 const id = el.id || '';
                 const cls = el.className || '';
                 const title = el.getAttribute('title') || el.getAttribute('data-original-title') || '';
+                const ngIf = el.getAttribute('ng-if') || '';
                 
-                // Exclude occupied seats
                 if (cls.includes('s_seat_ocu') || cls.includes('occ') || cls.includes('book') || !id.includes('_')) {
                     continue;
                 }
 
-                let seatNo = id.replace(/^[A-Z]{3}_[A-Z]{3}/, '') || el.innerText.trim();
-                let price = null;
+                if (cls.includes('lightgreen') || cls.includes('free') || ngIf.includes('TotalFare<=0') || /free/i.test(title)) {
+                    let seatNo = el.getAttribute('for') || id.replace(/^[A-Z]{3}_[A-Z]{3}/, '') || el.innerText.trim();
+                    el.scrollIntoView({behavior: 'instant', block: 'center'});
+                    el.click();
+                    return { seatNo: seatNo, rawId: id, price: 0.0 };
+                }
+            }
 
-                const attrPrice = el.getAttribute('price') || el.getAttribute('data-price');
-                if (attrPrice === '0' || attrPrice === '0.00' || attrPrice === '0.0') price = 0.0;
-                if (/free/i.test(title)) price = 0.0;
-                if (cls.includes('free')) price = 0.0;
-
-                // On Indian LCCs, middle seats in rear rows (18B, 18E, 20B, 20E, 22B, 22E) are free
+            // 3. Fallback: Check rear middle seats (Row 18-30 B & E)
+            for (const el of seatLabels) {
+                const id = el.id || '';
+                const cls = el.className || '';
+                if (cls.includes('s_seat_ocu') || cls.includes('occ') || cls.includes('book') || !id.includes('_')) continue;
+                
+                let seatNo = el.getAttribute('for') || id.replace(/^[A-Z]{3}_[A-Z]{3}/, '') || el.innerText.trim();
                 const rowMatch = seatNo.match(/^(\d+)([A-F])/);
                 if (rowMatch) {
                     const row = parseInt(rowMatch[1]);
                     const col = rowMatch[2];
-                    if (row >= 18 && (col === 'B' || col === 'E') && price === null) {
-                        price = 0.0;
+                    if (row >= 18 && (col === 'B' || col === 'E')) {
+                        el.scrollIntoView({behavior: 'instant', block: 'center'});
+                        el.click();
+                        return { seatNo: seatNo, rawId: id, price: 0.0 };
                     }
                 }
-
-                if (price === 0.0) {
-                    freeSeat = { seatNo: seatNo, rawId: id, price: 0.0, element: el };
-                    break;
-                }
             }
 
-            if (freeSeat) {
-                freeSeat.element.scrollIntoView({behavior: 'instant', block: 'center'});
-                freeSeat.element.click();
-                return { seatNo: freeSeat.seatNo, rawId: freeSeat.rawId, price: 0.0 };
-            }
-
-            // If no free seat is explicitly clickable, click 'Skip to Payment' to ensure 0.00 seat fee
+            // 4. If no free seat found in DOM, click Skip to Payment to guarantee INR 0.00 seat fee
             const skipBtn = document.querySelector('.skip-seat') || document.querySelector("a[ng-click*='Skip']") || document.querySelector('#spnSkipSeat');
             if (skipBtn) skipBtn.click();
 
