@@ -338,7 +338,7 @@ async def run_cleartrip_harvest(
         temp_profile = tempfile.mkdtemp(prefix="airgo_cleartrip_")
         context = await p.chromium.launch_persistent_context(
             user_data_dir=temp_profile,
-            channel="msedge",
+            channel="chrome",
             headless=False,
             no_viewport=True,
             locale="en-IN",
