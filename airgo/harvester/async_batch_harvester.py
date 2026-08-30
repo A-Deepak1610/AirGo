@@ -397,25 +397,78 @@ async def audit_multi_carrier_route(
             except Exception:
                 await safe_capture_screenshot(checkout_page, seat_map_img_path)
 
-            # Select an available genuine seat directly from the DOM
+            # Select the CHEAPEST/FREE available seat directly from the DOM
             selected_seat_info = await checkout_page.evaluate(r"""() => {
                 const seatLabels = Array.from(document.querySelectorAll('label[ng-click*="SelectedV2"], label.s_seat_avl, div.seat_n, span.seat_n'));
                 
-                let target = null;
+                const availableSeats = [];
+
                 for (const el of seatLabels) {
                     const id = el.id || '';
                     const cls = el.className || '';
-                    if (!cls.includes('s_seat_ocu') && !cls.includes('occ') && !cls.includes('book') && id.includes('_')) {
-                        let seatNo = id.replace(/^[A-Z]{3}_[A-Z]{3}/, '');
-                        target = { seatNo: seatNo || el.innerText.trim(), rawId: id };
-                        el.scrollIntoView({behavior: 'instant', block: 'center'});
-                        el.click();
-                        break;
+                    const title = el.getAttribute('title') || el.getAttribute('data-original-title') || '';
+                    
+                    // Filter out occupied/booked seats
+                    if (cls.includes('s_seat_ocu') || cls.includes('occ') || cls.includes('book') || !id.includes('_')) {
+                        continue;
                     }
+
+                    let seatNo = id.replace(/^[A-Z]{3}_[A-Z]{3}/, '') || el.innerText.trim();
+                    let price = null;
+
+                    // 1. Check price attribute
+                    const attrPrice = el.getAttribute('price') || el.getAttribute('data-price');
+                    if (attrPrice !== null && attrPrice !== '') {
+                        price = parseFloat(attrPrice);
+                    }
+
+                    // 2. Check title/tooltip (e.g., "12A - Free", "12A - Rs. 200")
+                    if (price === null && title) {
+                        if (/free/i.test(title)) {
+                            price = 0.0;
+                        } else {
+                            const match = title.match(/(?:Rs\.?|INR|\u20B9)\s*([\d,]+)/i);
+                            if (match) price = parseFloat(match[1].replace(/,/g, ''));
+                        }
+                    }
+
+                    // 3. Check class names (e.g. s_seat_free, free)
+                    if (price === null) {
+                        if (cls.includes('free') || cls.includes('s_seat_0')) {
+                            price = 0.0;
+                        }
+                    }
+
+                    // Default fallback if unstated: 0.0 if free class or standard rear seats
+                    if (price === null) {
+                        price = 0.0;
+                    }
+
+                    availableSeats.push({
+                        element: el,
+                        seatNo: seatNo,
+                        rawId: id,
+                        price: price
+                    });
                 }
-                return target;
+
+                if (availableSeats.length === 0) return null;
+
+                // Sort ascending by price: Free (0.0) first, then cheapest paid seats
+                availableSeats.sort((a, b) => a.price - b.price);
+
+                const bestSeat = availableSeats[0];
+                bestSeat.element.scrollIntoView({behavior: 'instant', block: 'center'});
+                bestSeat.element.click();
+
+                return {
+                    seatNo: bestSeat.seatNo,
+                    rawId: bestSeat.rawId,
+                    price: bestSeat.price
+                };
             }""")
 
+            seat_fee = selected_seat_info.get("price", 0.0) if selected_seat_info else 0.0
             await checkout_page.wait_for_timeout(2000)
 
             # Advance past seat map to the Final Payment Gateway Step
@@ -454,7 +507,7 @@ async def audit_multi_carrier_route(
                     if (clean) return parseFloat(clean);
                 }
                 return null;
-            }""") or grand_total
+            }""") or round(grand_total + seat_fee, 2)
 
             audit_item = {
                 "route": route_name,
@@ -473,6 +526,7 @@ async def audit_multi_carrier_route(
                 "audited_grand_total": grand_total,
                 "selected_seat_number": selected_seat_info.get("seatNo") if selected_seat_info else "Auto/Included",
                 "selected_seat_raw_id": selected_seat_info.get("rawId") if selected_seat_info else "N/A",
+                "seat_selection_fee": round(float(seat_fee), 2),
                 "final_payment_total": final_payment_total,
                 "payment_gateway_url": checkout_page.url,
                 "screenshot_search": os.path.relpath(search_img_path, run_dir),
@@ -486,7 +540,7 @@ async def audit_multi_carrier_route(
             save_run_artifact(flight_dir, "audit_breakup.json", audit_item)
             audited_flights.append(audit_item)
 
-            seat_str = f"Seat: {audit_item['selected_seat_number']}"
+            seat_str = f"Seat: {audit_item['selected_seat_number']} (Fee: INR {audit_item['seat_selection_fee']:.2f})"
             print(f"  [✅] Audited {flt['carrier']:<18} ({flt['flightNumber']:<8}) | Base: INR {base_fare} | Taxes: INR {taxes} | {seat_str} | Final Payment: INR {final_payment_total}")
 
             # Close checkout tab
