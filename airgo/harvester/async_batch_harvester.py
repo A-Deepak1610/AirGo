@@ -275,6 +275,7 @@ async def audit_multi_carrier_route(
 
             # Stage 2: Capture Review / Checkout Screenshot
             checkout_img_path = os.path.join(flight_dir, "01_checkout_review.png")
+            await checkout_page.evaluate("window.scrollTo(0, 0)")
             await safe_capture_screenshot(checkout_page, checkout_img_path)
 
             # Extract initial checkout breakup
@@ -373,6 +374,15 @@ async def audit_multi_carrier_route(
 
             await checkout_page.wait_for_timeout(3500)
 
+            # Scroll seat map directly into the center of the viewport
+            await checkout_page.evaluate("""() => {
+                const seatContainer = document.querySelector('#divSeatMap') || document.querySelector('.seat_lay') || document.querySelector('#seat_parent') || document.querySelector('.seat-map-wrapper') || document.querySelector('label[ng-click*="SelectedV2"]');
+                if (seatContainer) {
+                    seatContainer.scrollIntoView({behavior: 'instant', block: 'center'});
+                }
+            }""")
+            await checkout_page.wait_for_timeout(1000)
+
             # Stage 3: Capture Aircraft Cabin Seat Map Screenshot
             seat_map_img_path = os.path.join(flight_dir, "02_aircraft_seat_map.png")
             await safe_capture_screenshot(checkout_page, seat_map_img_path)
@@ -388,7 +398,7 @@ async def audit_multi_carrier_route(
                     if (!cls.includes('s_seat_ocu') && !cls.includes('occ') && !cls.includes('book') && id.includes('_')) {
                         let seatNo = id.replace(/^[A-Z]{3}_[A-Z]{3}/, '');
                         target = { seatNo: seatNo || el.innerText.trim(), rawId: id };
-                        el.scrollIntoView({behavior: 'smooth', block: 'center'});
+                        el.scrollIntoView({behavior: 'instant', block: 'center'});
                         el.click();
                         break;
                     }
@@ -410,6 +420,13 @@ async def audit_multi_carrier_route(
                 if (btn) btn.click();
             }""")
             await checkout_page.wait_for_timeout(5000)
+
+            # Scroll payment section into view
+            await checkout_page.evaluate("""() => {
+                const payBox = document.querySelector('.payment-mode') || document.querySelector('#divPaymentOption') || document.querySelector('#PaymentGateway') || document.querySelector('.pay-box');
+                if (payBox) payBox.scrollIntoView({behavior: 'instant', block: 'start'});
+            }""")
+            await checkout_page.wait_for_timeout(1000)
 
             # Stage 4: Capture Final Payment Gateway Screenshot
             payment_img_path = os.path.join(flight_dir, "03_final_payment_gateway.png")
@@ -488,6 +505,7 @@ async def worker_consumer(
     Worker coroutine pulling jobs with context recycling and anti-bot spacing.
     """
     context = await browser.new_context(
+        viewport={"width": 1920, "height": 1080},
         user_agent=(
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
@@ -513,6 +531,7 @@ async def worker_consumer(
             except Exception:
                 pass
             context = await browser.new_context(
+                viewport={"width": 1920, "height": 1080},
                 user_agent=(
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
