@@ -14,7 +14,7 @@ import tempfile
 from datetime import datetime, date, timedelta
 from typing import List, Dict, Any, Optional
 
-from playwright.async_api import async_playwright, BrowserContext, Page
+from patchright.async_api import async_playwright, BrowserContext, Page
 
 from airgo.utils.run_manager import create_run_directory, save_run_artifact
 
@@ -338,10 +338,9 @@ async def run_cleartrip_harvest(
         temp_profile = tempfile.mkdtemp(prefix="airgo_cleartrip_")
         context = await p.chromium.launch_persistent_context(
             user_data_dir=temp_profile,
-            headless=False,
             channel="msedge",
-            viewport={"width": 1920, "height": 1080},
-            args=["--start-maximized", "--disable-blink-features=AutomationControlled"],
+            headless=False,
+            no_viewport=True,
             locale="en-IN",
             timezone_id="Asia/Kolkata"
         )
