@@ -121,19 +121,25 @@ async def extract_cleartrip_search_cards(page: Page) -> List[Dict[str, Any]]:
             if (!container) continue;
 
             const text = container.innerText || '';
-            const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
 
-            // Airline name & flight number
-            const airlineEl = container.querySelector('p[font-size="12px"], [class*="airline"], [class*="name"]');
-            const flightNoEl = container.querySelector('p[font-size="10px"], [class*="flight-number"], [class*="number"]');
+            // Find all <p> elements with airline name and flight number
+            // The airline container has an <img> logo followed by two <p> tags
+            const imgEl = container.querySelector('img[alt], img[src*="air-logos"]');
+            let airlineName = '';
+            let flightNumber = '';
 
-            let airlineName = airlineEl ? airlineEl.innerText.trim() : '';
-            let flightNumber = flightNoEl ? flightNoEl.innerText.trim() : '';
+            if (imgEl && imgEl.parentElement && imgEl.parentElement.parentElement) {
+                const nameContainer = imgEl.parentElement.parentElement;
+                const pTags = Array.from(nameContainer.querySelectorAll('p')).map(p => p.innerText.trim()).filter(Boolean);
+                if (pTags.length >= 1) airlineName = pTags[0];
+                if (pTags.length >= 2) flightNumber = pTags[1];
+            }
 
-            // Fallback parsing from text lines
-            if (!airlineName || !flightNumber) {
+            // Fallback parsing from text lines excluding refundability tags
+            if (!airlineName || /refundable/i.test(airlineName)) {
+                const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
                 for (const line of lines) {
-                    if (/^(indigo|air\s*india(\s*express)?|spicejet|akasa(\s*air)?|vistara|alliance\s*air)/i.test(line)) {
+                    if (/^(indigo|air\s*india(\s*express)?|spicejet|akasa(\s*air)?|vistara|alliance\s*air)$/i.test(line)) {
                         airlineName = line;
                     }
                     if (/^[0-9A-Z]{2}[-\s]?[0-9]{3,4}$/i.test(line)) {
@@ -146,7 +152,6 @@ async def extract_cleartrip_search_cards(page: Page) -> List[Dict[str, Any]]:
             let price = 0.0;
             const priceMatches = text.match(/₹\s*([\d,]+)/g);
             if (priceMatches && priceMatches.length > 0) {
-                // The first price match is usually the main flight price
                 const cleanPrice = priceMatches[0].replace(/[₹,\s]/g, '');
                 price = parseFloat(cleanPrice) || 0.0;
             }
@@ -160,7 +165,7 @@ async def extract_cleartrip_search_cards(page: Page) -> List[Dict[str, Any]]:
             const durMatch = text.match(/\b(\d+h\s*\d*m?|\d+m)\b/i);
             let duration = durMatch ? durMatch[1] : '';
 
-            if (airlineName && flightNumber && price > 0) {
+            if (airlineName && !/refundable/i.test(airlineName) && flightNumber && price > 0) {
                 results.push({
                     domIndex: i,
                     airline: airlineName,
@@ -243,6 +248,13 @@ async def audit_cleartrip_flight(
         review_page = context.pages[-1]
         await review_page.wait_for_load_state("domcontentloaded")
         await review_page.wait_for_timeout(3000)
+
+        # Check if Cleartrip returned a server error / Akamai block page
+        if "failure" in review_page.url or await review_page.locator("text='Server error'").is_visible():
+            review_shot = os.path.join(flight_dir, "01_checkout_review_blocked.png")
+            await safe_capture_screenshot(review_page, review_shot)
+            print(f"  [❌] Cleartrip blocked checkout with Akamai 'Server error' for {flight_target['airline']} ({flight_target['flightNumber']})")
+            return None
 
         # Capture Stage 1: Checkout Review Form Screenshot
         review_shot = os.path.join(flight_dir, "01_checkout_review.png")
