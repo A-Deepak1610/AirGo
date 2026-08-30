@@ -1,9 +1,8 @@
 """
-AirGo CLI Runner for Asynchronous Deep Checkout Harvesting across DGCA Routes.
+AirGo CLI Runner for Multi-Carrier Deep Checkout Harvesting across DGCA Routes.
 Usage:
-    python scripts/run_batch_harvest.py --top-n 2 --horizons 1,7 --workers 2
-    python scripts/run_batch_harvest.py --top-n 5 --horizons 1,7,15,30,45 --workers 3
-    python scripts/run_batch_harvest.py --top-n 20 --horizons 1,7,15,30,45 --workers 4
+    python scripts/run_batch_harvest.py --top-n 1 --horizons 1 --workers 1 --flights-per-route 5
+    python scripts/run_batch_harvest.py --top-n 5 --horizons 1,7,15,30,45 --workers 3 --flights-per-route 5
 """
 
 import os
@@ -20,10 +19,11 @@ from airgo.harvester.async_batch_harvester import run_async_batch_harvest
 
 
 def main():
-    parser = argparse.ArgumentParser(description="AirGo Asynchronous Deep Checkout Route Harvester")
+    parser = argparse.ArgumentParser(description="AirGo Multi-Carrier Deep Checkout Route Harvester")
     parser.add_argument("--top-n", type=int, default=5, help="Number of top DGCA routes to audit (default: 5)")
     parser.add_argument("--horizons", type=str, default="1,7,15,30,45", help="Comma-separated advance horizons in days (e.g. 1,7,15,30,45)")
     parser.add_argument("--workers", type=int, default=3, help="Number of concurrent worker browser contexts (default: 3)")
+    parser.add_argument("--flights-per-route", type=int, default=5, help="Number of flights per route-horizon with carrier diversity (default: 5)")
     parser.add_argument("--csv", type=str, default="data/processed/dgca_top100_route_basket.csv", help="Path to DGCA top 100 route basket CSV")
 
     args = parser.parse_args()
@@ -36,7 +36,8 @@ def main():
             csv_path=csv_full_path,
             top_n=args.top_n,
             horizons=horizons_list,
-            num_workers=args.workers
+            num_workers=args.workers,
+            flights_per_route=args.flights_per_route
         )
     )
 

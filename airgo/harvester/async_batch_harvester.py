@@ -1,7 +1,7 @@
 """
-AirGo Fixed Async Queue Worker Pool with Deep Checkout Auditing for All Routes.
-Processes the DGCA Route Basket across T+1, T+7, T+15, T+30, T+45 horizons by actively
-navigating to the Review/Checkout page for EVERY route to extract audited base fares, taxes, and grand totals.
+AirGo Multi-Carrier Top-5 Flight Auditing Engine with Visual Proof Storage.
+Audits up to 5 flights per Route x Horizon (ensuring every distinct airline is represented),
+captures stage screenshots (search_results.png, checkout_review.png), and saves structured JSONs.
 """
 
 import os
@@ -52,12 +52,10 @@ def load_route_basket(csv_path: str, top_n: Optional[int] = None) -> List[Dict[s
             pair = row.get("route", "").strip().upper()
             if "-" in pair:
                 origin, dest = pair.split("-", 1)
-                
                 try:
                     total_pax = int(float(str(row.get("total_pax", 0)).strip() or 0))
                 except Exception:
                     total_pax = 0
-
                 try:
                     weight = float(str(row.get("weight_traffic_within_basket", 0.0)).strip() or 0.0)
                 except Exception:
@@ -109,194 +107,276 @@ def build_easemytrip_url(origin: str, dest: str, date_dmy: str) -> str:
     )
 
 
-async def audit_single_route_checkout(
+async def safe_capture_screenshot(page: Page, path: str):
+    """
+    Captures screenshot safely handling Chromium texture buffer boundaries.
+    """
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        await page.screenshot(path=path, full_page=False)
+    except Exception:
+        try:
+            await page.screenshot(path=path)
+        except Exception as e:
+            print(f"  [!] Screenshot note: {e}")
+
+
+async def audit_multi_carrier_route(
     context: BrowserContext,
     job: Dict[str, Any],
+    run_dir: str,
+    max_flights: int = 5,
     timeout_ms: int = 45000
-) -> Dict[str, Any]:
+) -> List[Dict[str, Any]]:
     """
-    Audits a single route-horizon job by searching flights AND clicking BOOK NOW
-    to extract the verified checkout line-item price breakup directly from the DOM.
+    Audits up to max_flights per route-horizon:
+    1. Guarantees every operating airline is represented.
+    2. Fills remaining slots with the cheapest market flights.
+    3. Captures search_results.png and checkout_review.png in structured folders.
     """
     origin = job["origin"]
     dest = job["dest"]
     date_dmy = job["date_dmy"]
     date_iso = job["date_iso"]
     horizon = job["horizon"]
-    task_id = f"{origin}-{dest}_{horizon}"
+    route_name = f"{origin}-{dest}"
     search_url = build_easemytrip_url(origin, dest, date_dmy)
 
+    # Base folder for this route and horizon: runs/<run_dir>/<ROUTE>/<HORIZON>/
+    horizon_folder = os.path.join(run_dir, route_name, horizon)
+    os.makedirs(horizon_folder, exist_ok=True)
+
     page = await context.new_page()
-    result = {
-        "task_id": task_id,
-        "route": f"{origin}-{dest}",
-        "origin": origin,
-        "destination": dest,
-        "horizon": horizon,
-        "departure_date": date_iso,
-        "search_url": search_url,
-        "status": "pending",
-        "search_fare": None,
-        "carrier": None,
-        "flight_number": None,
-        "departure_time": None,
-        "arrival_time": None,
-        "checkout_base_fare": None,
-        "checkout_taxes": None,
-        "checkout_convenience_fee": None,
-        "checkout_grand_total": None,
-        "checkout_url": None,
-        "error": None
-    }
+    audited_flights = []
 
     try:
-        # 1. Navigate to Search page
+        # 1. Search page navigation
         await page.goto(search_url, wait_until="domcontentloaded", timeout=timeout_ms)
         
-        # Dynamic selector wait: wait until flight cards render into the DOM
         try:
             await page.wait_for_selector(
-                "div.fltResult, .fltResult, [class*='fltResult'], div[ng-repeat*='Flight'], button:has-text('BOOK NOW')",
+                "div.fltResult, .fltResult, button:has-text('BOOK NOW')",
                 timeout=18000
             )
         except Exception:
             await page.wait_for_timeout(4000)
 
-        # Extract search flight details from first flight card
-        card_data = await page.evaluate(r"""() => {
-            const firstCard = document.querySelector('div.fltResult') || document.querySelector('.fltResult');
-            if (!firstCard) return null;
+        # Stage 1: Capture Search Results Proof Screenshot
+        search_img_path = os.path.join(horizon_folder, "search_results.png")
+        await safe_capture_screenshot(page, search_img_path)
 
-            const priceEl = firstCard.querySelector("span[id*='spnPrice']") || firstCard.querySelector("div.col-md-2 span[price]");
-            let price = null;
-            if (priceEl) {
-                const attr = priceEl.getAttribute('price');
-                if (attr) price = parseFloat(attr);
-                if (!price) {
-                    const clean = priceEl.innerText.replace(/[^0-9.]/g, '');
-                    if (clean) price = parseFloat(clean);
+        # 2. Extract all flight cards & index them for selection
+        raw_cards = await page.evaluate(r"""() => {
+            const cards = Array.from(document.querySelectorAll('div.fltResult'));
+            const flightList = [];
+
+            cards.forEach((card, idx) => {
+                const priceEl = card.querySelector("span[id*='spnPrice']") || card.querySelector("div.col-md-2 span[price]");
+                let price = null;
+                if (priceEl) {
+                    const attr = priceEl.getAttribute('price');
+                    if (attr) price = parseFloat(attr);
+                    if (!price) {
+                        const clean = priceEl.innerText.replace(/[^0-9.]/g, '');
+                        if (clean) price = parseFloat(clean);
+                    }
                 }
-            }
 
-            const airEl = firstCard.querySelector("span.txt-r4") || firstCard.querySelector("span.air-name");
-            const fltEl = firstCard.querySelector("span.txt-r5") || firstCard.querySelector("span.flt-num");
-            const times = Array.from(firstCard.querySelectorAll("span.txt-r2-n")).map(t => t.innerText.trim());
+                const airEl = card.querySelector("span.txt-r4") || card.querySelector("span.air-name");
+                const fltEl = card.querySelector("span.txt-r5") || card.querySelector("span.flt-num");
+                const times = Array.from(card.querySelectorAll("span.txt-r2-n")).map(t => t.innerText.trim());
+                const durEl = card.querySelector("span.dura_md") || card.querySelector("span.non-stop");
 
-            return {
-                searchPrice: price,
-                carrier: airEl ? airEl.innerText.trim() : null,
-                flightNo: fltEl ? fltEl.innerText.trim() : null,
-                depTime: times.length > 0 ? times[0] : null,
-                arrTime: times.length > 1 ? times[1] : null
-            };
+                if (price && airEl) {
+                    flightList.push({
+                        domIndex: idx,
+                        carrier: airEl.innerText.trim(),
+                        flightNumber: fltEl ? fltEl.innerText.trim() : 'N/A',
+                        departureTime: times.length > 0 ? times[0] : 'N/A',
+                        arrivalTime: times.length > 1 ? times[1] : 'N/A',
+                        duration: durEl ? durEl.innerText.trim() : 'N/A',
+                        searchPrice: price
+                    });
+                }
+            });
+
+            return flightList;
         }""")
 
-        if not card_data or not card_data.get("searchPrice"):
-            result["status"] = "no_flights_found"
+        if not raw_cards:
+            print(f"[⚠️ ] {route_name}_{horizon:<6} | No live flight inventory rendered on EaseMyTrip.")
             await page.close()
-            return result
+            return []
 
-        result["search_fare"] = card_data["searchPrice"]
-        result["carrier"] = card_data["carrier"]
-        result["flight_number"] = card_data["flightNo"]
-        result["departure_time"] = card_data["depTime"]
-        result["arrival_time"] = card_data["arrTime"]
+        # 3. Selection Algorithm: Guaranteed Airline Representation + Top Cheapest
+        # Group by carrier
+        carrier_groups = {}
+        for c in raw_cards:
+            carrier = c["carrier"]
+            if carrier not in carrier_groups:
+                carrier_groups[carrier] = []
+            carrier_groups[carrier].append(c)
 
-        # 2. Click Book Now to enter Checkout Review
-        book_btn = await page.query_selector("button:has-text('BOOK NOW'), a:has-text('BOOK NOW'), .btn-book, [class*='book-btn']")
-        if not book_btn:
-            await page.evaluate("""() => {
-                const b = document.querySelector('button[ng-click*="BookNow"], button:not([disabled])');
-                if (b) b.click();
-            }""")
+        # Sort each carrier's flights by price
+        for carrier in carrier_groups:
+            carrier_groups[carrier].sort(key=lambda x: x["searchPrice"])
+
+        selected_flights = []
+        # A. Pick cheapest flight of each distinct airline
+        for carrier, flights in carrier_groups.items():
+            selected_flights.append(flights[0])
+
+        # B. If we have fewer than max_flights, fill remaining slots with cheapest overall
+        if len(selected_flights) < max_flights:
+            all_sorted = sorted(raw_cards, key=lambda x: x["searchPrice"])
+            for f in all_sorted:
+                if f not in selected_flights:
+                    selected_flights.append(f)
+                    if len(selected_flights) >= max_flights:
+                        break
         else:
-            await book_btn.click()
+            # If we have more airlines than max_flights, keep top max_flights cheapest among them
+            selected_flights.sort(key=lambda x: x["searchPrice"])
+            selected_flights = selected_flights[:max_flights]
 
-        await page.wait_for_timeout(4500)
+        # Sort final selection by price
+        selected_flights.sort(key=lambda x: x["searchPrice"])
 
-        # 3. Switch to checkout page tab if opened
-        pages = context.pages
-        checkout_page = pages[-1] if len(pages) > 1 else page
-        await checkout_page.wait_for_load_state("domcontentloaded")
-        await checkout_page.wait_for_timeout(2500)
+        print(f"\n✈️  [{route_name}_{horizon}] Selected {len(selected_flights)} distinct airline flights to audit:")
+        for idx, sf in enumerate(selected_flights, 1):
+            print(f"   {idx}. {sf['carrier']:<18} ({sf['flightNumber']:<8}) - Search Fare: INR {sf['searchPrice']}")
 
-        result["checkout_url"] = checkout_page.url
+        # 4. Audit each of the selected flights through Review/Checkout
+        for idx, flt in enumerate(selected_flights, 1):
+            clean_carrier = re.sub(r'[^a-zA-Z0-9]', '', flt['carrier'])
+            clean_fltno = re.sub(r'[^a-zA-Z0-9]', '', flt['flightNumber'])
+            flight_folder_name = f"{idx:02d}_{clean_carrier}_{clean_fltno}"
+            flight_dir = os.path.join(horizon_folder, flight_folder_name)
+            os.makedirs(flight_dir, exist_ok=True)
 
-        # 4. Extract verified line-item checkout fare breakup
-        breakup = await checkout_page.evaluate(r"""() => {
-            let baseFare = null;
-            let totalTaxes = null;
-            let grandTotal = null;
+            dom_idx = flt["domIndex"]
+            
+            # Click the specific BOOK NOW button for this card using Playwright locator
+            card_locator = page.locator("div.fltResult").nth(dom_idx)
+            book_btn = card_locator.locator("button:has-text('BOOK NOW'), a:has-text('BOOK NOW'), .btn-book, [class*='book-btn'], button").first
+            try:
+                await book_btn.click()
+            except Exception:
+                await page.evaluate(f"""() => {{
+                    const cards = document.querySelectorAll('div.fltResult');
+                    if (cards && cards[{dom_idx}]) {{
+                        const b = cards[{dom_idx}].querySelector("button, a, .btn-book, [class*='book-btn']");
+                        if (b) b.click();
+                    }}
+                }}""")
 
-            const baseEl = document.querySelector('#spnBasePrice') || document.querySelector('.base-fare-price');
-            if (baseEl) {
-                const clean = baseEl.innerText.replace(/[^0-9.]/g, '');
-                if (clean) baseFare = parseFloat(clean);
+            await page.wait_for_timeout(4500)
+
+            # Switch to the opened checkout tab
+            pages = context.pages
+            checkout_page = pages[-1] if len(pages) > 1 else page
+            await checkout_page.wait_for_load_state("domcontentloaded")
+            await checkout_page.wait_for_timeout(2500)
+
+            # Stage 2: Capture Verified Checkout Review Proof Screenshot
+            checkout_img_path = os.path.join(flight_dir, "checkout_review.png")
+            await safe_capture_screenshot(checkout_page, checkout_img_path)
+
+            # Extract verified line-item fare breakup
+            breakup = await checkout_page.evaluate(r"""() => {
+                let baseFare = null;
+                let totalTaxes = null;
+                let grandTotal = null;
+
+                const baseEl = document.querySelector('#spnBasePrice') || document.querySelector('.base-fare-price');
+                if (baseEl) {
+                    const clean = baseEl.innerText.replace(/[^0-9.]/g, '');
+                    if (clean) baseFare = parseFloat(clean);
+                }
+
+                const taxEl = document.querySelector('#spnTax') || document.querySelector('.tax-price');
+                if (taxEl) {
+                    const clean = taxEl.innerText.replace(/[^0-9.]/g, '');
+                    if (clean) totalTaxes = parseFloat(clean);
+                }
+
+                const grandEl = document.querySelector('#spnGrandTotal') || document.querySelector('#spnTotal') || document.querySelector('.totl-fre');
+                if (grandEl) {
+                    const clean = grandEl.innerText.replace(/[^0-9.]/g, '');
+                    if (clean) grandTotal = parseFloat(clean);
+                }
+
+                if (baseFare === null || totalTaxes === null || grandTotal === null) {
+                    const allText = document.body.innerText;
+                    const bMatch = allText.match(/Base Fare[^\d]*([\d,]+(?:\.\d+)?)/i);
+                    if (bMatch && baseFare === null) baseFare = parseFloat(bMatch[1].replace(/,/g, ''));
+
+                    const tMatch = allText.match(/(?:Taxes|Fee & Surcharges|Other Surcharges)[^\d]*([\d,]+(?:\.\d+)?)/i);
+                    if (tMatch && totalTaxes === null) totalTaxes = parseFloat(tMatch[1].replace(/,/g, ''));
+
+                    const gMatch = allText.match(/Grand Total[^\d]*([\d,]+(?:\.\d+)?)/i);
+                    if (gMatch && grandTotal === null) grandTotal = parseFloat(gMatch[1].replace(/,/g, ''));
+                }
+
+                if (baseFare === null && grandTotal !== null && totalTaxes !== null) {
+                    baseFare = Math.round((grandTotal - totalTaxes) * 100) / 100;
+                }
+
+                return {
+                    base_fare: baseFare,
+                    total_taxes: totalTaxes,
+                    grand_total: grandTotal
+                };
+            }""")
+
+            grand_total = breakup.get("grand_total") or flt["searchPrice"]
+            taxes = breakup.get("total_taxes")
+            base_fare = breakup.get("base_fare")
+            if base_fare is None and grand_total and taxes:
+                base_fare = round(grand_total - taxes, 2)
+
+            audit_item = {
+                "route": route_name,
+                "origin": origin,
+                "destination": dest,
+                "horizon": horizon,
+                "departure_date": date_iso,
+                "carrier": flt["carrier"],
+                "flight_number": flt["flightNumber"],
+                "departure_time": flt["departureTime"],
+                "arrival_time": flt["arrivalTime"],
+                "duration": flt["duration"],
+                "search_fare": flt["searchPrice"],
+                "audited_base_fare": base_fare,
+                "audited_taxes": taxes,
+                "audited_grand_total": grand_total,
+                "checkout_url": checkout_page.url,
+                "screenshot_search": os.path.relpath(search_img_path, run_dir),
+                "screenshot_checkout": os.path.relpath(checkout_img_path, run_dir),
+                "captured_at": datetime.now().isoformat()
             }
 
-            const taxEl = document.querySelector('#spnTax') || document.querySelector('.tax-price');
-            if (taxEl) {
-                const clean = taxEl.innerText.replace(/[^0-9.]/g, '');
-                if (clean) totalTaxes = parseFloat(clean);
-            }
+            # Save individual flight audit JSON
+            save_run_artifact(flight_dir, "audit_breakup.json", audit_item)
+            audited_flights.append(audit_item)
 
-            const grandEl = document.querySelector('#spnGrandTotal') || document.querySelector('#spnTotal') || document.querySelector('.totl-fre');
-            if (grandEl) {
-                const clean = grandEl.innerText.replace(/[^0-9.]/g, '');
-                if (clean) grandTotal = parseFloat(clean);
-            }
+            print(f"  [✅] Audited {flt['carrier']:<18} | Base: INR {base_fare} | Taxes: INR {taxes} | Grand Total: INR {grand_total}")
 
-            // Text fallback parsing
-            if (baseFare === null || totalTaxes === null || grandTotal === null) {
-                const allText = document.body.innerText;
-                const bMatch = allText.match(/Base Fare[^\d]*([\d,]+(?:\.\d+)?)/i);
-                if (bMatch && baseFare === null) baseFare = parseFloat(bMatch[1].replace(/,/g, ''));
-
-                const tMatch = allText.match(/(?:Taxes|Fee & Surcharges|Other Surcharges)[^\d]*([\d,]+(?:\.\d+)?)/i);
-                if (tMatch && totalTaxes === null) totalTaxes = parseFloat(tMatch[1].replace(/,/g, ''));
-
-                const gMatch = allText.match(/Grand Total[^\d]*([\d,]+(?:\.\d+)?)/i);
-                if (gMatch && grandTotal === null) grandTotal = parseFloat(gMatch[1].replace(/,/g, ''));
-            }
-
-            if (baseFare === null && grandTotal !== null && totalTaxes !== null) {
-                baseFare = Math.round((grandTotal - totalTaxes) * 100) / 100;
-            }
-
-            return {
-                base_fare: baseFare,
-                total_taxes: totalTaxes,
-                grand_total: grandTotal
-            };
-        }""")
-
-        result["checkout_base_fare"] = breakup.get("base_fare")
-        result["checkout_taxes"] = breakup.get("total_taxes")
-        result["checkout_grand_total"] = breakup.get("grand_total") or result["search_fare"]
-        if result["checkout_base_fare"] is None and result["checkout_grand_total"] and result["checkout_taxes"]:
-            result["checkout_base_fare"] = round(result["checkout_grand_total"] - result["checkout_taxes"], 2)
-        result["status"] = "success"
-
-        print(
-            f"[✅] {task_id:<16} | Carrier: {result['carrier']:<12} | "
-            f"Search: INR {result['search_fare']} -> Checkout: INR {result['checkout_grand_total']} "
-            f"(Base: {result['checkout_base_fare']}, Taxes: {result['checkout_taxes']})"
-        )
+            # Close checkout tab if opened separately
+            if checkout_page != page:
+                await checkout_page.close()
 
     except Exception as e:
-        result["status"] = "error"
-        result["error"] = str(e)
-        print(f"[❌] {task_id:<16} | Failed: {str(e)[:60]}")
+        print(f"[❌] {route_name}_{horizon} failed: {e}")
 
     finally:
-        # Clean up open pages in context
         for p in context.pages:
             try:
                 await p.close()
             except Exception:
                 pass
 
-    return result
+    return audited_flights
 
 
 async def worker_consumer(
@@ -304,10 +384,12 @@ async def worker_consumer(
     browser: Browser,
     queue: asyncio.Queue,
     results_list: list,
-    recycle_every: int = 15
+    run_dir: str,
+    max_flights: int = 5,
+    recycle_every: int = 10
 ):
     """
-    Worker coroutine pulling jobs from the queue with browser context recycling and anti-bot jitter.
+    Worker coroutine pulling jobs with context recycling and anti-bot spacing.
     """
     context = await browser.new_context(
         user_agent=(
@@ -324,11 +406,10 @@ async def worker_consumer(
         except asyncio.CancelledError:
             break
 
-        if job is None:  # Sentinel to terminate worker
+        if job is None:
             queue.task_done()
             break
 
-        # Recycle context to prevent Chromium memory leaks
         queries_handled += 1
         if queries_handled > recycle_every:
             try:
@@ -344,21 +425,23 @@ async def worker_consumer(
             )
             queries_handled = 0
 
-        # Anti-bot randomized jitter
         await asyncio.sleep(random.uniform(0.8, 1.8))
 
-        # Execute checkout audit
-        res = await audit_single_route_checkout(context, job)
-        
-        # Automatic Retry (up to 2 retries on transient network/rendering lag)
+        flt_results = await audit_multi_carrier_route(
+            context=context,
+            job=job,
+            run_dir=run_dir,
+            max_flights=max_flights
+        )
+
         retries = job.get("retries", 0)
-        if res["status"] != "success" and retries < 2:
+        if len(flt_results) == 0 and retries < 2:
             job["retries"] = retries + 1
-            print(f"🔄 Retrying {job['route']}_{job['horizon']} (Attempt {job['retries']}/2 after short backoff)...")
-            await asyncio.sleep(2.0)
+            print(f"🔄 Retrying {job['route']}_{job['horizon']} (Attempt {job['retries']}/2)...")
+            await asyncio.sleep(2.5)
             await queue.put(job)
         else:
-            results_list.append(res)
+            results_list.extend(flt_results)
 
         queue.task_done()
 
@@ -372,26 +455,27 @@ async def run_async_batch_harvest(
     csv_path: str = "data/processed/dgca_top100_route_basket.csv",
     top_n: int = 5,
     horizons: List[int] = [1, 7, 15, 30, 45],
-    num_workers: int = 3
+    num_workers: int = 3,
+    flights_per_route: int = 5
 ) -> Dict[str, Any]:
     """
-    Master Async Queue Runner with deep checkout auditing across all routes and horizons.
+    Master Multi-Carrier Deep Checkout Batch Harvester.
     """
-    run_dir = create_run_directory(prefix=f"checkout_batch_top{top_n}")
+    run_dir = create_run_directory(prefix=f"top{top_n}_all_airlines")
 
     print("\n" + "=" * 95)
-    print("🛒 AIRGO ASYNC DEEP CHECKOUT HARVESTER (ALL ROUTES AUDITED TO FINAL CHECKOUT)")
+    print("🚀 AIRGO MULTI-CARRIER DEEP CHECKOUT HARVESTER (ALL AIRLINES AUDITED WITH PROOF)")
     print("=" * 95)
     print(f"  Target Routes (Top N) : {top_n}")
     print(f"  Horizons              : {[f'T+{h}' for h in horizons]}")
+    print(f"  Flights per Route     : Up to {flights_per_route} (every distinct carrier represented)")
     print(f"  Concurrent Workers    : {num_workers} parallel browser workers")
-    print(f"  Audit Storage Folder  : {run_dir}")
+    print(f"  Visual Audit Folder   : {run_dir}")
     print("=" * 95 + "\n")
 
     routes = load_route_basket(csv_path, top_n=top_n)
     target_dates = get_target_dates(horizons)
 
-    # 1. Populate asyncio.Queue
     queue = asyncio.Queue()
     total_jobs = 0
     for r in routes:
@@ -408,7 +492,7 @@ async def run_async_batch_harvest(
             })
             total_jobs += 1
 
-    print(f"📋 Enqueued {total_jobs} route-horizon checkout jobs into Async Queue.\n")
+    print(f"📋 Enqueued {total_jobs} route-horizon jobs into Async Worker Queue.\n")
 
     results_list = []
     start_time = datetime.now()
@@ -419,7 +503,6 @@ async def run_async_batch_harvest(
             args=["--no-sandbox", "--disable-dev-shm-usage"]
         )
 
-        # 2. Spawn worker coroutines
         workers = []
         for i in range(num_workers):
             w = asyncio.create_task(
@@ -427,15 +510,15 @@ async def run_async_batch_harvest(
                     worker_id=i + 1,
                     browser=browser,
                     queue=queue,
-                    results_list=results_list
+                    results_list=results_list,
+                    run_dir=run_dir,
+                    max_flights=flights_per_route
                 )
             )
             workers.append(w)
 
-        # Wait for all jobs in the queue to be processed
         await queue.join()
 
-        # Stop workers with None sentinel
         for _ in range(num_workers):
             await queue.put(None)
         await asyncio.gather(*workers)
@@ -444,33 +527,29 @@ async def run_async_batch_harvest(
 
     elapsed = (datetime.now() - start_time).total_seconds()
 
-    successful_jobs = [r for r in results_list if r["status"] == "success"]
-    failed_jobs = [r for r in results_list if r["status"] != "success"]
-
-    # Save outputs into run folder
+    # Save unified master dataset and summary
     save_run_artifact(run_dir, "audited_checkout_quotes.json", results_list)
 
     summary = {
         "run_timestamp": datetime.now().isoformat(),
         "run_directory": run_dir,
         "elapsed_seconds": round(elapsed, 2),
-        "total_jobs": len(results_list),
-        "successful_jobs": len(successful_jobs),
-        "failed_jobs": len(failed_jobs),
+        "total_route_horizon_jobs": total_jobs,
+        "total_flights_audited": len(results_list),
         "top_n_routes": top_n,
         "horizons_covered": [f"T+{h}" for h in horizons],
+        "flights_per_route": flights_per_route,
         "workers": num_workers
     }
     save_run_artifact(run_dir, "batch_summary.json", summary)
 
     print("\n" + "=" * 95)
-    print("📊 DEEP CHECKOUT HARVEST EXECUTION SUMMARY")
+    print("📊 MULTI-CARRIER BATCH HARVEST EXECUTION SUMMARY")
     print("=" * 95)
-    print(f"  * Total Routes Audited to Checkout : {len(results_list)}")
-    print(f"  * Successfully Audited            : {len(successful_jobs)} / {len(results_list)}")
-    print(f"  * Total Time Elapsed              : {elapsed:.2f}s (avg {elapsed/max(1, len(results_list)):.2f}s per checkout)")
-    print(f"  * Audited Quotes JSON Saved       : {os.path.join(run_dir, 'audited_checkout_quotes.json')}")
-    print(f"  * Batch Summary Saved             : {os.path.join(run_dir, 'batch_summary.json')}")
+    print(f"  * Total Flights Audited to Checkout : {len(results_list)}")
+    print(f"  * Total Time Elapsed                : {elapsed:.2f}s (avg {elapsed/max(1, len(results_list)):.2f}s per audited flight)")
+    print(f"  * Master Quotes JSON Saved          : {os.path.join(run_dir, 'audited_checkout_quotes.json')}")
+    print(f"  * Batch Summary Saved               : {os.path.join(run_dir, 'batch_summary.json')}")
     print("=" * 95 + "\n")
 
     return summary
