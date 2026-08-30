@@ -275,8 +275,16 @@ async def audit_multi_carrier_route(
 
             # Stage 2: Capture Review / Checkout Screenshot
             checkout_img_path = os.path.join(flight_dir, "01_checkout_review.png")
-            await checkout_page.evaluate("window.scrollTo(0, 0)")
-            await safe_capture_screenshot(checkout_page, checkout_img_path)
+            try:
+                review_card = checkout_page.locator("#divFlightDetails, .flt-dtl, .review-left, .review-flt-dtl").first
+                if await review_card.is_visible():
+                    await review_card.screenshot(path=checkout_img_path)
+                else:
+                    await checkout_page.evaluate("window.scrollTo(0, 0)")
+                    await safe_capture_screenshot(checkout_page, checkout_img_path)
+            except Exception:
+                await checkout_page.evaluate("window.scrollTo(0, 0)")
+                await safe_capture_screenshot(checkout_page, checkout_img_path)
 
             # Extract initial checkout breakup
             breakup = await checkout_page.evaluate(r"""() => {
@@ -374,18 +382,20 @@ async def audit_multi_carrier_route(
 
             await checkout_page.wait_for_timeout(3500)
 
-            # Scroll seat map directly into the center of the viewport
-            await checkout_page.evaluate("""() => {
-                const seatContainer = document.querySelector('#divSeatMap') || document.querySelector('.seat_lay') || document.querySelector('#seat_parent') || document.querySelector('.seat-map-wrapper') || document.querySelector('label[ng-click*="SelectedV2"]');
-                if (seatContainer) {
-                    seatContainer.scrollIntoView({behavior: 'instant', block: 'center'});
-                }
-            }""")
-            await checkout_page.wait_for_timeout(1000)
-
-            # Stage 3: Capture Aircraft Cabin Seat Map Screenshot
+            # Stage 3: Capture Aircraft Cabin Seat Map Screenshot (Precisely scrolled to show plane layout)
             seat_map_img_path = os.path.join(flight_dir, "02_aircraft_seat_map.png")
-            await safe_capture_screenshot(checkout_page, seat_map_img_path)
+            try:
+                await checkout_page.evaluate("""() => {
+                    const seatEl = document.querySelector('div.seat_lay') || document.querySelector('#seat_parent') || document.querySelector('label[ng-click*="SelectedV2"]') || document.querySelector('#divSeatMap');
+                    if (seatEl) {
+                        const top = seatEl.getBoundingClientRect().top + window.scrollY - 120;
+                        window.scrollTo(0, Math.max(0, top));
+                    }
+                }""")
+                await checkout_page.wait_for_timeout(1000)
+                await safe_capture_screenshot(checkout_page, seat_map_img_path)
+            except Exception:
+                await safe_capture_screenshot(checkout_page, seat_map_img_path)
 
             # Select an available genuine seat directly from the DOM
             selected_seat_info = await checkout_page.evaluate(r"""() => {
@@ -421,16 +431,20 @@ async def audit_multi_carrier_route(
             }""")
             await checkout_page.wait_for_timeout(5000)
 
-            # Scroll payment section into view
-            await checkout_page.evaluate("""() => {
-                const payBox = document.querySelector('.payment-mode') || document.querySelector('#divPaymentOption') || document.querySelector('#PaymentGateway') || document.querySelector('.pay-box');
-                if (payBox) payBox.scrollIntoView({behavior: 'instant', block: 'start'});
-            }""")
-            await checkout_page.wait_for_timeout(1000)
-
-            # Stage 4: Capture Final Payment Gateway Screenshot
+            # Stage 4: Capture Final Payment Gateway Screenshot (Targeted payment options container)
             payment_img_path = os.path.join(flight_dir, "03_final_payment_gateway.png")
-            await safe_capture_screenshot(checkout_page, payment_img_path)
+            try:
+                pay_container = checkout_page.locator(".payment-mode, #divPaymentOption, #PaymentGateway, .pay-box").first
+                if await pay_container.is_visible():
+                    await pay_container.screenshot(path=payment_img_path)
+                else:
+                    await checkout_page.evaluate("""() => {
+                        const p = document.querySelector('.payment-mode') || document.querySelector('#divPaymentOption') || document.querySelector('#PaymentGateway');
+                        if (p) p.scrollIntoView({behavior: 'instant', block: 'start'});
+                    }""")
+                    await safe_capture_screenshot(checkout_page, payment_img_path)
+            except Exception:
+                await safe_capture_screenshot(checkout_page, payment_img_path)
 
             # Final Grand Total at Payment Step
             final_payment_total = await checkout_page.evaluate(r"""() => {
