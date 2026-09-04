@@ -209,7 +209,7 @@ async def audit_cleartrip_flight(
 
     try:
         await page.goto(search_url, wait_until="domcontentloaded", timeout=45000)
-        await page.wait_for_selector("button:has-text('Book')", timeout=25000)
+        await page.wait_for_selector("button:has-text('Book')", timeout=35000)
         await page.wait_for_timeout(2000)
 
         # Smooth scroll to ensure all lazy cards are hydrated in the DOM
@@ -387,114 +387,162 @@ async def audit_cleartrip_flight(
                 pass
 
 
+async def launch_cleartrip_context(p, profile_dir: str) -> BrowserContext:
+    try:
+        return await p.chromium.launch_persistent_context(
+            user_data_dir=profile_dir,
+            channel="msedge",
+            headless=False,
+            no_viewport=True,
+            locale="en-IN",
+            timezone_id="Asia/Kolkata"
+        )
+    except Exception:
+        return await p.chromium.launch_persistent_context(
+            user_data_dir=profile_dir,
+            channel="chrome",
+            headless=False,
+            no_viewport=True,
+            locale="en-IN",
+            timezone_id="Asia/Kolkata"
+        )
+
+
 async def run_cleartrip_harvest(
     csv_path: str,
     top_n: int = 5,
     horizons: List[int] = [1, 7, 15, 30, 45],
-    flights_per_route: int = 5
+    flights_per_route: int = 5,
+    checkout: bool = False
 ) -> str:
     """
-    Executes Cleartrip multi-carrier harvest across DGCA routes.
+    Executes Cleartrip multi-carrier search inventory harvest across DGCA routes.
+    By default runs clean page-flow extraction. If checkout=True, executes deep booking audit.
     """
     routes = load_route_basket(csv_path, top_n=top_n)
     run_dir = create_run_directory(f"cleartrip_top{top_n}")
 
     print("=" * 95)
-    print(f"🛫 AIRGO CLEARTRIP MULTI-CARRIER ROUTE HARVESTER")
+    print(f"🛫 AIRGO CLEARTRIP MULTI-CARRIER ROUTE HARVESTER ({'DEEP CHECKOUT' if checkout else 'PAGE FLOW'})")
     print(f"   * Routes: {len(routes)} Top DGCA Routes")
     print(f"   * Horizons: {[f'T+{h}' for h in horizons]}")
     print(f"   * Storage: {run_dir}")
     print("=" * 95)
 
     all_audited_quotes = []
-
     profile_dir = os.path.join(os.getcwd(), "runs", "patchright_chrome_profile")
     os.makedirs(profile_dir, exist_ok=True)
 
-    async with async_playwright() as p:
-        try:
-            context = await p.chromium.launch_persistent_context(
-                user_data_dir=profile_dir,
-                channel="msedge",
-                headless=False,
-                no_viewport=True,
-                locale="en-IN",
-                timezone_id="Asia/Kolkata"
-            )
-        except Exception:
-            context = await p.chromium.launch_persistent_context(
-                user_data_dir=profile_dir,
-                channel="chrome",
-                headless=False,
-                no_viewport=True,
-                locale="en-IN",
-                timezone_id="Asia/Kolkata"
-            )
+    booking_count = 0
 
-        for route in routes:
+    async with async_playwright() as p:
+        for route_idx, route in enumerate(routes):
             origin = route["origin"]
             dest = route["destination"]
             route_code = route["route"]
 
-            for h in horizons:
-                horizon_label = f"T+{h}"
-                dept_date = (date.today() + timedelta(days=h)).strftime("%d/%m/%Y")
-                search_url = f"https://www.cleartrip.com/flights/results?adults=1&childs=0&infants=0&class=Economy&depart_date={dept_date}&from={origin}&to={dest}&intl=n&page=loaded"
+            route_profile_dir = tempfile.mkdtemp(prefix=f"airgo_ct_{route_code}_")
+            print(f"\n🌐 Launching fresh browser instance for Route [{route_idx + 1}/{len(routes)}]: {route_code}...")
+            context = await launch_cleartrip_context(p, route_profile_dir)
 
-                rh_dir = os.path.join(run_dir, route_code, horizon_label)
-                os.makedirs(rh_dir, exist_ok=True)
+            try:
+                for h in horizons:
+                    horizon_label = f"T+{h}"
+                    dept_date = (date.today() + timedelta(days=h)).strftime("%d/%m/%Y")
+                    search_url = f"https://www.cleartrip.com/flights/results?adults=1&childs=0&infants=0&class=Economy&depart_date={dept_date}&from={origin}&to={dest}&intl=n&page=loaded"
 
-                page = await context.new_page()
-                try:
-                    await page.goto(search_url, wait_until="domcontentloaded", timeout=45000)
-                    await page.wait_for_selector("button:has-text('Book')", timeout=25000)
-                    await page.wait_for_timeout(3000)
+                    rh_dir = os.path.join(run_dir, route_code, horizon_label)
+                    os.makedirs(rh_dir, exist_ok=True)
 
-                    # Capture search inventory
-                    search_shot = os.path.join(rh_dir, "search_results.png")
-                    await safe_capture_screenshot(page, search_shot)
+                    page = await context.new_page()
+                    try:
+                        await page.goto(search_url, wait_until="domcontentloaded", timeout=45000)
+                        await page.wait_for_selector("button:has-text('Book')", timeout=35000)
+                        await page.wait_for_timeout(3000)
 
-                    # Extract all flight cards
-                    cards = await extract_cleartrip_search_cards(page)
-                    print(f"\n✈️  [{route_code}_{horizon_label}] Found {len(cards)} live flights on Cleartrip:")
+                        # Capture search inventory ground truth
+                        search_shot = os.path.join(rh_dir, "search_results.png")
+                        await safe_capture_screenshot(page, search_shot)
 
-                    # Ensure carrier diversity
-                    seen_carriers = set()
-                    selected_flights = []
-                    for c in cards:
-                        carrier = c["airline"]
-                        if carrier not in seen_carriers:
-                            seen_carriers.add(carrier)
-                            selected_flights.append(c)
-                        if len(selected_flights) >= flights_per_route:
-                            break
+                        # Extract all flight cards directly from the rendered DOM
+                        cards = await extract_cleartrip_search_cards(page)
+                        print(f"\n✈️  [{route_code}_{horizon_label}] Found {len(cards)} live flights on Cleartrip:")
 
-                    # Fill remaining slots up to flights_per_route
-                    if len(selected_flights) < flights_per_route:
+                        # Ensure carrier diversity
+                        seen_carriers = set()
+                        selected_flights = []
                         for c in cards:
-                            if c not in selected_flights:
+                            carrier = c["airline"]
+                            if carrier not in seen_carriers:
+                                seen_carriers.add(carrier)
                                 selected_flights.append(c)
-                                if len(selected_flights) >= flights_per_route:
-                                    break
+                            if len(selected_flights) >= flights_per_route:
+                                break
 
-                    for idx, flt in enumerate(selected_flights):
-                        carrier_slug = re.sub(r'[^a-zA-Z0-9]', '', flt['airline'])
-                        flight_slug = re.sub(r'[^a-zA-Z0-9]', '', flt['flightNumber'])
-                        flt_dir = os.path.join(rh_dir, f"{idx+1:02d}_{carrier_slug}_{flight_slug}")
-                        os.makedirs(flt_dir, exist_ok=True)
+                        # Fill remaining slots up to flights_per_route
+                        if len(selected_flights) < flights_per_route:
+                            for c in cards:
+                                if c not in selected_flights:
+                                    selected_flights.append(c)
+                                    if len(selected_flights) >= flights_per_route:
+                                        break
 
-                        quote = await audit_cleartrip_flight(context, search_url, flt, flt_dir, route_code, horizon_label)
-                        if quote:
-                            all_audited_quotes.append(quote)
-                            print(f"  [✅] Audited {flt['airline']:<20} ({flt['flightNumber']:<8}) | Base: INR {quote['base_fare_inr']} | Taxes: INR {quote['taxes_inr']} | Total: INR {quote['final_payable_total_inr']}")
-                        await asyncio.sleep(4)
+                        for idx, flt in enumerate(selected_flights):
+                            carrier_slug = re.sub(r'[^a-zA-Z0-9]', '', flt['airline'])
+                            flight_slug = re.sub(r'[^a-zA-Z0-9]', '', flt['flightNumber'])
+                            flt_dir = os.path.join(rh_dir, f"{idx+1:02d}_{carrier_slug}_{flight_slug}")
+                            os.makedirs(flt_dir, exist_ok=True)
 
-                except Exception as e:
-                    print(f"[⚠️ ] {route_code}_{horizon_label} | Error: {e}")
-                finally:
-                    await page.close()
+                            if checkout:
+                                quote = await audit_cleartrip_flight(context, search_url, flt, flt_dir, route_code, horizon_label)
+                                if quote:
+                                    all_audited_quotes.append(quote)
+                                    print(f"  [✅] Audited {flt['airline']:<20} ({flt['flightNumber']:<8}) | Base: INR {quote['base_fare_inr']} | Taxes: INR {quote['taxes_inr']} | Total: INR {quote['final_payable_total_inr']}")
 
-        await context.close()
+                                booking_count += 1
+                                if booking_count % 5 == 0:
+                                    print(f"\n⏳ Completed {booking_count} bookings. Enforcing 30s cooldown to reset session rate limits...")
+                                    await asyncio.sleep(30)
+                                else:
+                                    await asyncio.sleep(4)
+                            else:
+                                quote = {
+                                    "platform": "Cleartrip",
+                                    "audit_timestamp": datetime.utcnow().isoformat() + "Z",
+                                    "route": route_code,
+                                    "advance_horizon": horizon_label,
+                                    "airline": flt["airline"],
+                                    "flight_number": flt["flightNumber"],
+                                    "departure_time": flt["departureTime"],
+                                    "arrival_time": flt["arrivalTime"],
+                                    "duration": flt["duration"],
+                                    "total_fare_inr": flt["price"],
+                                    "stops": flt["stops"],
+                                    "screenshot": os.path.relpath(search_shot, run_dir)
+                                }
+                                all_audited_quotes.append(quote)
+                                save_run_artifact(flt_dir, "quote.json", quote)
+                                print(f"  [✅] Extracted {flt['airline']:<20} ({flt['flightNumber']:<8}) | Time: {flt['departureTime']}->{flt['arrivalTime']} | Fare: INR {flt['price']}")
+
+                    except Exception as e:
+                        print(f"[⚠️ ] {route_code}_{horizon_label} | Error: {e}")
+                    finally:
+                        await page.close()
+
+            finally:
+                try:
+                    await context.close()
+                except Exception:
+                    pass
+                try:
+                    import shutil
+                    shutil.rmtree(route_profile_dir, ignore_errors=True)
+                except Exception:
+                    pass
+
+            if route_idx < len(routes) - 1:
+                print(f"\n⏳ Completed Route {route_code}. Cooling down for 30s before launching next route session...")
+                await asyncio.sleep(30)
 
     save_run_artifact(run_dir, "audited_cleartrip_quotes.json", all_audited_quotes)
     print(f"\n🎉 Cleartrip Harvest Completed! Total Quotes Saved: {len(all_audited_quotes)}")
