@@ -109,15 +109,24 @@ async def extract_cleartrip_search_cards(page: Page) -> List[Dict[str, Any]]:
         const results = [];
         const bookButtons = Array.from(document.querySelectorAll('button')).filter(b => b.innerText.trim() === 'Book');
 
+        function findCardForButton(btn) {
+            let cur = btn.parentElement;
+            let card = null;
+            while (cur && cur !== document.body) {
+                const logos = cur.querySelectorAll('img[src*="air-logos"]');
+                const books = Array.from(cur.querySelectorAll('button')).filter(b => b.innerText.trim() === 'Book');
+                if (books.length === 1 && logos.length >= 1) {
+                    card = cur;
+                }
+                if (books.length > 1) break;
+                cur = cur.parentElement;
+            }
+            return card || btn.closest('div');
+        }
+
         for (let i = 0; i < bookButtons.length; i++) {
             const btn = bookButtons[i];
-            
-            // Traverse up to find card container
-            let container = btn;
-            for (let k = 0; k < 6; k++) {
-                if (container.parentElement) container = container.parentElement;
-            }
-
+            const container = findCardForButton(btn);
             if (!container) continue;
 
             const text = container.innerText || '';
@@ -139,7 +148,7 @@ async def extract_cleartrip_search_cards(page: Page) -> List[Dict[str, Any]]:
             if (!airlineName || /refundable/i.test(airlineName)) {
                 const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
                 for (const line of lines) {
-                    if (/^(indigo|air\s*india(\s*express)?|spicejet|akasa(\s*air)?|vistara|alliance\s*air)$/i.test(line)) {
+                    if (/^(indigo|air\s*india(\s*express)?|spicejet|akasa(\s*air)?|vistara|alliance\s*air|star\s*air)$/i.test(line)) {
                         airlineName = line;
                     }
                     if (/^[0-9A-Z]{2}[-\s]?[0-9]{3,4}$/i.test(line)) {
@@ -194,41 +203,97 @@ async def audit_cleartrip_flight(
     """
     Performs full multi-step checkout review for a single distinct Cleartrip flight in an isolated tab.
     """
+    initial_pages = set(context.pages)
     page = await context.new_page()
+    review_page = None
 
     try:
         await page.goto(search_url, wait_until="domcontentloaded", timeout=45000)
         await page.wait_for_selector("button:has-text('Book')", timeout=25000)
-        await page.wait_for_timeout(3000)
+        await page.wait_for_timeout(2000)
+
+        # Smooth scroll to ensure all lazy cards are hydrated in the DOM
+        await page.evaluate("""async () => {
+            const scrollHeight = document.body.scrollHeight || document.documentElement.scrollHeight;
+            for (let y = 0; y < Math.min(scrollHeight, 4000); y += 500) {
+                window.scrollBy(0, 500);
+                await new Promise(r => setTimeout(r, 60));
+            }
+            window.scrollTo(0, 0);
+        }""")
+        await page.wait_for_timeout(1000)
 
         # Match exact flight card by carrier and flight digits
         target_airline = flight_target.get("airline", "").strip().lower()
-        target_num_digits = re.sub(r"\D", "", flight_target.get("flightNumber", ""))
+        target_flight_no = flight_target.get("flightNumber", "").strip()
+        target_dom_index = flight_target.get("domIndex", -1)
 
-        clicked = await page.evaluate(r"""({ targetAirline, targetDigits }) => {
-            const clean = s => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+        target_btn_index = await page.evaluate(r"""({ targetAirline, targetFlightNo, targetIndex }) => {
+            const clean = s => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
             const bookButtons = Array.from(document.querySelectorAll('button')).filter(b => b.innerText.trim() === 'Book');
+            const cleanTargetAir = clean(targetAirline);
+            const cleanTargetFlt = clean(targetFlightNo);
+            const targetDigits = cleanTargetFlt.replace(/\D/g, '');
 
-            for (const btn of bookButtons) {
-                let container = btn;
-                for (let k = 0; k < 6; k++) {
-                    if (container.parentElement) container = container.parentElement;
+            function findCardForButton(btn) {
+                let cur = btn.parentElement;
+                let card = null;
+                while (cur && cur !== document.body) {
+                    const logos = cur.querySelectorAll('img[src*="air-logos"]');
+                    const books = Array.from(cur.querySelectorAll('button')).filter(b => b.innerText.trim() === 'Book');
+                    if (books.length === 1 && logos.length >= 1) {
+                        card = cur;
+                    }
+                    if (books.length > 1) break;
+                    cur = cur.parentElement;
                 }
-                const text = container ? container.innerText : '';
-                const cleanText = clean(text);
-                const digits = text.replace(/\D/g, '');
+                return card || btn.closest('div');
+            }
 
-                if (cleanText.includes(targetAirline.replace(/\s+/g, '')) && digits.includes(targetDigits)) {
-                    btn.click();
-                    return true;
+            // 1. Scan for button whose specific card matches the flight number!
+            if (cleanTargetFlt) {
+                for (let i = 0; i < bookButtons.length; i++) {
+                    const card = findCardForButton(bookButtons[i]);
+                    if (!card) continue;
+                    const t = clean(card.innerText);
+                    if (t.includes(cleanTargetFlt)) {
+                        return i;
+                    }
                 }
             }
-            return false;
-        }""", {"targetAirline": target_airline, "targetDigits": target_num_digits})
 
-        if not clicked:
+            // 2. Scan by carrier and digits
+            if (cleanTargetAir && targetDigits) {
+                for (let i = 0; i < bookButtons.length; i++) {
+                    const card = findCardForButton(bookButtons[i]);
+                    if (!card) continue;
+                    const t = clean(card.innerText);
+                    if (t.includes(cleanTargetAir) && t.includes(targetDigits)) {
+                        return i;
+                    }
+                }
+            }
+
+            // 3. Fallback to targetIndex if within bounds
+            if (targetIndex >= 0 && targetIndex < bookButtons.length) {
+                return targetIndex;
+            }
+
+            return -1;
+        }""", {
+            "targetAirline": target_airline,
+            "targetFlightNo": target_flight_no,
+            "targetIndex": target_dom_index
+        })
+
+        if target_btn_index < 0:
             print(f"  [!] Card match note for {flight_target['airline']} ({flight_target['flightNumber']}): Card not found")
             return None
+
+        # Execute genuine trusted OS-level click via Patchright CDP
+        book_btn = page.locator("button:has-text('Book')").nth(target_btn_index)
+        await book_btn.scroll_into_view_if_needed()
+        await book_btn.click()
 
         await page.wait_for_timeout(2000)
 
@@ -245,7 +310,8 @@ async def audit_cleartrip_flight(
         await page.wait_for_timeout(6000)
 
         # Find the review tab
-        review_page = context.pages[-1]
+        new_pages = [p for p in context.pages if p not in initial_pages and p != page]
+        review_page = new_pages[-1] if new_pages else context.pages[-1]
         await review_page.wait_for_load_state("domcontentloaded")
         await review_page.wait_for_timeout(3000)
 
@@ -310,7 +376,15 @@ async def audit_cleartrip_flight(
         print(f"  [❌] Error auditing Cleartrip flight {flight_target['airline']} ({flight_target['flightNumber']}): {e}")
         return None
     finally:
-        await page.close()
+        try:
+            await page.close()
+        except Exception:
+            pass
+        if review_page and review_page != page:
+            try:
+                await review_page.close()
+            except Exception:
+                pass
 
 
 async def run_cleartrip_harvest(
@@ -334,16 +408,28 @@ async def run_cleartrip_harvest(
 
     all_audited_quotes = []
 
+    profile_dir = os.path.join(os.getcwd(), "runs", "patchright_chrome_profile")
+    os.makedirs(profile_dir, exist_ok=True)
+
     async with async_playwright() as p:
-        temp_profile = tempfile.mkdtemp(prefix="airgo_cleartrip_")
-        context = await p.chromium.launch_persistent_context(
-            user_data_dir=temp_profile,
-            channel="chrome",
-            headless=False,
-            no_viewport=True,
-            locale="en-IN",
-            timezone_id="Asia/Kolkata"
-        )
+        try:
+            context = await p.chromium.launch_persistent_context(
+                user_data_dir=profile_dir,
+                channel="msedge",
+                headless=False,
+                no_viewport=True,
+                locale="en-IN",
+                timezone_id="Asia/Kolkata"
+            )
+        except Exception:
+            context = await p.chromium.launch_persistent_context(
+                user_data_dir=profile_dir,
+                channel="chrome",
+                headless=False,
+                no_viewport=True,
+                locale="en-IN",
+                timezone_id="Asia/Kolkata"
+            )
 
         for route in routes:
             origin = route["origin"]
@@ -383,6 +469,14 @@ async def run_cleartrip_harvest(
                         if len(selected_flights) >= flights_per_route:
                             break
 
+                    # Fill remaining slots up to flights_per_route
+                    if len(selected_flights) < flights_per_route:
+                        for c in cards:
+                            if c not in selected_flights:
+                                selected_flights.append(c)
+                                if len(selected_flights) >= flights_per_route:
+                                    break
+
                     for idx, flt in enumerate(selected_flights):
                         carrier_slug = re.sub(r'[^a-zA-Z0-9]', '', flt['airline'])
                         flight_slug = re.sub(r'[^a-zA-Z0-9]', '', flt['flightNumber'])
@@ -393,6 +487,7 @@ async def run_cleartrip_harvest(
                         if quote:
                             all_audited_quotes.append(quote)
                             print(f"  [✅] Audited {flt['airline']:<20} ({flt['flightNumber']:<8}) | Base: INR {quote['base_fare_inr']} | Taxes: INR {quote['taxes_inr']} | Total: INR {quote['final_payable_total_inr']}")
+                        await asyncio.sleep(4)
 
                 except Exception as e:
                     print(f"[⚠️ ] {route_code}_{horizon_label} | Error: {e}")
