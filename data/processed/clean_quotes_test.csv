@@ -1,0 +1,4 @@
+flight_no,airline,route,horizon,total_fare,base_fare,taxes,udf,source,status,scrape_timestamp
+6E-101,IndiGo,DEL-BOM,T+1,6500.0,5000.0,1200.0,300.0,airline,available,2026-08-30T20:00:00Z
+QP-404,Akasa Air,DEL-BOM,T+1,5500.0,4200.0,1000.0,300.0,airline,available,2026-08-30T20:04:00Z
+SG-303,SpiceJet,DEL-BOM,T+1,900000.0,899000.0,1000.0,0.0,airline,available,2026-08-30T20:03:00Z
