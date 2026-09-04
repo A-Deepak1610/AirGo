@@ -1,8 +1,7 @@
 """
-AirGo CLI Runner for Cleartrip Multi-Carrier Flight Harvesting across DGCA Routes.
+AirGo CLI Runner for Cleartrip Multi-Carrier Full-Day Flight Harvesting across DGCA Routes.
 Usage:
-    python scripts/run_cleartrip_harvest.py --top-n 1 --horizons 1 --flights-per-route 3
-    python scripts/run_cleartrip_harvest.py --top-n 5 --horizons 1,7,15,30,45 --flights-per-route 5
+    python scripts/run_cleartrip_harvest.py --top-n 1 --horizons 0,1,7,15,30,45
 """
 
 import os
@@ -18,11 +17,10 @@ from airgo.harvester.cleartrip_harvester import run_cleartrip_harvest
 
 
 def main():
-    parser = argparse.ArgumentParser(description="AirGo Cleartrip Multi-Carrier Route Harvester")
+    parser = argparse.ArgumentParser(description="AirGo Cleartrip Full-Day Route Harvester")
     parser.add_argument("--top-n", type=int, default=1, help="Number of top DGCA routes to audit (default: 1)")
-    parser.add_argument("--horizons", type=str, default="1", help="Comma-separated advance horizons in days (e.g. 1,7,15,30,45)")
-    parser.add_argument("--flights-per-route", type=int, default=3, help="Number of flights per route-horizon with carrier diversity (default: 3)")
-    parser.add_argument("--checkout", action="store_true", default=False, help="Whether to enter deep checkout booking flow (default: False, page flow only)")
+    parser.add_argument("--horizons", type=str, default="0,1,7,15,30,45", help="Comma-separated advance horizons in days (default: 0,1,7,15,30,45)")
+    parser.add_argument("--checkout", action="store_true", default=False, help="Whether to execute representative checkout tax audit (default: False)")
     parser.add_argument("--csv", type=str, default="data/processed/dgca_top100_route_basket.csv", help="Path to DGCA route basket CSV")
 
     args = parser.parse_args()
@@ -34,7 +32,6 @@ def main():
             csv_path=csv_full_path,
             top_n=args.top_n,
             horizons=horizons_list,
-            flights_per_route=args.flights_per_route,
             checkout=args.checkout
         )
     )
