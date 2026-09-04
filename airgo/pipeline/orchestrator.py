@@ -31,9 +31,9 @@ class PipelineOrchestrator:
         self.deduplicator = AirfareDeduplicator()
         self.aggregator = AirfareAggregator()
 
-    def start_scraping_run(self, platform: str, routes_count: int = 0) -> str:
+    def start_scraping_run(self, platform: str, routes_count: int = 0, custom_run_id: Optional[str] = None) -> str:
         """Initializes a new scraping run metadata entry."""
-        run_id = f"run_{platform.lower()}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
+        run_id = custom_run_id or f"run_{platform.lower()}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
         with get_db_session() as session:
             run_entry = ScrapingRunDB(
                 scraping_run_id=run_id,

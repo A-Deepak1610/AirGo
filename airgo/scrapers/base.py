@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime, date
 from typing import List, Optional, Dict, Any
 import requests
-from airgo.pipeline.models import RawQuoteSchema
+from airgo.pipeline.models import RawObservationSchema
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("AirGoScraper")
@@ -52,8 +52,9 @@ class BaseScraper(ABC):
         destination: str,
         departure_date: date,
         advance_window: str,
-        advance_days: int
-    ) -> List[RawQuoteSchema]:
+        advance_days: int,
+        run_id: str = "run_default"
+    ) -> List[RawObservationSchema]:
         pass
 
     def run_safe(
@@ -62,14 +63,15 @@ class BaseScraper(ABC):
         destination: str,
         departure_date: date,
         advance_window: str,
-        advance_days: int
-    ) -> List[RawQuoteSchema]:
+        advance_days: int,
+        run_id: str = "run_default"
+    ) -> List[RawObservationSchema]:
         retries = 0
         while retries < self.max_retries:
             try:
                 self.throttle()
                 start_time = time.time()
-                quotes = self.fetch_quotes(origin, destination, departure_date, advance_window, advance_days)
+                quotes = self.fetch_quotes(origin, destination, departure_date, advance_window, advance_days, run_id=run_id)
                 elapsed_ms = int((time.time() - start_time) * 1000)
                 self.logger.info(
                     f"[{self.name}] {origin}->{destination} ({advance_window}, {departure_date}): "
