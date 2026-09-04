@@ -3,7 +3,6 @@ import {
   TrendingUp, 
   Compass, 
   BarChart3, 
-  Users, 
   AlertTriangle, 
   Database, 
   Activity, 
@@ -14,7 +13,10 @@ import {
   Shield, 
   Settings,
   Scale,
-  Briefcase
+  Layers,
+  Plane,
+  Calendar,
+  BookOpen
 } from 'lucide-react';
 
 export const USER_ROLES = {
@@ -30,30 +32,32 @@ export const USER_ROLES = {
       {
         title: 'OVERVIEW',
         items: [
-          { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/', active: true }
+          { id: 'dashboard', label: 'Classic Dashboard', icon: LayoutDashboard, path: '/dashboard', active: true }
         ]
       },
       {
-        title: 'INTELLIGENCE',
+        title: 'INDEX & PRICE ANALYTICS',
         items: [
-          { id: 'airfare_index', label: 'Airfare Index', icon: TrendingUp, path: '/airfare-index' },
-          { id: 'route_intelligence', label: 'Route Intelligence', icon: Compass, path: '/route-intelligence' },
-          { id: 'fare_analytics', label: 'Fare Analytics', icon: BarChart3, path: '/fare-analytics' },
-          { id: 'passenger_demand', label: 'Passenger Demand', icon: Users, path: '/passenger-demand' },
-          { id: 'anomaly_detection', label: 'Anomaly Detection', icon: AlertTriangle, path: '/anomaly-detection', badge: '27' }
+          { id: 'routes_index', label: 'Route Index & Heatmap', icon: Compass, path: '/index/routes' },
+          { id: 'booking_window', label: 'Booking Window Horizon', icon: Calendar, path: '/index/booking-window' },
+          { id: 'airline_analytics', label: 'Airline Pricing & Yield', icon: Plane, path: '/index/airlines' },
+          { id: 'flight_analytics', label: 'Flight Product Explorer', icon: Layers, path: '/index/flights' },
+          { id: 'platform_analytics', label: 'Platform & OTA Spreads', icon: BarChart3, path: '/index/platforms' },
+          { id: 'price_analytics', label: 'Price Distributions & Volatility', icon: Activity, path: '/index/price-analytics' },
+          { id: 'inflation_analytics', label: 'Airfare Inflation', icon: TrendingUp, path: '/index/inflation' }
         ]
       },
       {
-        title: 'DATA',
+        title: 'AUDIT & METHODOLOGY',
         items: [
-          { id: 'data_sources', label: 'Data Sources', icon: Database, path: '/data-sources' },
-          { id: 'scraping_monitor', label: 'Scraping Monitor', icon: Activity, path: '/scraping-monitor' },
-          { id: 'data_quality', label: 'Data Quality', icon: CheckCircle2, path: '/data-quality' },
-          { id: 'historical_data', label: 'Historical Data', icon: History, path: '/historical-data' }
+          { id: 'raw_data', label: 'Raw Observations Log', icon: Database, path: '/index/raw-data' },
+          { id: 'data_quality', label: 'Data Quality Assurance', icon: CheckCircle2, path: '/index/data-quality' },
+          { id: 'methodology', label: 'Index Methodology', icon: BookOpen, path: '/index/methodology' },
+          { id: 'scraping_monitor', label: 'Scraping Monitor', icon: Activity, path: '/scraping-monitor' }
         ]
       },
       {
-        title: 'REPORTS',
+        title: 'REPORTS & EXPORTS',
         items: [
           { id: 'govt_reports', label: 'Government Reports', icon: FileText, path: '/govt-reports' },
           { id: 'export_centre', label: 'Export Centre', icon: Download, path: '/export-centre' }
@@ -81,23 +85,24 @@ export const USER_ROLES = {
       {
         title: 'OVERVIEW',
         items: [
-          { id: 'dashboard', label: 'Tariff Compliance Dashboard', icon: LayoutDashboard, path: '/', active: true }
+          { id: 'dashboard', label: 'Tariff Compliance Dashboard', icon: LayoutDashboard, path: '/dashboard', active: true }
         ]
       },
       {
         title: 'REGULATORY AUDIT',
         items: [
-          { id: 'airfare_index', label: 'Sector Tariff Compliance', icon: Scale, path: '/airfare-index' },
-          { id: 'route_intelligence', label: 'High Demand Surge Audit', icon: Compass, path: '/route-intelligence' },
+          { id: 'routes_index', label: 'Corridor Index & Heatmap', icon: Scale, path: '/index/routes' },
+          { id: 'booking_window', label: 'T+1 Surge Window Audit', icon: Calendar, path: '/index/booking-window' },
+          { id: 'platform_analytics', label: 'Direct vs OTA Fee Spreads', icon: BarChart3, path: '/index/platforms' },
           { id: 'anomaly_detection', label: 'Surge Price Anomalies', icon: AlertTriangle, path: '/anomaly-detection', badge: '12' }
         ]
       },
       {
         title: 'EVIDENCE & DATA',
         items: [
-          { id: 'scraping_monitor', label: 'Live Scraping Audits', icon: Activity, path: '/scraping-monitor' },
-          { id: 'data_quality', label: 'OTA Ground-Truth Verifier', icon: CheckCircle2, path: '/data-quality' },
-          { id: 'historical_data', label: 'Historical DGCA Tariff Archive', icon: History, path: '/historical-data' }
+          { id: 'raw_data', label: 'Raw Observations Audit Log', icon: Database, path: '/index/raw-data' },
+          { id: 'data_quality', label: 'Ground-Truth Quality Verifier', icon: CheckCircle2, path: '/index/data-quality' },
+          { id: 'scraping_monitor', label: 'Live Scraping Audits', icon: Activity, path: '/scraping-monitor' }
         ]
       },
       {
@@ -122,23 +127,24 @@ export const USER_ROLES = {
       {
         title: 'OVERVIEW',
         items: [
-          { id: 'dashboard', label: 'CPI Air Transport Dashboard', icon: LayoutDashboard, path: '/', active: true }
+          { id: 'dashboard', label: 'CPI Transport Dashboard', icon: LayoutDashboard, path: '/dashboard', active: true }
         ]
       },
       {
         title: 'MACRO INFLATION',
         items: [
-          { id: 'airfare_index', label: 'Real-Time APIx Series', icon: TrendingUp, path: '/airfare-index' },
-          { id: 'fare_analytics', label: 'CPI Basket Weight Impact', icon: BarChart3, path: '/fare-analytics' },
-          { id: 'passenger_demand', label: 'Transport Demand Deflator', icon: Users, path: '/passenger-demand' }
+          { id: 'inflation_analytics', label: 'Airfare Inflation Decomposition', icon: TrendingUp, path: '/index/inflation' },
+          { id: 'routes_index', label: 'Route Index Matrix', icon: Compass, path: '/index/routes' },
+          { id: 'price_analytics', label: 'Price Volatility Distributions', icon: Activity, path: '/index/price-analytics' }
         ]
       },
       {
-        title: 'FORECASTING',
+        title: 'FORECASTING & METHODOLOGY',
         items: [
+          { id: 'methodology', label: 'Econometric Methodology', icon: BookOpen, path: '/index/methodology' },
           { id: 'historical_data', label: 'Monthly CPI Historical Comparison', icon: History, path: '/historical-data' },
           { id: 'govt_reports', label: 'Monetary Policy Committee Reports', icon: FileText, path: '/govt-reports' },
-          { id: 'export_centre', label: 'RBI Macro Data Feeds (JSON/CSV)', icon: Download, path: '/export-centre' }
+          { id: 'export_centre', label: 'RBI Macro Data Feeds', icon: Download, path: '/export-centre' }
         ]
       }
     ]

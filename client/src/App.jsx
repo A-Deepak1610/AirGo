@@ -10,7 +10,6 @@ import { RoleSwitcherModal } from './components/common/RoleSwitcherModal';
 // Dedicated Pages
 import { DashboardPage } from './pages/DashboardPage';
 import { RouteIntelligencePage } from './pages/RouteIntelligencePage';
-import { AirfareIndexPage } from './pages/AirfareIndexPage';
 import { FareAnalyticsPage } from './pages/FareAnalyticsPage';
 import { PassengerDemandPage } from './pages/PassengerDemandPage';
 import { AnomalyDetectionPage } from './pages/AnomalyDetectionPage';
@@ -22,6 +21,20 @@ import { GovtReportsPage } from './pages/GovtReportsPage';
 import { ExportCentrePage } from './pages/ExportCentrePage';
 import { UsersRolesPage } from './pages/UsersRolesPage';
 import { SystemSettingsPage } from './pages/SystemSettingsPage';
+
+// Complete Airfare Index & Analytics Module Pages
+import { NationalOverviewPage } from './pages/NationalOverviewPage';
+import { RouteIndexPage } from './pages/RouteIndexPage';
+import { RouteDetailPage } from './pages/RouteDetailPage';
+import { BookingWindowPage } from './pages/BookingWindowPage';
+import { AirlineAnalyticsPage } from './pages/AirlineAnalyticsPage';
+import { FlightAnalyticsPage } from './pages/FlightAnalyticsPage';
+import { FlightDetailPage } from './pages/FlightDetailPage';
+import { PlatformAnalyticsPage } from './pages/PlatformAnalyticsPage';
+import { PriceAnalyticsPage } from './pages/PriceAnalyticsPage';
+import { InflationPage } from './pages/InflationPage';
+import { RawDataPage } from './pages/RawDataPage';
+import { MethodologyPage } from './pages/MethodologyPage';
 
 function AppLayout() {
   return (
@@ -40,10 +53,27 @@ function AppLayout() {
         {/* Page Content Body */}
         <main className="flex-1 p-6 space-y-6 max-w-[1600px] w-full mx-auto">
           <Routes>
-            <Route path="/" element={<DashboardPage />} />
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardPage />} />
+            
+            {/* Airfare Index & Analytics Module Routes */}
+            <Route path="/airfare-index" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/index/overview" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/index/routes" element={<RouteIndexPage />} />
+            <Route path="/index/routes/:routeId" element={<RouteDetailPage />} />
+            <Route path="/index/booking-window" element={<BookingWindowPage />} />
+            <Route path="/index/airlines" element={<AirlineAnalyticsPage />} />
+            <Route path="/index/flights" element={<FlightAnalyticsPage />} />
+            <Route path="/index/flights/:flightId" element={<FlightDetailPage />} />
+            <Route path="/index/platforms" element={<PlatformAnalyticsPage />} />
+            <Route path="/index/price-analytics" element={<PriceAnalyticsPage />} />
+            <Route path="/index/inflation" element={<InflationPage />} />
+            <Route path="/index/raw-data" element={<RawDataPage />} />
+            <Route path="/index/data-quality" element={<DataQualityPage />} />
+            <Route path="/index/methodology" element={<MethodologyPage />} />
+
+            {/* Platform Feature Routes */}
             <Route path="/route-intelligence" element={<RouteIntelligencePage />} />
-            <Route path="/airfare-index" element={<AirfareIndexPage />} />
             <Route path="/fare-analytics" element={<FareAnalyticsPage />} />
             <Route path="/passenger-demand" element={<PassengerDemandPage />} />
             <Route path="/anomaly-detection" element={<AnomalyDetectionPage />} />
