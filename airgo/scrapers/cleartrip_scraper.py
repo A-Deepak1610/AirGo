@@ -44,116 +44,12 @@ AIRLINE_LOOKUP = [
 ]
 
 
-def parse_cleartrip_flight_card(card_text: str, card_html: str = "") -> Optional[Dict[str, Any]]:
-    """
-    Parses a single raw flight card from Cleartrip live DOM.
-    Returns dict of extracted fields or None if card is invalid or unparseable.
-    Enforces STRICT ZERO DUMMY DATA policy — no hardcoded fallback flight numbers, times, or fees.
-    """
-    try:
-        lines = [s.strip() for s in card_text.split("\n") if s.strip()]
-        if not lines:
-            return None
-
-        # 1. Total Fare Extraction
-        price_val = None
-        for l in lines:
-            if "₹" in l:
-                clean_p = l.replace("₹", "").replace(",", "").strip()
-                m = re.search(r"(\d{3,6})", clean_p)
-                if m:
-                    val = float(m.group(1))
-                    if 1000 <= val <= 150000:
-                        price_val = val
-                        break
-
-        if not price_val or price_val <= 0:
-            return None
-
-        # 2. Airline Name & Carrier Code
-        carrier_name = None
-        carrier_code = None
-        for a_name, a_code in AIRLINE_LOOKUP:
-            if a_name.lower() in card_text.lower() or f"{a_code}.svg" in card_html or f'alt="{a_code}"' in card_html:
-                carrier_name = a_name
-                carrier_code = a_code
-                break
-
-        if not carrier_code:
-            code_match = re.search(r"\b(6E|AI|IX|QP|SG|UK|I5|IC)\b", card_text, re.IGNORECASE)
-            if code_match:
-                carrier_code = code_match.group(1).upper()
-                carrier_name = INDIAN_AIRLINES.get(carrier_code, carrier_code)
-
-        if not carrier_code or not carrier_name:
-            return None
-
-        # 3. Flight Number
-        flight_no = None
-        fn_match = re.search(r"\b(6E|AI|IX|QP|SG|UK|I5|IC)[\s-]?(\d{2,4})\b", card_text, re.IGNORECASE)
-        if fn_match:
-            flight_no = f"{fn_match.group(1).upper()}-{fn_match.group(2)}"
-        else:
-            fn_html = re.search(rf'alt="{carrier_code}".*?\b{carrier_code}[\s-]?(\d{{2,4}})\b', card_html, re.IGNORECASE | re.DOTALL)
-            if fn_html:
-                flight_no = f"{carrier_code}-{fn_html.group(1)}"
-
-        if not flight_no:
-            return None
-
-        # 4. Departure and Arrival Times
-        times = re.findall(r"\b([01]?\d|2[0-3]):([0-5]\d)\b", card_text)
-        if len(times) < 2:
-            return None
-
-        dep_time_str = f"{int(times[0][0]):02d}:{times[0][1]}"
-        arr_time_str = f"{int(times[1][0]):02d}:{times[1][1]}"
-
-        # 5. Duration
-        dur_match = re.search(r"(\d{1,2})\s*h(?:rs?)?\s*(?:(\d{1,2})\s*m(?:ins?)?)?", card_text, re.IGNORECASE)
-        if dur_match:
-            dur_h = int(dur_match.group(1))
-            dur_m = int(dur_match.group(2)) if dur_match.group(2) else 0
-            duration_mins = dur_h * 60 + dur_m
-        else:
-            duration_mins = 120
-
-        # 6. Stops
-        stops = 0
-        card_lower = card_text.lower()
-        if "1 stop" in card_lower or "1-stop" in card_lower:
-            stops = 1
-        elif "2 stop" in card_lower or "2-stop" in card_lower:
-            stops = 2
-
-        # 7. Fare Breakdown
-        base_fare = round(price_val * 0.74, 2)
-        taxes_and_fees = round(price_val - base_fare, 2)
-
-        return {
-            "source": "Cleartrip",
-            "carrier": carrier_name,
-            "carrier_code": carrier_code,
-            "flight_number": flight_no,
-            "departure_time": dep_time_str,
-            "arrival_time": arr_time_str,
-            "duration_mins": duration_mins,
-            "stops": stops,
-            "base_fare": base_fare,
-            "taxes_and_fees": taxes_and_fees,
-            "convenience_fee": 0.0,
-            "total_fare": price_val
-        }
-    except Exception:
-        return None
-
-
 class CleartripScraper(BaseScraper):
     """
     Live web scraper for Cleartrip flight search engine.
     Fetches 100% real observed live fares using fast Chrome-impersonated API endpoints
-    with Playwright DOM fallback.
-    Strictly ZERO dummy data policy — no synthetic random numbers or fake fallbacks.
+    and Playwright browser automation for visual DOM/Seat/Checkout audit proof.
+    Strictly ZERO dummy data policy.
     """
 
     def __init__(self, headless: bool = True, rate_limit_secs: float = 1.0):
@@ -168,6 +64,10 @@ class CleartripScraper(BaseScraper):
         departure_date: date,
         advance_window: str,
         advance_days: int,
+        run_dir: Optional[str] = None,
+        pause_for_inspection: bool = False,
+        checkout: bool = False,
+        select_seat: bool = False,
         **kwargs
     ) -> List[RawQuoteSchema]:
         quotes: List[RawQuoteSchema] = []
@@ -183,7 +83,7 @@ class CleartripScraper(BaseScraper):
             f"&origin={origin}%20-%20{orig_city},%20IN&destination={destination}%20-%20{dest_city},%20IN"
         )
 
-        # 1. Primary: Ultra-Fast Live Chrome API Extraction
+        # 1. Primary: Fast Live Chrome API Extraction
         try:
             params = {
                 "from": origin,
@@ -309,18 +209,67 @@ class CleartripScraper(BaseScraper):
         except Exception as e:
             self.logger.debug(f"[Cleartrip] API extraction error: {e}")
 
-        # 2. Fallback: Secondary Playwright DOM Scraper (if API returns 0 quotes)
-        if not quotes and self.headless is False:
+        # 2. Playwright Visual Inspection, DOM HTML & Seat Matrix Screenshot Capture
+        if run_dir or not self.headless or pause_for_inspection or checkout or select_seat:
             try:
                 from playwright.sync_api import sync_playwright
+                print(f"📸 Launching Chromium for Visual Ground-Truth & Seat Audit...")
                 with sync_playwright() as p:
-                    browser = p.chromium.launch(headless=self.headless, slow_mo=0, args=["--no-sandbox"])
-                    page = browser.new_page()
-                    page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
-                    page.wait_for_timeout(3000)
+                    browser = p.chromium.launch(
+                        headless=self.headless,
+                        slow_mo=500 if not self.headless else 0,
+                        args=["--no-sandbox", "--disable-setuid-sandbox"]
+                    )
+                    context = browser.new_context(viewport={"width": 1280, "height": 900})
+                    page = context.new_page()
+
+                    page.goto(search_url, wait_until="domcontentloaded", timeout=45000)
+                    page.wait_for_timeout(4000)
+
+                    if run_dir:
+                        html_path = os.path.join(run_dir, "search_results.html")
+                        png_path = os.path.join(run_dir, "search_results.png")
+                        with open(html_path, "w", encoding="utf-8") as f:
+                            f.write(page.content())
+                        page.screenshot(path=png_path, full_page=False)
+                        print(f"📸 Ground-truth screenshot saved: {png_path}")
+                        print(f"📄 Rendered DOM HTML saved: {html_path}")
+
+                    # Handle Book / Checkout / Seat Navigation Audit
+                    if checkout or select_seat:
+                        book_buttons = page.query_selector_all("button:has-text('Book')") or page.query_selector_all("button:has-text('Select')")
+                        if book_buttons:
+                            print("👆 Clicking flight card 'Book' button to audit checkout review...")
+                            book_buttons[0].click()
+                            page.wait_for_timeout(4000)
+
+                            if run_dir:
+                                checkout_png = os.path.join(run_dir, "checkout_review.png")
+                                checkout_html = os.path.join(run_dir, "checkout_review.html")
+                                with open(checkout_html, "w", encoding="utf-8") as f:
+                                    f.write(page.content())
+                                page.screenshot(path=checkout_png, full_page=False)
+                                print(f"📸 Checkout Review screenshot saved: {checkout_png}")
+
+                            if select_seat:
+                                seat_buttons = page.query_selector_all("button:has-text('Seat')") or page.query_selector_all("text=Select Seat")
+                                if seat_buttons:
+                                    print("💺 Clicking 'Select Seat' matrix...")
+                                    seat_buttons[0].click()
+                                    page.wait_for_timeout(3000)
+
+                                    if run_dir:
+                                        seat_png = os.path.join(run_dir, "seat_matrix.png")
+                                        page.screenshot(path=seat_png, full_page=False)
+                                        print(f"📸 Seat Matrix screenshot saved: {seat_png}")
+
+                    if pause_for_inspection:
+                        print("\n⏸️  [PAUSE] Browser window open for human audit inspection.")
+                        input("    Press ENTER to close browser and complete run...")
+
                     browser.close()
             except Exception as e:
-                self.logger.debug(f"[Cleartrip] Playwright DOM fallback error: {e}")
+                self.logger.warning(f"[Cleartrip] Playwright visual audit warning: {e}")
 
         if not quotes:
             self.logger.warning(f"[Cleartrip] Fail Fast: Zero valid live flight quotes extracted for {origin}->{destination} on {departure_date}")
