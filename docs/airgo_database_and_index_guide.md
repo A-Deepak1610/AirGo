@@ -79,12 +79,25 @@ with get_db_session() as s:
 ### 2.3 Timestamped Audit Run Folders (`runs/`)
 Every pipeline execution saves raw ground-truth proof inside `runs/YYYY-MM-DD_HH-MM-SS_<prefix>/`:
 * **`pipeline_result.json`**: Complete execution manifest with quote counts, status, and processing times.
-* **`audited_cleartrip_quotes.json`**: Full list of un-mutated scraped flight quotes.
+* **`audited_cleartrip_quotes.json`**: Full list of un-mutated flight quotes harvested from Cleartrip.
+* **`audited_easemytrip_quotes.json`**: Full list of live flight quotes harvested via EaseMyTrip's `AirBus_New` API response interception.
 * **`<route>/<horizon>/search_results.png`**: High-resolution browser screenshots verifying what was rendered on screen.
 
 ### 2.4 Interactive Web Dashboard
 * Built with modern React/Vite in `client/` and accessible at `http://localhost:8000/` or `http://localhost:8000/dashboard`.
 * Visualizes real-time index meters, historical trend charts, advance purchase elasticity curves, and sector heatmaps.
+
+### 2.5 Pipeline Stages Inspection CLI Tool
+To inspect and verify all 5 stages of the pipeline in real-time across both PostgreSQL and the local audit filesystem:
+```bash
+python scripts/check_pipeline_stages.py
+```
+This utility audits:
+1. `scraping_runs` & `raw_observations` counts and platform breakdowns (Cleartrip vs EaseMyTrip).
+2. `canonical_fares` deduplication, cheapest platform wins, and IQR outlier counts.
+3. `daily_airfare_aggregates` route-level statistical averages and medians.
+4. `apix_indices` headline, Laspeyres, Jevons, and Fisher index values.
+5. Local audit runs in `runs/` with screenshot and artifact counts.
 
 ---
 

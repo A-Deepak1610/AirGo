@@ -1,64 +1,91 @@
-# Walkthrough: Webscraped Flights, Headless Scraper Studio & AeroIntel AI Copilot
+# Walkthrough: Complete AirGo Documentation, Multi-OTA Pipeline & Verification Suite
 
-We have implemented authentic ground-truth webscraped flight inspection, interactive headless scraper simulation, live verification links, and an AI Econometric Copilot across the AirGo platform.
-
----
-
-## 🌟 Key Features Implemented
-
-### 1. Ground-Truth Webscraped Flight Proof & Verification
-- **Strict Zero-Dummy Data Adherence**: Integrated genuine extraction artifacts from `runs/2026-09-06_17-28-51_full_checkout_top1` and `runs/2026-09-06_20-38-36_easemytrip_full_day_top1`.
-- **4-Step Visual Ground-Truth Lightbox (`GroundTruthAuditModal.jsx`)**:
-  1. **Search Results**: Real DOM flight matrix capture.
-  2. **Checkout Review**: Exact price disaggregation (Base fare ₹4,709, statutory taxes ₹1,720, total fare ₹6,429).
-  3. **Aircraft Seat Map**: Real seat allocation (`31B`, ₹300 seat surcharge).
-  4. **Payment Gateway**: Authentic order token hash and checkout snapshot.
-- **Live Verification Links**: Clickable outbound links leading directly to authentic booking checkout tokens (e.g., EaseMyTrip order token `97yQlNJ34A4GGFoDiWQ/ChFT7V8ScSQ0txbr87inN6c=`).
-- **Inspection Integration**: Available in the [Data Collection Page](file:///home/rithish/Desktop/projects/AirGo/client/src/pages/DataCollectionPage.jsx), [Airfare Data Page](file:///home/rithish/Desktop/projects/AirGo/client/src/pages/AirfareDataPage.jsx), and [Live Scraper Ticker](file:///home/rithish/Desktop/projects/AirGo/client/src/components/dashboard/LiveScraperTicker.jsx).
+We have delivered comprehensive, production-grade technical and regulatory documentation across the entire AirGo platform, accompanying the dual-OTA live harvesting pipeline (Cleartrip + EaseMyTrip) and the 5-stage pipeline verification tooling.
 
 ---
 
-### 2. Headless Scraper Simulation Studio (`HeadlessDemoRunnerModal.jsx`)
-- **Interactive Chromium Harvester Runner**:
-  - Lets evaluators simulate a live Playwright run (`--headless=new` or `--visible --headed`).
-  - Terminal stream with colorized stdout/stderr logs, execution latency, and progress indicators across 4 stages (Search $\to$ Checkout $\to$ Seat Map $\to$ Gateway Hash).
-  - Real-time output table populated with verified flight quotes and direct inspection triggers.
-- **Accessible Globally**: Can be launched from the top navigation [Header](file:///home/rithish/Desktop/projects/AirGo/client/src/components/layout/Header.jsx), the [Live Scraper Ticker](file:///home/rithish/Desktop/projects/AirGo/client/src/components/dashboard/LiveScraperTicker.jsx), and the [Data Collection Page](file:///home/rithish/Desktop/projects/AirGo/client/src/pages/DataCollectionPage.jsx).
+## 🌟 What Was Completed
+
+### 1. Master System Documentation (`README.md`)
+- **Complete Architecture Manual**: Expanded `README.md` into an executive and developer-ready reference guide covering:
+  - MoSPI (NSO) and RBI Consumer Price Index (CPI) transport modernization context.
+  - High-frequency automated scraping architecture.
+  - Dual-OTA stealth harvesters (Cleartrip Patchright + EaseMyTrip Angular response interception).
+  - Strict Zero-Dummy Data & Audit Proof Guarantee (Rules 1–5).
+  - End-to-End 5-Stage Data Pipeline.
+  - Econometric formulation (Laspeyres, Jevons, Fisher Ideal, dynamic first-scrape $P_0$ baseline, DGCA Table 5.01 census weights).
+  - Complete PostgreSQL database schema table (all 7 tables).
+  - REST API endpoint summary.
+  - Unified CLI runner commands and options (`run.py`, `scripts/run_daily_harvest.py`).
+  - Automated testing and ethical scraping compliance.
 
 ---
 
-### 3. AeroIntel AI Econometric Copilot (`AICopilotDrawer.jsx`)
-- **AI-Powered Statistical Assistant**:
-  - Slide-out copilot drawer powered by the backend API endpoint (`POST /api/v1/copilot/chat`) with intelligent offline econometric reasoning fallback.
-  - Interactive prompts:
-    - *"Analyze T+1 surge on DEL-BOM"*
-    - *"Explain Fisher vs Laspeyres index methodology"*
-    - *"Detect fare gouging anomalies across carriers"*
-    - *"Audit OTA convenience fee markups"*
-  - Displays statistical metric cards ($L_t, F_t, J_t$), markdown bullet points, and dynamic policy recommendations.
-  - Export briefing action for DGCA / MoSPI policy memos.
+### 2. End-to-End Pipeline Architecture & Inspection Manual (`docs/pipeline_architecture_and_inspection.md`)
+- **Granular 5-Stage Deep Dive**:
+  - **Stage 1**: Multi-OTA Live Harvesting (`scraping_runs`, `raw_observations`, Cleartrip DOM traversal, EaseMyTrip `AirBus_New` response interception).
+  - **Stage 2**: Canonical Deduplication & Outlier Removal (`canonical_fares`, MD5 composite hashing, cross-platform price arbitrage, Tukey $1.5 \times \text{IQR}$ outlier rejection).
+  - **Stage 3**: Statistical Route Aggregation (`daily_airfare_aggregates`, multi-dimensional slicing by route, horizon, carrier, and platform).
+  - **Stage 4**: Econometric Index Calculation (`apix_indices`, dynamic $P_0=100.00$ derivation, Laspeyres, Jevons, Fisher formulas).
+  - **Stage 5**: Multi-Tier Audit & Verification (`runs/`, screenshots, manifests, and `scripts/check_pipeline_stages.py`).
+- **Mermaid Data Flow Diagram**: Visualizes the flow of quotes from harvesters through PostgreSQL tables to institutional feeds.
+- **Troubleshooting Guide**: Diagnostic steps for common issues (pipe delimiters, outlier flags, Chromium installation, Windows UTF-8 stdout).
 
 ---
 
-### 4. Real-time Live Scraper Ticker (`LiveScraperTicker.jsx`)
-- Compact, high-tech live pulse bar embedded at the top of the [Dashboard Page](file:///home/rithish/Desktop/projects/AirGo/client/src/pages/DashboardPage.jsx).
-- Displays real-time streaming quotes, price deltas, 4-step proof buttons, and quick triggers for the Scraper Studio and AI Copilot.
+### 3. REST API Specification & Developer Reference (`docs/api_reference.md`)
+- **Complete Endpoint Specifications**:
+  - `GET /api/v1/index/realtime`: Real-time national headline APIx, Laspeyres, Jevons, Fisher, DoD change %, and quote counts.
+  - `GET /api/v1/sectors/summary`: Route-by-route APIx values, DGCA traffic weights, and active carrier coverage.
+  - `GET /api/v1/elasticity`: Lead-time price decay curves across booking horizons ($T+1, T+7, T+15, T+30, T+45$).
+  - `GET /api/v1/backtest`: 30-day econometric validation against published DGCA average tariffs ($R^2 = 0.942$, $\text{MAPE} = 2.14\%$).
+  - `GET /api/v1/quotes`: Filtered, paginated canonical flight quotes with cross-platform price arbitrage details.
+  - `GET /api/v1/institutional/nso-feed`: Dedicated MoSPI Consumer Price Index transport sub-index feed.
+  - `GET /api/v1/institutional/rbi-bulletin`: RBI Monetary Policy Committee high-frequency price impulse nowcasting feed.
+  - `GET /api/v1/runs` & `GET /api/v1/runs/{run_folder}`: Audit execution folder discovery and ground-truth evidence serving.
+  - `POST /api/v1/copilot/chat`: AeroIntel AI Econometric Copilot assistant endpoint.
+  - `GET /api/v1/export/csv` & `GET /api/v1/export/json`: Institutional streaming data exports.
 
 ---
 
-### 5. Backend Static Audit File Serving & Runs API
-- [airgo/api/app.py](file:///home/rithish/Desktop/projects/AirGo/airgo/api/app.py):
-  - Mounted `/runs` statically so that PNG screenshots and HTML dumps are directly accessible over HTTP.
-  - Added `@app.get("/api/v1/runs")` to discover and list all timestamped run directories.
-  - Added `@app.post("/api/v1/copilot/chat")` to handle AI copilot queries with natural language responses, metrics, and actions.
+### 4. Database Schema & Index Guide Update (`docs/airgo_database_and_index_guide.md`)
+- Updated with EaseMyTrip integration alongside Cleartrip.
+- Added instructions for `scripts/check_pipeline_stages.py`.
+- Formally documented how the first scrape date dynamically establishes the Base Reference Period ($P_0$), normalizing Day 1 indices to **`100.00`** with zero hardcoded numbers.
 
 ---
 
-## 🧪 Verification & Build Status
+### 5. Automated Pipeline Inspection Tool (`scripts/check_pipeline_stages.py`)
+- Audits and displays the live health of all 5 pipeline stages directly from PostgreSQL and the filesystem:
+  ```bash
+  python scripts/check_pipeline_stages.py
+  ```
+- Validates:
+  1. `scraping_runs` and `raw_observations` counts and platform breakdowns.
+  2. `canonical_fares` deduplication, cheapest platform wins, and IQR outlier percentages.
+  3. `daily_airfare_aggregates` route-level statistical averages and medians.
+  4. `apix_indices` headline, Laspeyres, Jevons, and Fisher index values.
+  5. Local audit runs in `runs/` with screenshot and artifact counts.
 
-- **Build**: `npm run build` completed cleanly in 1.60s with 0 errors.
-- **Linter**: `npm run lint` completed with 0 errors.
-- **API Tests**:
-  - `GET http://localhost:8000/api/v1/runs` $\to$ Returns list of local runs and quote counts.
-  - `GET http://localhost:8000/runs/.../01_checkout_review.png` $\to$ Returns HTTP 200 image.
-  - `POST http://localhost:8000/api/v1/copilot/chat` $\to$ Returns structured AI analysis with econometric metrics.
+---
+
+## 🧪 Verification & Test Suite
+
+### Automated Test Suite Execution
+```bash
+python -m pytest tests/
+```
+**Result**:
+- `tests/test_cleartrip_best_practice.py` **PASSED**
+- `tests/test_data_pipeline.py` (4 tests) **PASSED**
+- `tests/test_easemytrip_pipeline.py` (2 tests) **PASSED**
+- **Overall**: **`7 passed in 30.57s`** (100% pass rate).
+
+### Pipeline Stage Inspection Execution
+```bash
+python scripts/check_pipeline_stages.py
+```
+**Result**:
+- Verified all 5 stages active, populated, and fully auditable.
+- Cleartrip and EaseMyTrip raw observations logged and cleanly deduplicated.
+- APIx Index computed with dynamic base period ($P_0=100.00$) and official DGCA Table 5.01 passenger census weights.
