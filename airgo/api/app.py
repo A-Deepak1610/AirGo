@@ -2,7 +2,6 @@ import os
 import io
 import sys
 import csv
-import logging
 import subprocess
 from datetime import date, datetime, timezone
 from typing import Optional, List
@@ -18,7 +17,7 @@ from sqlalchemy.orm import Session
 
 from airgo.pipeline.db import get_db, init_db
 from airgo.pipeline.models import (
-    CleanFareDB, RawQuoteDB, APIxIndexDB, ScraperLogDB,
+    CleanFareDB, APIxIndexDB, ScraperLogDB,
     CanonicalFareDB, DailyAirfareAggregateDB, ScrapingRunDB, RawObservationDB
 )
 from airgo.engine.dgca_weights import DGCA_ROUTES
@@ -88,7 +87,7 @@ def get_realtime_index(db: Session = Depends(get_db)):
     latest_index = db.scalars(stmt).first()
 
     if not latest_index:
-        res = index_calculator.compute_daily_index(date.today())
+        index_calculator.compute_daily_index(date.today())
         latest_index = db.scalars(stmt).first()
 
     if not latest_index:
@@ -144,20 +143,21 @@ def get_sectors_summary(db: Session = Depends(get_db)):
     ).all()
 
     # Group canonical fares by route for latest_date and base_date
-    latest_by_route = {}
-    base_by_route = {}
+    latest_by_route: dict[str, list[CanonicalFareDB]] = {}
+    base_by_route: dict[str, list[CanonicalFareDB]] = {}
     for rec in canon_records:
-        r = str(rec.route)
-        if latest_date is None or rec.observation_date == latest_date:
+        r = str(getattr(rec, "route", ""))
+        rec_date = getattr(rec, "observation_date", None)
+        if latest_date is None or rec_date == latest_date:
             latest_by_route.setdefault(r, []).append(rec)
-        if base_date and rec.observation_date == base_date:
+        if base_date is not None and rec_date == base_date:
             base_by_route.setdefault(r, []).append(rec)
 
     # Pre-fetch fallback clean fares if needed
     clean_records = db.scalars(
         select(CleanFareDB).where(CleanFareDB.is_outlier == False).order_by(desc(CleanFareDB.created_at))
     ).all()
-    clean_by_sector = {}
+    clean_by_sector: dict[str, list[CleanFareDB]] = {}
     for rec in clean_records:
         s = str(rec.sector)
         clean_by_sector.setdefault(s, []).append(rec)
@@ -561,10 +561,21 @@ def get_nso_cpi_feed(db: Session = Depends(get_db)):
         select(CanonicalFareDB).where(CanonicalFareDB.is_outlier == False).limit(500)
     ).all()
 
-    avg_base = round(sum([float(r.base_fare or 0) for r in canon_records if (r.base_fare or 0) > 0]) / max(1, len([r for r in canon_records if (r.base_fare or 0) > 0])), 2) if canon_records else 4820.0
-    avg_tax = round(sum([float(r.taxes or 0) for r in canon_records if (r.taxes or 0) > 0]) / max(1, len([r for r in canon_records if (r.taxes or 0) > 0])), 2) if canon_records else 850.0
-    avg_fee = round(sum([float(r.fees or 0) for r in canon_records if (r.fees or 0) > 0]) / max(1, len([r for r in canon_records if (r.fees or 0) > 0])), 2) if canon_records else 640.0
-    avg_convenience = round(sum([float(r.convenience_fee or 0) for r in canon_records if (r.convenience_fee or 0) > 0]) / max(1, len([r for r in canon_records if (r.convenience_fee or 0) > 0])), 2) if canon_records else 350.0
+    base_vals = [float(getattr(r, "base_fare", 0.0) or 0.0) for r in canon_records]
+    base_clean = [v for v in base_vals if v > 0]
+    avg_base = round(sum(base_clean) / len(base_clean), 2) if base_clean else 4820.0
+
+    tax_vals = [float(getattr(r, "taxes", 0.0) or 0.0) for r in canon_records]
+    tax_clean = [v for v in tax_vals if v > 0]
+    avg_tax = round(sum(tax_clean) / len(tax_clean), 2) if tax_clean else 850.0
+
+    fee_vals = [float(getattr(r, "fees", 0.0) or 0.0) for r in canon_records]
+    fee_clean = [v for v in fee_vals if v > 0]
+    avg_fee = round(sum(fee_clean) / len(fee_clean), 2) if fee_clean else 640.0
+
+    conv_vals = [float(getattr(r, "convenience_fee", 0.0) or 0.0) for r in canon_records]
+    conv_clean = [v for v in conv_vals if v > 0]
+    avg_convenience = round(sum(conv_clean) / len(conv_clean), 2) if conv_clean else 350.0
 
     return {
         "status": "OFFICIAL_RELEASE",
@@ -687,7 +698,7 @@ def trigger_scrape_job(
                 creationflags=creation_flags
             )
             proc.wait()
-        except Exception as e:
+        except Exception:
             orchestrator.run_batch(routes=routes, windows=windows, max_routes=4)
             cleaner.process_pending_quotes(date.today())
             index_calculator.compute_daily_index(date.today())
@@ -845,7 +856,6 @@ def list_scraped_runs(limit: int = 25):
         entry_dir = os.path.join(RUNS_DIR, entry)
         quotes_file = os.path.join(entry_dir, "audited_checkout_quotes.json")
         easemytrip_quotes_file = os.path.join(entry_dir, "audited_easemytrip_quotes.json")
-        batch_summary_file = os.path.join(entry_dir, "batch_summary.json")
 
         run_data = {
             "run_id": entry,
@@ -964,7 +974,15 @@ def copilot_chat(req: CopilotChatRequest, db: Session = Depends(get_db)):
 
     # 4. Default General Assistant
     return {
-        "reply": f"### ✈️ AirGo Econometric Copilot Report\n\n- **National APIx Index**: **118.42** (Base 2024 = 100.0, +1.4% 24h change)\n- **Observed Mean Fare**: ₹5,680 across 20 primary domestic corridors.\n- **Ingestion Scale**: 4,720 clean scraped quotes validated with zero-dummy verification.\n- **Leading Inflation Corridor**: DEL-BOM (+14.2% YoY, Index: 124.2).\n- **Stabilizing Corridor**: BLR-DEL (+3.2% YoY, Index: 112.5).\n\nAsk me about lead-time elasticity curves, corridor volatility rankings, Fisher vs Laspeyres calculations, or live headless scraper auditing!",
+        "reply": (
+            "### ✈️ AirGo Econometric Copilot Report\n\n"
+            "- **National APIx Index**: **118.42** (Base 2024 = 100.0, +1.4% 24h change)\n"
+            "- **Observed Mean Fare**: ₹5,680 across 20 primary domestic corridors.\n"
+            "- **Ingestion Scale**: 4,720 clean scraped quotes validated with zero-dummy verification.\n"
+            "- **Leading Inflation Corridor**: DEL-BOM (+14.2% YoY, Index: 124.2).\n"
+            "- **Stabilizing Corridor**: BLR-DEL (+3.2% YoY, Index: 112.5).\n\n"
+            "Ask me about lead-time elasticity curves, corridor volatility rankings, Fisher vs Laspeyres calculations, or live headless scraper auditing!"
+        ),
         "metrics": {
             "national_apix": 118.42,
             "avg_fare": 5680,
