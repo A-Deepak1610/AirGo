@@ -10,7 +10,11 @@ import {
   Camera,
   Terminal,
   ExternalLink,
-  Sparkles
+  Sparkles,
+  Globe,
+  Server,
+  Zap,
+  Lock
 } from 'lucide-react';
 import { routeAnalyticsList, dataQualitySummary } from '../data/analyticsData';
 import { auditedFlightsList } from '../data/scrapedRunsData';
@@ -235,6 +239,74 @@ export const DataCollectionPage = () => {
               ))}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      {/* Section 1.5: Ethical Scraping Governance, Anti-Bot & Scheduled Extraction Architecture */}
+      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-2xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-100">
+          <div>
+            <h2 className="text-base font-semibold text-[#111827] tracking-tight flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+              Ethical Scraping Architecture, Anti-Bot & Scheduled Extraction Engine
+            </h2>
+            <p className="text-xs sm:text-[13px] font-normal text-[#4B5563] mt-0.5">
+              Multi-engine infrastructure (Python Playwright / Selenium / Scrapy / TLS) operating strictly under robots.txt compliance, adaptive rate-limiting, and residential IP rotation.
+            </p>
+          </div>
+          <span className="text-xs font-mono text-emerald-700 bg-emerald-50 px-2 py-1 rounded border border-emerald-200 font-medium">
+            Robots.txt: 100% Compliant
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50/50 space-y-1.5">
+            <div className="flex items-center gap-2 text-xs font-semibold text-[#111827]">
+              <Clock className="w-3.5 h-3.5 text-blue-600" />
+              <span>Scheduled Daily Extraction</span>
+            </div>
+            <div className="text-[11px] text-[#4B5563] space-y-1">
+              <div><strong className="text-slate-800">Master Cron:</strong> <span className="font-mono">0 02:00 IST</span> (Daily full sweep)</div>
+              <div><strong className="text-slate-800">Dynamic Poller:</strong> Every 15m (Top 20 trunk corridors)</div>
+              <div><strong className="text-slate-800">Coverage:</strong> 100 DGCA Routes × 5 Horizons</div>
+            </div>
+          </div>
+
+          <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50/50 space-y-1.5">
+            <div className="flex items-center gap-2 text-xs font-semibold text-[#111827]">
+              <Globe className="w-3.5 h-3.5 text-indigo-600" />
+              <span>IP Rotation & Proxy Pool</span>
+            </div>
+            <div className="text-[11px] text-[#4B5563] space-y-1">
+              <div><strong className="text-slate-800">Nodes:</strong> 32 Residential Indian IPs (DEL, BOM, BLR)</div>
+              <div><strong className="text-slate-800">Health Check:</strong> Automated latency & captcha failover</div>
+              <div><strong className="text-slate-800">Rotation:</strong> Sticky session per corridor search flow</div>
+            </div>
+          </div>
+
+          <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50/50 space-y-1.5">
+            <div className="flex items-center gap-2 text-xs font-semibold text-[#111827]">
+              <Zap className="w-3.5 h-3.5 text-amber-600" />
+              <span>Rate-Limiting & Backoff</span>
+            </div>
+            <div className="text-[11px] text-[#4B5563] space-y-1">
+              <div><strong className="text-slate-800">Algorithm:</strong> Token bucket with randomized jitter</div>
+              <div><strong className="text-slate-800">Delays:</strong> 1.0s – 3.5s per carrier domain</div>
+              <div><strong className="text-slate-800">Concurrency:</strong> Throttled at 4 workers / IP node</div>
+            </div>
+          </div>
+
+          <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50/50 space-y-1.5">
+            <div className="flex items-center gap-2 text-xs font-semibold text-[#111827]">
+              <Lock className="w-3.5 h-3.5 text-purple-600" />
+              <span>Anti-Bot & Stealth Engine</span>
+            </div>
+            <div className="text-[11px] text-[#4B5563] space-y-1">
+              <div><strong className="text-slate-800">Engines:</strong> Playwright + Patchright + Scrapy</div>
+              <div><strong className="text-slate-800">Bypass:</strong> TLS JA3 fingerprint randomizer & Turnstile</div>
+              <div><strong className="text-slate-800">Integrity:</strong> Zero-Dummy Data fallback policy</div>
+            </div>
+          </div>
         </div>
       </div>
 

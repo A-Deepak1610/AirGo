@@ -10,7 +10,11 @@ import {
   Calendar,
   Tag,
   Building2,
-  RotateCcw
+  RotateCcw,
+  Terminal,
+  CheckCircle2,
+  Copy,
+  ShieldCheck
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -34,6 +38,8 @@ export const IndexApixPage = () => {
   const navigate = useNavigate();
   const [activeFormula, setActiveFormula] = useState('laspeyres'); // 'laspeyres' | 'jevons' | 'fisher'
   const [activeHorizon, setActiveHorizon] = useState('daily'); // 'daily' | 'weekly' | 'monthly'
+  const [activeApiTab, setActiveApiTab] = useState('nso'); // 'nso' | 'rbi' | 'python'
+  const [copiedApi, setCopiedApi] = useState(false);
 
   // Calculations for formula variants based on current data
   const formulaStats = {
@@ -428,6 +434,149 @@ export const IndexApixPage = () => {
               ))}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      {/* Section: Institutional NSO & RBI High-Frequency Ingestion API Specification */}
+      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-2xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+          <div>
+            <h2 className="text-base font-semibold text-[#111827] tracking-tight flex items-center gap-2">
+              <Terminal className="w-4 h-4 text-blue-600" />
+              Institutional API Gateway for NSO & Reserve Bank of India
+            </h2>
+            <p className="text-xs sm:text-[13px] font-normal text-[#4B5563] mt-0.5">
+              Production JSON data streams designed for MoSPI Consumer Price Index compilation and RBI Monetary Policy nowcasting.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg text-xs font-medium">
+            <button
+              onClick={() => setActiveApiTab('nso')}
+              className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
+                activeApiTab === 'nso' ? 'bg-white text-blue-700 shadow-2xs font-semibold' : 'text-[#4B5563] hover:text-[#111827]'
+              }`}
+            >
+              MoSPI / NSO Feed
+            </button>
+            <button
+              onClick={() => setActiveApiTab('rbi')}
+              className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
+                activeApiTab === 'rbi' ? 'bg-white text-blue-700 shadow-2xs font-semibold' : 'text-[#4B5563] hover:text-[#111827]'
+              }`}
+            >
+              RBI Bulletin Feed
+            </button>
+            <button
+              onClick={() => setActiveApiTab('python')}
+              className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
+                activeApiTab === 'python' ? 'bg-white text-blue-700 shadow-2xs font-semibold' : 'text-[#4B5563] hover:text-[#111827]'
+              }`}
+            >
+              Python Client
+            </button>
+          </div>
+        </div>
+
+        {/* Code & Specification Box */}
+        <div className="bg-slate-900 rounded-lg p-4 font-mono text-xs text-slate-100 overflow-x-auto relative">
+          <button
+            onClick={() => {
+              const code = activeApiTab === 'nso' 
+                ? 'curl -X GET "http://localhost:8000/api/v1/institutional/nso-feed" -H "Accept: application/json"'
+                : activeApiTab === 'rbi'
+                ? 'curl -X GET "http://localhost:8000/api/v1/institutional/rbi-bulletin" -H "Accept: application/json"'
+                : 'import requests\n\n# MoSPI CPI Central Compilation Integration\nr = requests.get("http://localhost:8000/api/v1/institutional/nso-feed")\ndata = r.json()\nprint(f"National APIx: {data[\'headline_indices\'][\'laspeyres\']}")\nprint(f"Base Fare: ₹{data[\'component_fare_disaggregation_inr\'][\'average_base_fare\']}")';
+              navigator.clipboard.writeText(code);
+              setCopiedApi(true);
+              setTimeout(() => setCopiedApi(false), 2000);
+            }}
+            className="absolute top-3 right-3 flex items-center gap-1 bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded text-[11px] cursor-pointer border border-slate-700"
+          >
+            {copiedApi ? <CheckCircle2 className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+            <span>{copiedApi ? 'Copied!' : 'Copy Code'}</span>
+          </button>
+
+          {activeApiTab === 'nso' && (
+            <div>
+              <div className="text-slate-400 mb-2"># MoSPI National Statistical Office CPI Transport Sub-Index Ingestion</div>
+              <div className="text-emerald-400 mb-2">GET http://localhost:8000/api/v1/institutional/nso-feed</div>
+              <div className="text-slate-300 whitespace-pre leading-relaxed">{`{
+  "status": "OFFICIAL_RELEASE",
+  "base_period": "Calendar Year 2024 = 100.0",
+  "representative_city_pairs": 100,
+  "traffic_coverage_pct": 82.4,
+  "headline_indices": {
+    "laspeyres": 118.40,
+    "jevons": 117.65,
+    "fisher_ideal": 118.02,
+    "mom_change_pct": 3.8
+  },
+  "component_fare_disaggregation_inr": {
+    "average_base_fare": 4820.00,
+    "statutory_taxes_gst": 850.00,
+    "user_development_fee_udf_psf": 640.00,
+    "ota_convenience_charge": 350.00,
+    "total_effective_fare": 6660.00
+  },
+  "advance_window_subindices": {
+    "T+1_urgent": {"index": 142.6, "weight_pct": 18.0},
+    "T+7_weekly": {"index": 124.2, "weight_pct": 24.0},
+    "T+15_fortnight": {"index": 112.5, "weight_pct": 32.0},
+    "T+30_monthly": {"index": 104.8, "weight_pct": 16.0},
+    "T+45_base_inventory": {"index": 98.4, "weight_pct": 10.0}
+  }
+}`}</div>
+            </div>
+          )}
+
+          {activeApiTab === 'rbi' && (
+            <div>
+              <div className="text-slate-400 mb-2"># Reserve Bank of India Monetary Policy Committee (MPC) Nowcasting Feed</div>
+              <div className="text-emerald-400 mb-2">GET http://localhost:8000/api/v1/institutional/rbi-bulletin</div>
+              <div className="text-slate-300 whitespace-pre leading-relaxed">{`{
+  "status": "LIVE_TRANSMISSION",
+  "bulletin_frequency": "Daily High-Frequency Nowcasting",
+  "headline_price_impulse": {
+    "annualized_airfare_inflation_pct": 14.8,
+    "mom_momentum_pct": 3.8,
+    "volatility_dispersion_sigma": 3.45
+  },
+  "lead_time_elasticity_multipliers": {
+    "t1_over_t45_ratio": 2.01,
+    "t7_over_t45_ratio": 1.60,
+    "yield_management_inflection_day": 7
+  },
+  "top_trunk_corridors_pressure": [
+    {"corridor": "DEL-BOM", "weight_pct": 8.5, "volatility": 4.8},
+    {"corridor": "BLR-DEL", "weight_pct": 6.8, "volatility": 4.2},
+    {"corridor": "BOM-BLR", "weight_pct": 5.4, "volatility": 3.6}
+  ]
+}`}</div>
+            </div>
+          )}
+
+          {activeApiTab === 'python' && (
+            <div>
+              <div className="text-slate-400 mb-2"># Python Automated Ingestion Script for MoSPI / RBI Data Warehouses</div>
+              <div className="text-blue-400 mb-2">python3 -m pip install requests</div>
+              <div className="text-slate-300 whitespace-pre leading-relaxed">{`import requests
+
+# 1. Fetch Official MoSPI CPI Transport Sub-Index
+nso_response = requests.get("http://localhost:8000/api/v1/institutional/nso-feed")
+nso_data = nso_response.json()
+
+print(f"APIx Headline Index: {nso_data['headline_indices']['laspeyres']}")
+print(f"Base Fare: ₹{nso_data['component_fare_disaggregation_inr']['average_base_fare']}")
+
+# 2. Fetch RBI Monetary Policy High-Frequency Nowcast
+rbi_response = requests.get("http://localhost:8000/api/v1/institutional/rbi-bulletin")
+rbi_data = rbi_response.json()
+
+print(f"Airfare Inflation: {rbi_data['headline_price_impulse']['annualized_airfare_inflation_pct']}%")
+print(f"Volatility (σ): {rbi_data['headline_price_impulse']['volatility_dispersion_sigma']}")`}</div>
+            </div>
+          )}
         </div>
       </div>
 

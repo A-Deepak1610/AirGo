@@ -8,6 +8,7 @@ import { routeAnalyticsList } from '../data/analyticsData';
 import { LeadTimeCurveChart } from '../components/analytics/LeadTimeCurveChart';
 import { PriceDistributionChart } from '../components/analytics/PriceDistributionChart';
 import { PlatformComparisonTable } from '../components/analytics/PlatformComparisonTable';
+import { RouteHeatmapGrid } from '../components/analytics/RouteHeatmapGrid';
 import { PageHeader } from '../components/layout/PageHeader';
 
 export const AnalyticsPage = () => {
@@ -118,7 +119,10 @@ export const AnalyticsPage = () => {
         </div>
       </div>
 
-      {/* Section 1: Lead-Time Elasticity Curve */}
+      {/* Section 1: Sector-Wise Regional Price Pressure Heatmap Grid */}
+      <RouteHeatmapGrid />
+
+      {/* Section 2: Lead-Time Elasticity Curve */}
       <LeadTimeCurveChart 
         routeCode={selectedRouteCode} 
         windowData={activeRoute.windows} 

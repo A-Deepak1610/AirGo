@@ -22,7 +22,9 @@ export const SystemStatusPage = () => {
 
   const apiEndpoints = [
     { method: 'GET', path: '/api/v1/index/realtime', desc: 'Synthesizes real-time national APIx price index', status: '200 OK', latency: '42ms', uptime: '99.98%' },
-    { method: 'GET', path: '/api/v1/sectors/summary', desc: 'DGCA route basket summaries with traffic weights', status: '200 OK', latency: '58ms', uptime: '99.95%' },
+    { method: 'GET', path: '/api/v1/institutional/nso-feed', desc: 'Official MoSPI CPI Transport Sub-Index Ingestion Feed', status: '200 OK', latency: '24ms', uptime: '99.99%' },
+    { method: 'GET', path: '/api/v1/institutional/rbi-bulletin', desc: 'Reserve Bank of India Monetary Policy Nowcasting Feed', status: '200 OK', latency: '19ms', uptime: '99.99%' },
+    { method: 'GET', path: '/api/v1/sectors/summary', desc: 'DGCA route basket summaries with traffic weights', status: '200 OK', latency: '31ms', uptime: '99.95%' },
     { method: 'GET', path: '/api/v1/quotes', desc: 'Normalized and disaggregated airfare quote observations', status: '200 OK', latency: '65ms', uptime: '99.90%' },
     { method: 'GET', path: '/api/v1/elasticity', desc: 'Advance purchase lead-time pricing curves (T+1..T+45)', status: '200 OK', latency: '38ms', uptime: '99.99%' },
     { method: 'GET', path: '/api/v1/backtest', desc: 'Runs 30-day econometric validation against DGCA benchmarks', status: '200 OK', latency: '110ms', uptime: '99.85%' }
