@@ -29,17 +29,82 @@ function projectGeo(lat, lng, scale = 1.0) {
   return { x, y, z: 0 };
 }
 
-export const IndiaAviation3DMap = ({ defaultRoute = 'DEL-BOM', onSelectRoute }) => {
+// Lightweight procedural 3D commercial airliner model
+function createAirlinerMesh(scale = 1.0, color = 0xffffff, finColor = 0x2563eb) {
+  const plane = new THREE.Group();
+
+  // Fuselage (main body)
+  const bodyGeo = new THREE.CylinderGeometry(0.11 * scale, 0.08 * scale, 1.15 * scale, 10);
+  bodyGeo.rotateX(Math.PI / 2);
+  const bodyMat = new THREE.MeshStandardMaterial({ 
+    color: color, 
+    metalness: 0.5, 
+    roughness: 0.3 
+  });
+  const body = new THREE.Mesh(bodyGeo, bodyMat);
+  plane.add(body);
+
+  // Nose cone
+  const noseGeo = new THREE.ConeGeometry(0.11 * scale, 0.32 * scale, 10);
+  noseGeo.rotateX(-Math.PI / 2);
+  const nose = new THREE.Mesh(noseGeo, bodyMat);
+  nose.position.z = 0.72 * scale;
+  plane.add(nose);
+
+  // Swept Wings
+  const wingGeo = new THREE.BoxGeometry(1.5 * scale, 0.03 * scale, 0.32 * scale);
+  const wingMat = new THREE.MeshStandardMaterial({ 
+    color: 0x93c5fd, 
+    metalness: 0.4, 
+    roughness: 0.4 
+  });
+  const wing = new THREE.Mesh(wingGeo, wingMat);
+  wing.position.set(0, 0, 0.05 * scale);
+  plane.add(wing);
+
+  // Twin Turbofan Engines under wings
+  [-0.42 * scale, 0.42 * scale].forEach(x => {
+    const engineGeo = new THREE.CylinderGeometry(0.055 * scale, 0.045 * scale, 0.26 * scale, 8);
+    engineGeo.rotateX(Math.PI / 2);
+    const engineMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.7, roughness: 0.3 });
+    const engine = new THREE.Mesh(engineGeo, engineMat);
+    engine.position.set(x, -0.06 * scale, 0.05 * scale);
+    plane.add(engine);
+  });
+
+  // Vertical Tail Fin
+  const tailFinGeo = new THREE.BoxGeometry(0.03 * scale, 0.34 * scale, 0.22 * scale);
+  const tailFinMat = new THREE.MeshStandardMaterial({ color: finColor, roughness: 0.2 });
+  const tailFin = new THREE.Mesh(tailFinGeo, tailFinMat);
+  tailFin.position.set(0, 0.17 * scale, -0.48 * scale);
+  plane.add(tailFin);
+
+  // Horizontal Tail Stabilizers
+  const horizTailGeo = new THREE.BoxGeometry(0.55 * scale, 0.02 * scale, 0.16 * scale);
+  const horizTail = new THREE.Mesh(horizTailGeo, wingMat);
+  horizTail.position.set(0, 0.04 * scale, -0.5 * scale);
+  plane.add(horizTail);
+
+  return plane;
+}
+
+export const IndiaAviation3DMap = ({ 
+  defaultRoute = 'DEL-BOM', 
+  onSelectRoute,
+  isHeroMode = false,
+  height = '520px',
+  showControls = true
+}) => {
   const mountRef = useRef(null);
   const navigate = useNavigate();
 
-  // Interactive UI state
+  // Interactive UI state (autoRotate strictly false: India does NOT rotate)
   const [selectedCorridorId, setSelectedCorridorId] = useState(defaultRoute);
   const [hoveredAirport, setHoveredAirport] = useState(null);
   const [selectedFilter, setSelectedFilter] = useState('ALL'); // 'ALL' | 'HIGH' | 'MODERATE' | 'STABLE'
   const [selectedCarrier, setSelectedCarrier] = useState('ALL');
   const [is3DMode, setIs3DMode] = useState(true);
-  const [autoRotate, setAutoRotate] = useState(true);
+  const [autoRotate, setAutoRotate] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [activeFlightsCount, setActiveFlightsCount] = useState(148);
 
@@ -235,10 +300,10 @@ export const IndiaAviation3DMap = ({ defaultRoute = 'DEL-BOM', onSelectRoute }) 
       mapGroup.add(lineMesh);
       corridorObjects.push({ lineMesh, curve, corridor });
 
-      // Add animated flying flight photons (1-2 aircraft per corridor)
+      // Add animated flying flight photons (subtle photon pulses)
       const numAircraft = Math.max(1, Math.floor(corridor.flightsDaily / 30));
       for (let a = 0; a < numAircraft; a++) {
-        const photonGeo = new THREE.SphereGeometry(0.18, 12, 12);
+        const photonGeo = new THREE.SphereGeometry(0.16, 10, 10);
         const photonMat = new THREE.MeshBasicMaterial({
           color: isSelected ? 0xffffff : arcColor,
           transparent: true,
@@ -256,6 +321,32 @@ export const IndiaAviation3DMap = ({ defaultRoute = 'DEL-BOM', onSelectRoute }) 
         });
       }
     });
+
+    // 7.1 Active 3D Aircraft Models (1-2 models total, distinct orientations, smooth flight)
+    const activeAircraft = [];
+    const delBomObj = corridorObjects.find(c => c.corridor.id === 'DEL-BOM') || corridorObjects[0];
+    if (delBomObj) {
+      const plane1 = createAirlinerMesh(1.15, 0xffffff, 0x0284c7); // IndiGo cyan fin
+      mapGroup.add(plane1);
+      activeAircraft.push({
+        mesh: plane1,
+        curve: delBomObj.curve,
+        t: 0.25,
+        speed: 0.0038
+      });
+    }
+
+    const blrDelObj = corridorObjects.find(c => c.corridor.id === 'BLR-DEL') || corridorObjects[1];
+    if (blrDelObj) {
+      const plane2 = createAirlinerMesh(1.05, 0xf8fafc, 0xf59e0b); // Air India amber fin
+      mapGroup.add(plane2);
+      activeAircraft.push({
+        mesh: plane2,
+        curve: blrDelObj.curve,
+        t: 0.70,
+        speed: 0.0032
+      });
+    }
 
     // 8. Rotating 360° Aviation Radar Beam
     const radarBeamGeo = new THREE.RingGeometry(0.2, 24, 32, 1, 0, Math.PI / 4);
@@ -392,6 +483,16 @@ export const IndiaAviation3DMap = ({ defaultRoute = 'DEL-BOM', onSelectRoute }) 
         photon.mesh.position.copy(pos);
       });
 
+      // Move 3D aircraft along primary trunk curves with realistic pitch and heading
+      activeAircraft.forEach(ac => {
+        ac.t = (ac.t + ac.speed) % 1.0;
+        const pos = ac.curve.getPoint(ac.t);
+        const nextT = Math.min(ac.t + 0.02, 0.999);
+        const nextPos = ac.curve.getPoint(nextT);
+        ac.mesh.position.copy(pos);
+        ac.mesh.lookAt(nextPos);
+      });
+
       renderer.render(scene, camera);
     };
 
@@ -426,30 +527,31 @@ export const IndiaAviation3DMap = ({ defaultRoute = 'DEL-BOM', onSelectRoute }) 
       isFullscreen ? 'fixed inset-0 z-50 rounded-none' : 'w-full'
     }`}>
       {/* 1. Header Toolbar & Real-Time Airspace Status HUD */}
-      <div className="absolute top-0 inset-x-0 z-20 flex flex-wrap items-center justify-between gap-3 p-4 bg-gradient-to-b from-[#0a0f1d]/90 via-[#0a0f1d]/60 to-transparent backdrop-blur-xs pointer-events-none">
-        <div className="pointer-events-auto">
-          <div className="flex items-center gap-2.5">
-            <div className="relative flex items-center justify-center w-8 h-8 rounded-lg bg-blue-500/20 border border-blue-500/40 text-blue-400">
-              <Radio className="w-4 h-4 animate-pulse" />
-              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-            </div>
-            <div>
-              <h3 className="text-sm font-bold tracking-tight text-white flex items-center gap-2">
-                <span>DGCA National Airspace 3D Corridor Radar</span>
-                <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30 text-[10px] font-mono font-semibold">
-                  LIVE 3D
-                </span>
-              </h3>
-              <p className="text-[11px] text-slate-400 flex items-center gap-1.5 mt-0.5">
-                <span>Tracking 20 Core City-Pairs</span>
-                <span className="text-slate-600">·</span>
-                <span className="text-emerald-400 font-mono font-medium">{activeFlightsCount} Flights Active</span>
-                <span className="text-slate-600">·</span>
-                <span>82.4% Domestic Passenger Traffic Basket</span>
-              </p>
+      {showControls && (
+        <div className="absolute top-0 inset-x-0 z-20 flex flex-wrap items-center justify-between gap-3 p-4 bg-gradient-to-b from-[#0a0f1d]/90 via-[#0a0f1d]/60 to-transparent backdrop-blur-xs pointer-events-none">
+          <div className="pointer-events-auto">
+            <div className="flex items-center gap-2.5">
+              <div className="relative flex items-center justify-center w-8 h-8 rounded-lg bg-blue-500/20 border border-blue-500/40 text-blue-400">
+                <Radio className="w-4 h-4 animate-pulse" />
+                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+              </div>
+              <div>
+                <h3 className="text-sm font-bold tracking-tight text-white flex items-center gap-2">
+                  <span>DGCA National Airspace 3D Corridor Radar</span>
+                  <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30 text-[10px] font-mono font-semibold">
+                    LIVE 3D
+                  </span>
+                </h3>
+                <p className="text-[11px] text-slate-400 flex items-center gap-1.5 mt-0.5">
+                  <span>Tracking 20 Core City-Pairs</span>
+                  <span className="text-slate-600">·</span>
+                  <span className="text-emerald-400 font-mono font-medium">{activeFlightsCount} Flights Active</span>
+                  <span className="text-slate-600">·</span>
+                  <span>82.4% Domestic Passenger Traffic Basket</span>
+                </p>
+              </div>
             </div>
           </div>
-        </div>
 
         {/* Action Controls */}
         <div className="flex items-center gap-2 pointer-events-auto flex-wrap text-xs">
@@ -513,11 +615,13 @@ export const IndiaAviation3DMap = ({ defaultRoute = 'DEL-BOM', onSelectRoute }) 
           </button>
         </div>
       </div>
+      )}
 
       {/* 2. WebGL 3D Canvas Container */}
       <div 
         ref={mountRef} 
-        className={`w-full ${isFullscreen ? 'h-screen' : 'h-[520px]'} cursor-grab active:cursor-grabbing select-none`}
+        style={{ height: isFullscreen ? '100vh' : height }}
+        className="w-full cursor-grab active:cursor-grabbing select-none"
       />
 
       {/* 3. Floating Interactive Flight Corridor Telemetry HUD (Framer Motion) */}

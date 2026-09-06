@@ -7,6 +7,7 @@ import { Sidebar } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
 
 // 7 Core Workflow Pages for SIH26056
+// 7 Core Workflow Pages for SIH26056
 import { DashboardPage } from './pages/DashboardPage';
 import { DataCollectionPage } from './pages/DataCollectionPage';
 import { AirfareDataPage } from './pages/AirfareDataPage';
@@ -14,6 +15,9 @@ import { IndexApixPage } from './pages/IndexApixPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
 import { BacktestingPage } from './pages/BacktestingPage';
 import { SystemStatusPage } from './pages/SystemStatusPage';
+
+// Public Institutional Landing Page
+import { LandingPage } from './pages/LandingPage';
 
 // Corridor Micro-Level Deep Dive
 import { RouteDetailPage } from './pages/RouteDetailPage';
@@ -49,8 +53,6 @@ function AppLayout() {
         {/* Page Content Body */}
         <main className="flex-1 p-6 space-y-6 max-w-[1600px] w-full mx-auto">
           <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-
             {/* 7 Core Workflow Routes */}
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/data-collection" element={<DataCollectionPage />} />
@@ -135,7 +137,13 @@ function App() {
       <RoleProvider>
         <FilterProvider>
           <AuditModalProvider>
-            <AppLayout />
+            <Routes>
+              {/* Public Institutional Landing Page (Full-Width) */}
+              <Route path="/" element={<LandingPage />} />
+
+              {/* Operational Platform Terminal Suite */}
+              <Route path="/*" element={<AppLayout />} />
+            </Routes>
           </AuditModalProvider>
         </FilterProvider>
       </RoleProvider>

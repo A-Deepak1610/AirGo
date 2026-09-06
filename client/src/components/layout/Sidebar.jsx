@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { Globe } from 'lucide-react';
 import { useRole } from '../../context/RoleContext';
 
 export const Sidebar = () => {
@@ -25,6 +26,20 @@ export const Sidebar = () => {
             Airfare Index Platform
           </p>
         </div>
+      </div>
+
+      {/* Public Landing Portal Link */}
+      <div className="px-3.5 pt-3 pb-1">
+        <button
+          onClick={() => navigate('/')}
+          className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200/80 transition-all cursor-pointer shadow-2xs"
+        >
+          <div className="flex items-center gap-2.5">
+            <Globe className="w-3.5 h-3.5 text-blue-600" />
+            <span>Public Portal & APIx</span>
+          </div>
+          <span className="text-[10px] font-mono font-bold text-slate-400">HOME</span>
+        </button>
       </div>
 
       {/* Dynamic Role Navigation Sections (Increased Width & Domain-Relevant Icons) */}
