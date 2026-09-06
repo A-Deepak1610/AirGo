@@ -8,15 +8,15 @@ export const DomesticFareMovement = () => {
         {/* Header and Legend */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
           <div>
-            <h2 className="text-sm font-bold text-slate-900 tracking-tight">
+            <h2 className="text-base font-semibold text-[#111827] tracking-tight">
               Domestic Fare Movement
             </h2>
-            <p className="text-[11px] text-slate-500 mt-0.5">
+            <p className="text-xs sm:text-[13px] font-normal text-[#4B5563] mt-0.5">
               Route-level comparison – August 2026
             </p>
           </div>
 
-          <div className="flex items-center gap-3 text-[10px] font-medium text-slate-600">
+          <div className="flex items-center gap-3 text-xs font-medium text-[#6B7280]">
             <div className="flex items-center gap-1">
               <span className="w-2.5 h-2.5 rounded-xs bg-[#1d4ed8]"></span>
               <span>Aug 2026</span>
@@ -42,7 +42,7 @@ export const DomesticFareMovement = () => {
 
             return (
               <div key={idx} className="flex items-center gap-3 text-xs">
-                <span className="w-16 text-[11px] font-bold text-slate-700 shrink-0">
+                <span className="w-16 text-xs font-medium font-mono text-[#111827] shrink-0">
                   {item.route}
                 </span>
 
@@ -64,7 +64,7 @@ export const DomesticFareMovement = () => {
                   ></div>
                 </div>
 
-                <span className="w-14 text-right text-[11px] font-extrabold text-slate-800 shrink-0">
+                <span className="w-14 text-right text-xs font-medium font-mono tabular-nums text-[#111827] shrink-0">
                   {item.total}
                 </span>
               </div>

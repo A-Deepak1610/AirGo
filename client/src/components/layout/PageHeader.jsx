@@ -23,7 +23,7 @@ export const PageHeader = ({
     <div className="space-y-3.5 pb-4 border-b border-slate-200/90">
       {/* Optional Breadcrumb Navigation */}
       {breadcrumbs && breadcrumbs.length > 0 && (
-        <nav className="flex items-center gap-1.5 text-xs text-slate-500 font-medium -mb-1">
+        <nav className="flex items-center gap-1.5 text-xs text-[#6B7280] font-medium -mb-1">
           {breadcrumbs.map((crumb, idx) => {
             const isLast = idx === breadcrumbs.length - 1;
             return (
@@ -34,7 +34,7 @@ export const PageHeader = ({
                     {crumb.label}
                   </Link>
                 ) : (
-                  <span className={isLast ? "text-slate-800 font-semibold" : ""}>
+                  <span className={isLast ? "text-[#111827] font-semibold" : ""}>
                     {crumb.label}
                   </span>
                 )}
@@ -48,7 +48,7 @@ export const PageHeader = ({
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="space-y-1">
           <div className="flex items-center gap-2.5 flex-wrap">
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+            <h1 className="text-2xl sm:text-[28px] font-semibold text-[#111827] tracking-tight leading-[1.2]">
               {title}
             </h1>
             {badge && (
@@ -58,7 +58,7 @@ export const PageHeader = ({
             )}
           </div>
           {description && (
-            <p className="text-xs sm:text-sm text-slate-500 leading-relaxed max-w-4xl">
+            <p className="text-xs sm:text-sm font-normal text-[#4B5563] leading-relaxed max-w-4xl">
               {description}
             </p>
           )}

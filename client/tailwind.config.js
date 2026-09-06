@@ -27,10 +27,17 @@ export default {
           dark: '#0f172a',
           darkCard: '#1e293b',
           darkHover: '#334155'
+        },
+        text: {
+          primary: '#111827',
+          secondary: '#4B5563',
+          muted: '#6B7280',
+          disabled: '#9CA3AF',
         }
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        sans: ['Outfit', 'Inter', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'sans-serif'],
+        mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
       }
     },
   },

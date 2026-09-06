@@ -15,11 +15,11 @@ export const MetricCards = () => {
           >
             {/* Top row: Title and Alert tag if any */}
             <div className="flex items-start justify-between gap-2">
-              <span className="text-[11px] font-medium text-slate-500 leading-snug">
+              <span className="text-xs font-medium text-[#6B7280] leading-snug">
                 {metric.title}
               </span>
               {metric.tag && (
-                <span className="bg-red-500/10 text-red-600 border border-red-500/20 text-[9px] font-bold px-1.5 py-0.5 rounded tracking-wider">
+                <span className="bg-red-500/10 text-red-600 border border-red-500/20 text-[10px] font-medium px-1.5 py-0.5 rounded tracking-normal">
                   {metric.tag}
                 </span>
               )}
@@ -27,25 +27,25 @@ export const MetricCards = () => {
 
             {/* Middle: Big Value */}
             <div className="my-2.5">
-              <span className={`text-2xl font-extrabold tracking-tight ${isAnomaly ? 'text-slate-900' : 'text-slate-900'}`}>
+              <span className="text-2xl sm:text-[26px] font-semibold tracking-tight text-[#111827] font-mono tabular-nums leading-none">
                 {metric.value}
               </span>
             </div>
 
             {/* Bottom: Change and Subtext */}
-            <div className="text-[10px] space-y-0.5">
-              <div className="flex items-center gap-1 font-semibold">
+            <div className="text-xs space-y-0.5">
+              <div className="flex items-center gap-1 font-medium">
                 {isAnomaly ? (
-                  <span className="text-red-600 flex items-center gap-0.5">
+                  <span className="text-red-600 flex items-center gap-0.5 font-semibold">
                     {metric.change}
                   </span>
                 ) : (
-                  <span className="text-emerald-600 flex items-center gap-0.5">
+                  <span className="text-emerald-600 flex items-center gap-0.5 font-semibold">
                     <ArrowUpRight className="w-3 h-3 stroke-[2.5]" />
                     {metric.change}
                   </span>
                 )}
-                <span className="text-slate-400 font-normal truncate">{metric.changeSub}</span>
+                <span className="text-[#6B7280] font-normal text-[11px] truncate">{metric.changeSub}</span>
               </div>
             </div>
           </div>

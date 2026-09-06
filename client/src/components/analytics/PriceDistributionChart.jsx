@@ -35,20 +35,20 @@ export const PriceDistributionChart = ({ routeCode = 'DEL-BOM', fares = [3400, 3
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
-          <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+          <h3 className="text-base font-semibold text-[#111827] flex items-center gap-2">
             <BarChart3 className="w-4 h-4 text-indigo-600" />
             <span>Airfare Statistical Price Distribution Histogram ({routeCode})</span>
           </h3>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <p className="text-[13px] text-[#4B5563] mt-0.5">
             Empirical probability density of clean scraped fares highlighting central tendency and IQR outlier fences.
           </p>
         </div>
 
-        <div className="flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200 text-xs font-semibold">
+        <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-[13px] font-medium">
           <button
             onClick={() => setMetric('total')}
             className={`px-3 py-1 rounded-md transition-all ${
-              metric === 'total' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-600 hover:text-slate-900'
+              metric === 'total' ? 'bg-white text-[#111827] shadow-2xs font-medium' : 'text-[#6B7280] hover:text-[#111827]'
             }`}
           >
             Total Fare
@@ -56,7 +56,7 @@ export const PriceDistributionChart = ({ routeCode = 'DEL-BOM', fares = [3400, 3
           <button
             onClick={() => setMetric('base')}
             className={`px-3 py-1 rounded-md transition-all ${
-              metric === 'base' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-600 hover:text-slate-900'
+              metric === 'base' ? 'bg-white text-[#111827] shadow-2xs font-medium' : 'text-[#6B7280] hover:text-[#111827]'
             }`}
           >
             Base Fare
@@ -86,7 +86,7 @@ export const PriceDistributionChart = ({ routeCode = 'DEL-BOM', fares = [3400, 3
                     : 'bg-indigo-600 hover:bg-indigo-700'
                 }`}
               />
-              <span className="text-[9px] text-slate-500 font-mono mt-1 rotate-0 truncate max-w-full">
+              <span className="text-[10px] text-[#6B7280] font-mono mt-1 rotate-0 truncate max-w-full">
                 {(b.start / 1000).toFixed(1)}k
               </span>
             </div>
@@ -97,28 +97,28 @@ export const PriceDistributionChart = ({ routeCode = 'DEL-BOM', fares = [3400, 3
       {/* Statistical Quantiles Matrix */}
       <div className="grid grid-cols-2 sm:grid-cols-6 gap-2 pt-1 text-center">
         <div className="p-2 bg-slate-50 rounded-lg border border-slate-200">
-          <span className="text-[10px] text-slate-500 uppercase block">Mean (Avg)</span>
-          <span className="text-sm font-bold text-slate-900 font-mono">₹{mean.toLocaleString()}</span>
+          <span className="text-[11px] font-medium text-[#6B7280] block">Mean (Avg)</span>
+          <span className="text-sm font-semibold text-[#111827] font-mono tabular-nums">₹{mean.toLocaleString()}</span>
         </div>
         <div className="p-2 bg-slate-50 rounded-lg border border-slate-200">
-          <span className="text-[10px] text-slate-500 uppercase block">Median (P50)</span>
-          <span className="text-sm font-bold text-blue-600 font-mono">₹{median.toLocaleString()}</span>
+          <span className="text-[11px] font-medium text-[#6B7280] block">Median (P50)</span>
+          <span className="text-sm font-semibold text-blue-600 font-mono tabular-nums">₹{median.toLocaleString()}</span>
         </div>
         <div className="p-2 bg-slate-50 rounded-lg border border-slate-200">
-          <span className="text-[10px] text-slate-500 uppercase block">25th Percentile</span>
-          <span className="text-sm font-bold text-slate-700 font-mono">₹{p25.toLocaleString()}</span>
+          <span className="text-[11px] font-medium text-[#6B7280] block">25th Percentile</span>
+          <span className="text-sm font-semibold text-[#111827] font-mono tabular-nums">₹{p25.toLocaleString()}</span>
         </div>
         <div className="p-2 bg-slate-50 rounded-lg border border-slate-200">
-          <span className="text-[10px] text-slate-500 uppercase block">75th Percentile</span>
-          <span className="text-sm font-bold text-slate-700 font-mono">₹{p75.toLocaleString()}</span>
+          <span className="text-[11px] font-medium text-[#6B7280] block">75th Percentile</span>
+          <span className="text-sm font-semibold text-[#111827] font-mono tabular-nums">₹{p75.toLocaleString()}</span>
         </div>
         <div className="p-2 bg-slate-50 rounded-lg border border-slate-200">
-          <span className="text-[10px] text-slate-500 uppercase block">90th Percentile</span>
-          <span className="text-sm font-bold text-amber-700 font-mono">₹{p90.toLocaleString()}</span>
+          <span className="text-[11px] font-medium text-[#6B7280] block">90th Percentile</span>
+          <span className="text-sm font-semibold text-amber-700 font-mono tabular-nums">₹{p90.toLocaleString()}</span>
         </div>
         <div className="p-2 bg-slate-50 rounded-lg border border-slate-200">
-          <span className="text-[10px] text-slate-500 uppercase block">IQR Outlier Fence</span>
-          <span className="text-sm font-bold text-red-600 font-mono">&gt; ₹{Math.round(upperOutlierFence).toLocaleString()}</span>
+          <span className="text-[11px] font-medium text-[#6B7280] block">IQR Outlier Fence</span>
+          <span className="text-sm font-semibold text-red-600 font-mono tabular-nums">&gt; ₹{Math.round(upperOutlierFence).toLocaleString()}</span>
         </div>
       </div>
     </div>

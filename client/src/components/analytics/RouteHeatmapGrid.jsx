@@ -25,25 +25,25 @@ export const RouteHeatmapGrid = () => {
       {/* Controls & Metric Selectors */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
-          <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+          <h3 className="text-base font-semibold text-[#111827] flex items-center gap-2">
             <Flame className="w-4 h-4 text-amber-600" />
             <span>DGCA National Corridors Price Pressure Heatmap</span>
           </h3>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <p className="text-[13px] text-[#4B5563] mt-0.5">
             Visual matrix highlighting regional price pressures and inflation concentration across top Indian routes.
           </p>
         </div>
 
         {/* Switch Metric Tabs */}
-        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200 text-xs font-semibold overflow-x-auto max-w-full">
+        <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-[13px] font-medium overflow-x-auto max-w-full">
           {Object.entries(metricsConfig).map(([key, cfg]) => (
             <button
               key={key}
               onClick={() => setSelectedMetric(key)}
               className={`px-2.5 py-1 rounded-md whitespace-nowrap transition-all ${
                 selectedMetric === key
-                  ? 'bg-blue-600 text-white shadow-2xs font-bold'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-white text-[#111827] shadow-2xs font-medium'
+                  : 'text-[#6B7280] hover:text-[#111827]'
               }`}
             >
               {cfg.label.split(' ')[0]}
@@ -65,13 +65,13 @@ export const RouteHeatmapGrid = () => {
               onClick={() => navigate(`/index/routes/${r.route}`)}
               className={`p-3.5 rounded-xl border ${heatStyle} cursor-pointer hover:scale-[1.02] transition-all space-y-1 shadow-2xs`}
             >
-              <div className="flex justify-between items-center text-[11px] font-bold">
+              <div className="flex justify-between items-center text-xs font-semibold font-mono">
                 <span>{r.route}</span>
-                <span className="text-[10px] opacity-75">{r.tier}</span>
+                <span className="text-[11px] font-normal opacity-75">{r.tier}</span>
               </div>
-              <div className="text-xs opacity-80 truncate">{r.city1} ↔ {r.city2}</div>
-              <div className="text-lg font-black mt-1 font-mono">{formattedVal}</div>
-              <div className="text-[10px] opacity-75 font-medium flex justify-between items-center pt-1 border-t border-current/20">
+              <div className="text-xs opacity-85 truncate">{r.city1} ↔ {r.city2}</div>
+              <div className="text-xl font-semibold mt-1 font-mono tabular-nums tracking-tight">{formattedVal}</div>
+              <div className="text-[11px] opacity-75 font-normal flex justify-between items-center pt-1 border-t border-current/20 font-mono">
                 <span>Weight: {r.weightPct}%</span>
                 <span>Avg: ₹{(r.avgFare/1000).toFixed(1)}k</span>
               </div>

@@ -22,10 +22,10 @@ export const KeyInsights = ({ onNavigateAnalysis }) => {
     <div className="bg-white border border-slate-200/90 rounded-xl p-5 shadow-2xs">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-        <h2 className="text-sm font-bold text-slate-900 tracking-tight">
+        <h2 className="text-base font-semibold text-[#111827] tracking-tight">
           Key Insights
         </h2>
-        <span className="text-[11px] text-slate-400 font-medium">
+        <span className="text-xs text-[#6B7280] font-normal">
           AI-Driven Briefing Unit – August 2026
         </span>
       </div>
@@ -42,12 +42,12 @@ export const KeyInsights = ({ onNavigateAnalysis }) => {
                 <div className={`p-1.5 rounded-md ${card.bgColor} border ${card.borderColor}`}>
                   {getIcon(card.iconType)}
                 </div>
-                <h3 className="text-xs font-bold text-slate-900">
+                <h3 className="text-sm font-semibold text-[#111827]">
                   {card.title}
                 </h3>
               </div>
 
-              <p className="text-[11px] text-slate-600 leading-relaxed">
+              <p className="text-xs sm:text-[13px] text-[#4B5563] leading-relaxed">
                 {card.description}
               </p>
             </div>
@@ -55,7 +55,7 @@ export const KeyInsights = ({ onNavigateAnalysis }) => {
             <div className="mt-3 pt-2.5 border-t border-slate-100">
               <button
                 onClick={onNavigateAnalysis}
-                className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 hover:underline cursor-pointer"
+                className="text-xs sm:text-[13px] font-medium text-blue-600 hover:text-blue-700 flex items-center gap-1 hover:underline cursor-pointer"
               >
                 <span>{card.linkText}</span>
                 <ArrowRight className="w-3 h-3" />

@@ -225,29 +225,29 @@ export const IndexApixPage = () => {
           >
             <div className="flex justify-between items-start">
               <div>
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                <span className="text-sm font-semibold text-[#111827]">
                   {f.name}
                 </span>
-                <p className="text-2xl font-black text-slate-900 mt-1 font-mono">
+                <p className="text-2xl sm:text-[26px] font-semibold text-[#111827] mt-1 font-mono tabular-nums leading-none">
                   {f.currentValue.toFixed(2)}
                 </p>
               </div>
-              <span className={`text-xs font-bold px-2 py-0.5 rounded font-mono ${
+              <span className={`text-xs font-semibold px-2 py-0.5 rounded font-mono ${
                 activeFormula === key ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'
               }`}>
                 {f.symbol}
               </span>
             </div>
 
-            <p className="text-xs text-slate-600 mt-2 line-clamp-2 leading-relaxed">
+            <p className="text-xs sm:text-[13px] text-[#4B5563] mt-2 line-clamp-2 leading-relaxed">
               {f.description}
             </p>
 
             <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-              <span className="text-emerald-700 font-bold flex items-center gap-1 font-mono">
+              <span className="text-emerald-700 font-medium flex items-center gap-1 font-mono">
                 <ArrowUpRight className="w-3.5 h-3.5" /> 24h: {f.change24h}
               </span>
-              <span className="text-slate-500 font-medium font-mono">
+              <span className="text-[#6B7280] font-normal font-mono">
                 7d: {f.change7d}
               </span>
             </div>
@@ -259,17 +259,17 @@ export const IndexApixPage = () => {
       <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-2xs space-y-4">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-2 border-b border-slate-100">
           <div>
-            <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+            <h2 className="text-base font-semibold text-[#111827] tracking-tight flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-blue-600" />
               <span>National APIx Historical Trajectory ({currentFormula.name})</span>
             </h2>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs sm:text-[13px] font-normal text-[#4B5563] mt-0.5">
               Tracking Headline APIx vs. Urgent Booking Surge (T+1) vs. Long-Lead Base Inventory (T+45).
             </p>
           </div>
 
-          <div className="text-xs font-mono text-slate-500">
-            Observation Frequency: <span className="font-bold text-slate-800 capitalize">{activeHorizon}</span>
+          <div className="text-xs font-mono text-[#6B7280]">
+            Observation Frequency: <span className="font-semibold text-[#111827] capitalize">{activeHorizon}</span>
           </div>
         </div>
 
@@ -324,46 +324,46 @@ export const IndexApixPage = () => {
       <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-2xs space-y-4">
         <div className="pb-2 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
-            <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+            <h2 className="text-base font-semibold text-[#111827] tracking-tight flex items-center gap-2">
               <Plane className="w-4 h-4 text-blue-600" />
               Carrier-Wise Airfare Indices & Market Shares
             </h2>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs sm:text-[13px] font-normal text-[#4B5563] mt-0.5">
               Domestic scheduled airline pricing indices computed from weighted elementary price relatives.
             </p>
           </div>
-          <span className="text-[11px] font-mono text-slate-500">Weighted by domestic seat capacity</span>
+          <span className="text-xs font-mono text-[#6B7280]">Weighted by domestic seat capacity</span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {airlineAnalyticsList.map((a) => (
             <div key={a.code} className="p-4 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-2">
               <div className="flex justify-between items-center">
-                <span className="text-sm font-bold text-slate-900">{a.name}</span>
-                <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-700">
+                <span className="text-sm font-semibold text-[#111827]">{a.name}</span>
+                <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded bg-blue-50 text-blue-700">
                   {a.code}
                 </span>
               </div>
 
               <div className="flex items-baseline justify-between pt-1">
-                <span className="text-2xl font-black text-slate-900 font-mono">{a.index}</span>
-                <span className="text-xs font-semibold text-emerald-600 font-mono">
+                <span className="text-2xl font-semibold text-[#111827] font-mono tabular-nums leading-none">{a.index}</span>
+                <span className="text-xs font-medium text-emerald-600 font-mono">
                   +{a.yoyPct}% YoY
                 </span>
               </div>
 
               <div className="pt-2 border-t border-slate-100 space-y-1 text-xs">
-                <div className="flex justify-between text-slate-600">
+                <div className="flex justify-between text-[#4B5563]">
                   <span>DGCA Market Share:</span>
-                  <span className="font-bold text-slate-900 font-mono">{a.marketSharePct}%</span>
+                  <span className="font-semibold text-[#111827] font-mono tabular-nums">{a.marketSharePct}%</span>
                 </div>
-                <div className="flex justify-between text-slate-600">
+                <div className="flex justify-between text-[#4B5563]">
                   <span>Mean Fare:</span>
-                  <span className="font-bold text-slate-900 font-mono">₹{a.avgFare.toLocaleString()}</span>
+                  <span className="font-semibold text-[#111827] font-mono tabular-nums">₹{a.avgFare.toLocaleString()}</span>
                 </div>
-                <div className="flex justify-between text-slate-600">
+                <div className="flex justify-between text-[#4B5563]">
                   <span>T+1 Surge Multiplier:</span>
-                  <span className="font-bold text-red-600 font-mono">{a.surgeMultiplier}x</span>
+                  <span className="font-semibold text-red-600 font-mono tabular-nums">{a.surgeMultiplier}x</span>
                 </div>
               </div>
             </div>
@@ -375,51 +375,51 @@ export const IndexApixPage = () => {
       <div className="bg-white border border-slate-200 rounded-xl shadow-2xs overflow-hidden">
         <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+            <h2 className="text-base font-semibold text-[#111827] tracking-tight flex items-center gap-2">
               <Compass className="w-4 h-4 text-blue-600" />
               DGCA Monitored Corridors — Index & Price Movements
             </h2>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs sm:text-[13px] font-normal text-[#4B5563] mt-0.5">
               Corridor-specific Laspeyres price index numbers with base 2024 tariffs and 24-hour rate of change.
             </p>
           </div>
-          <span className="text-xs text-slate-500 font-mono">Total Corridors: {routeAnalyticsList.length}</span>
+          <span className="text-xs text-[#6B7280] font-mono">Total Corridors: {routeAnalyticsList.length}</span>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="border-b border-slate-200 text-slate-500 bg-slate-50 font-semibold">
-                <th className="py-2.5 px-4">Corridor Code</th>
-                <th className="py-2.5 px-4">Sector Description</th>
-                <th className="py-2.5 px-4 font-mono">DGCA Weight (w_i)</th>
-                <th className="py-2.5 px-4 font-mono">2024 Base Fare</th>
-                <th className="py-2.5 px-4 font-mono">Current Fare</th>
-                <th className="py-2.5 px-4 font-mono font-bold text-slate-900">APIx Corridor Index</th>
-                <th className="py-2.5 px-4 font-mono">24h Shift</th>
-                <th className="py-2.5 px-4 font-mono">YoY Change</th>
-                <th className="py-2.5 px-4 text-right">Route Deep Dive</th>
+              <tr className="border-b border-slate-200 text-[#6B7280] bg-slate-50 font-medium">
+                <th className="py-2.5 px-4 font-medium">Corridor Code</th>
+                <th className="py-2.5 px-4 font-medium">Sector Description</th>
+                <th className="py-2.5 px-4 font-medium font-mono">DGCA Weight (w_i)</th>
+                <th className="py-2.5 px-4 font-medium font-mono">2024 Base Fare</th>
+                <th className="py-2.5 px-4 font-medium font-mono">Current Fare</th>
+                <th className="py-2.5 px-4 font-medium font-mono text-[#111827]">APIx Corridor Index</th>
+                <th className="py-2.5 px-4 font-medium font-mono">24h Shift</th>
+                <th className="py-2.5 px-4 font-medium font-mono">YoY Change</th>
+                <th className="py-2.5 px-4 text-right font-medium">Route Deep Dive</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+            <tbody className="divide-y divide-slate-100 font-normal text-[#4B5563]">
               {routeAnalyticsList.map((r) => (
                 <tr key={r.route} className="hover:bg-slate-50 transition-colors">
-                  <td className="py-3 px-4 font-mono font-bold text-blue-700">{r.route}</td>
-                  <td className="py-3 px-4 font-semibold text-slate-900">{r.name || `${r.city1} ↔ ${r.city2}`}</td>
-                  <td className="py-3 px-4 font-mono">{r.trafficWeightPct || r.weightPct}%</td>
-                  <td className="py-3 px-4 font-mono text-slate-500">₹{(r.baseFare2024 || r.baseFare || 0).toLocaleString()}</td>
-                  <td className="py-3 px-4 font-mono font-bold text-slate-900">₹{(r.currentFare || r.avgFare || 0).toLocaleString()}</td>
-                  <td className="py-3 px-4 font-mono font-bold text-blue-600 text-sm">{r.index}</td>
-                  <td className="py-3 px-4 font-mono text-emerald-600 font-semibold">
+                  <td className="py-3 px-4 font-mono font-medium text-blue-700 text-[13px]">{r.route}</td>
+                  <td className="py-3 px-4 font-medium text-[#111827] text-[13px]">{r.name || `${r.city1} ↔ ${r.city2}`}</td>
+                  <td className="py-3 px-4 font-mono tabular-nums">{r.trafficWeightPct || r.weightPct}%</td>
+                  <td className="py-3 px-4 font-mono tabular-nums text-[#6B7280]">₹{(r.baseFare2024 || r.baseFare || 0).toLocaleString()}</td>
+                  <td className="py-3 px-4 font-mono tabular-nums font-medium text-[#111827]">₹{(r.currentFare || r.avgFare || 0).toLocaleString()}</td>
+                  <td className="py-3 px-4 font-mono tabular-nums font-semibold text-blue-600 text-[13px]">{r.index}</td>
+                  <td className="py-3 px-4 font-mono tabular-nums text-emerald-600 font-medium">
                     +{r.dodPct || '0.4'}%
                   </td>
-                  <td className="py-3 px-4 font-mono text-slate-700">
+                  <td className="py-3 px-4 font-mono tabular-nums text-[#4B5563]">
                     +{r.yoyPct}%
                   </td>
                   <td className="py-3 px-4 text-right">
                     <button
                       onClick={() => navigate(`/index/routes/${r.route}`)}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold transition-colors cursor-pointer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-[#4B5563] hover:text-[#111827] text-xs font-medium transition-colors cursor-pointer"
                     >
                       Inspect Micro-Data <ChevronRight className="w-3 h-3" />
                     </button>

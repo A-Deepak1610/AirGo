@@ -42,20 +42,20 @@ export const LeadTimeCurveChart = ({ routeCode = 'DEL-BOM', windowData = null })
       {/* Header & Controls */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
-          <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+          <h3 className="text-base font-semibold text-[#111827] flex items-center gap-2">
             <TrendingUp className="w-4 h-4 text-blue-600" />
             <span>Advance Purchase Lead-Time Elasticity Curve ({routeCode})</span>
           </h3>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <p className="text-[13px] text-[#4B5563] mt-0.5">
             Prices surge exponentially as departure date approaches (T+45 leisure baseline to T+1 urgent booking).
           </p>
         </div>
 
-        <div className="flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200 text-xs font-semibold">
+        <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-[13px] font-medium">
           <button
             onClick={() => setMetric('fare')}
             className={`px-3 py-1 rounded-md transition-all ${
-              metric === 'fare' ? 'bg-blue-600 text-white shadow-2xs font-bold' : 'text-slate-600 hover:text-slate-900'
+              metric === 'fare' ? 'bg-white text-[#111827] shadow-2xs font-medium' : 'text-[#6B7280] hover:text-[#111827]'
             }`}
           >
             Average Fare (₹)
@@ -63,7 +63,7 @@ export const LeadTimeCurveChart = ({ routeCode = 'DEL-BOM', windowData = null })
           <button
             onClick={() => setMetric('index')}
             className={`px-3 py-1 rounded-md transition-all ${
-              metric === 'index' ? 'bg-blue-600 text-white shadow-2xs font-bold' : 'text-slate-600 hover:text-slate-900'
+              metric === 'index' ? 'bg-white text-[#111827] shadow-2xs font-medium' : 'text-[#6B7280] hover:text-[#111827]'
             }`}
           >
             Window Index
@@ -90,16 +90,16 @@ export const LeadTimeCurveChart = ({ routeCode = 'DEL-BOM', windowData = null })
           <path d={areaD} fill="url(#curveGradient)" />
 
           {/* Curve Line */}
-          <path d={pathD} fill="none" stroke="#2563eb" strokeWidth="3" strokeLinecap="round" />
+          <path d={pathD} fill="none" stroke="#2563eb" strokeWidth="2.5" strokeLinecap="round" />
 
           {/* Data Points */}
           {points.map((p, idx) => (
             <g key={idx} className="group cursor-pointer">
-              <circle cx={p.x} cy={p.y} r="6" className="fill-blue-600 stroke-white stroke-2 group-hover:r-8 transition-all shadow-sm" />
-              <text x={p.x} y={p.y - 12} textAnchor="middle" className="text-[11px] font-bold fill-slate-900 font-mono">
+              <circle cx={p.x} cy={p.y} r="5" className="fill-blue-600 stroke-white stroke-2 group-hover:r-7 transition-all shadow-sm" />
+              <text x={p.x} y={p.y - 12} textAnchor="middle" className="text-[11px] font-medium fill-[#111827] font-mono tabular-nums">
                 {metric === 'fare' ? `₹${p.val.toLocaleString()}` : p.val}
               </text>
-              <text x={p.x} y="200" textAnchor="middle" className="text-[10px] font-bold fill-slate-500">
+              <text x={p.x} y="200" textAnchor="middle" className="text-[11px] font-medium fill-[#6B7280]">
                 {p.key}
               </text>
             </g>
@@ -111,11 +111,11 @@ export const LeadTimeCurveChart = ({ routeCode = 'DEL-BOM', windowData = null })
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-2 border-t border-slate-100">
         {keys.map((k) => (
           <div key={k} className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-center space-y-0.5">
-            <span className="text-[10px] font-bold text-slate-400 uppercase">{k} Window</span>
-            <div className="text-sm font-bold text-slate-900">
+            <span className="text-[11px] font-medium text-[#6B7280]">{k} Window</span>
+            <div className="text-sm font-semibold text-[#111827] font-mono tabular-nums">
               {metric === 'fare' ? `₹${windows[k].avgFare.toLocaleString()}` : windows[k].index}
             </div>
-            <div className="text-[10px] font-semibold text-emerald-600">
+            <div className="text-[11px] font-medium text-emerald-600">
               {windows[k].availabilityPct}% seat avail
             </div>
           </div>

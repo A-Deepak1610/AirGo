@@ -121,36 +121,36 @@ export const DataCollectionPage = () => {
       {/* 4 Summary Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Ingested Quotes</p>
-          <p className="text-2xl font-black text-slate-900 mt-1 font-mono">{dataQualitySummary.totalIngested.toLocaleString()}</p>
-          <div className="flex items-center gap-1.5 text-[11px] text-emerald-600 font-semibold mt-1">
+          <p className="text-xs font-medium text-[#6B7280]">Total Ingested Quotes</p>
+          <p className="text-2xl sm:text-[26px] font-semibold text-[#111827] mt-1 font-mono tabular-nums leading-none">{dataQualitySummary.totalIngested.toLocaleString()}</p>
+          <div className="flex items-center gap-1.5 text-xs text-emerald-600 font-medium mt-1">
             <CheckCircle2 className="w-3.5 h-3.5" />
             <span>99.1% Validated Samples</span>
           </div>
         </div>
 
         <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Monitored Route Corridors</p>
-          <p className="text-2xl font-black text-slate-900 mt-1 font-mono">20</p>
-          <div className="flex items-center gap-1.5 text-[11px] text-blue-600 font-semibold mt-1">
+          <p className="text-xs font-medium text-[#6B7280]">Monitored Route Corridors</p>
+          <p className="text-2xl sm:text-[26px] font-semibold text-[#111827] mt-1 font-mono tabular-nums leading-none">20</p>
+          <div className="flex items-center gap-1.5 text-xs text-blue-600 font-medium mt-1">
             <Plane className="w-3.5 h-3.5" />
             <span>82.4% Domestic Passenger Traffic</span>
           </div>
         </div>
 
         <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Advance Purchase Windows</p>
-          <p className="text-2xl font-black text-slate-900 mt-1 font-mono">5 Horizons</p>
-          <div className="flex items-center gap-1.5 text-[11px] text-slate-600 font-semibold mt-1">
+          <p className="text-xs font-medium text-[#6B7280]">Advance Purchase Windows</p>
+          <p className="text-2xl sm:text-[26px] font-semibold text-[#111827] mt-1 font-mono tabular-nums leading-none">5 Horizons</p>
+          <div className="flex items-center gap-1.5 text-xs text-[#6B7280] font-normal mt-1">
             <Calendar className="w-3.5 h-3.5" />
             <span>T+1, T+7, T+15, T+30, T+45</span>
           </div>
         </div>
 
         <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Zero-Dummy Audit Integrity</p>
-          <p className="text-2xl font-black text-emerald-600 mt-1 font-mono">100%</p>
-          <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium mt-1">
+          <p className="text-xs font-medium text-[#6B7280]">Zero-Dummy Audit Integrity</p>
+          <p className="text-2xl sm:text-[26px] font-semibold text-emerald-600 mt-1 font-mono tabular-nums leading-none">100%</p>
+          <div className="flex items-center gap-1.5 text-xs text-[#6B7280] font-normal mt-1">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
             <span>Local DOM & Screenshot Storage</span>
           </div>
@@ -161,14 +161,14 @@ export const DataCollectionPage = () => {
       <div className="bg-white border border-slate-200 rounded-xl shadow-2xs overflow-hidden">
         <div className="p-4 border-b border-slate-100 flex items-center justify-between">
           <div>
-            <h2 className="text-sm font-bold text-slate-900">
+            <h2 className="text-base font-semibold text-[#111827] tracking-tight">
               Airline & OTA Scraper Connector Matrix
             </h2>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs sm:text-[13px] font-normal text-[#4B5563] mt-0.5">
               Current operational health, response latency, and quote harvest quotas per source channel.
             </p>
           </div>
-          <span className="text-[11px] text-slate-500 font-medium">Auto-poll frequency: 15-60 min</span>
+          <span className="text-xs text-[#6B7280] font-normal">Auto-poll frequency: 15-60 min</span>
         </div>
 
         <div className="overflow-x-auto">
@@ -226,24 +226,24 @@ export const DataCollectionPage = () => {
       <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-2xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-100">
           <div>
-            <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+            <h2 className="text-base font-semibold text-[#111827] tracking-tight flex items-center gap-2">
               <Calendar className="w-4 h-4 text-blue-600" />
               Standardized Advance-Purchase Windows Matrix
             </h2>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs sm:text-[13px] font-normal text-[#4B5563] mt-0.5">
               DGCA-mandated temporal pricing horizons tracking lead time pricing behavior from same-day surge (T+1) to base inventory (T+45).
             </p>
           </div>
 
-          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg text-xs font-semibold">
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg text-[13px] font-medium">
             {['ALL', 'T+1', 'T+7', 'T+15', 'T+30', 'T+45'].map((w) => (
               <button
                 key={w}
                 onClick={() => setSelectedWindow(w)}
                 className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
                   selectedWindow === w
-                    ? 'bg-white text-blue-700 shadow-2xs font-bold'
-                    : 'text-slate-600 hover:text-slate-900'
+                    ? 'bg-white text-blue-700 shadow-2xs font-semibold'
+                    : 'text-[#4B5563] hover:text-[#111827]'
                 }`}
               >
                 {w}
@@ -263,24 +263,24 @@ export const DataCollectionPage = () => {
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-black font-mono px-2 py-0.5 rounded bg-blue-100 text-blue-800">
+                <span className="text-xs font-semibold font-mono px-2 py-0.5 rounded bg-blue-100 text-blue-800">
                   {aw.window}
                 </span>
-                <span className="text-[10px] font-bold text-slate-500">Weight: {aw.weight}</span>
+                <span className="text-xs font-medium text-[#6B7280]">Weight: {aw.weight}</span>
               </div>
-              <p className="text-xs font-bold text-slate-800 mt-2">{aw.label}</p>
-              <p className="text-[11px] text-slate-500 font-mono">Flight Date: {aw.targetDate}</p>
+              <p className="text-sm font-semibold text-[#111827] mt-2">{aw.label}</p>
+              <p className="text-xs text-[#6B7280] font-mono">Flight Date: {aw.targetDate}</p>
 
               <div className="mt-3 pt-3 border-t border-slate-100 space-y-1">
                 <div className="flex justify-between text-xs">
-                  <span className="text-slate-500">Sample Quotes:</span>
-                  <span className="font-bold text-slate-900 font-mono">{aw.observedQuotes}</span>
+                  <span className="text-[#6B7280]">Sample Quotes:</span>
+                  <span className="font-medium text-[#111827] font-mono tabular-nums">{aw.observedQuotes}</span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-slate-500">Avg Fare:</span>
-                  <span className="font-bold text-blue-700 font-mono">₹{aw.avgObservedFare.toLocaleString()}</span>
+                  <span className="text-[#6B7280]">Avg Fare:</span>
+                  <span className="font-semibold text-blue-700 font-mono tabular-nums">₹{aw.avgObservedFare.toLocaleString()}</span>
                 </div>
-                <div className="flex items-center gap-1 text-[10px] text-emerald-600 font-semibold pt-1">
+                <div className="flex items-center gap-1 text-[11px] text-emerald-600 font-medium pt-1">
                   <CheckCircle2 className="w-3 h-3" /> {aw.compliance}
                 </div>
               </div>
@@ -293,11 +293,11 @@ export const DataCollectionPage = () => {
       <div className="bg-white border border-slate-200 rounded-xl shadow-2xs overflow-hidden">
         <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+            <h2 className="text-base font-semibold text-[#111827] tracking-tight flex items-center gap-2">
               <Plane className="w-4 h-4 text-blue-600" />
               Domestic Route Basket Coverage
             </h2>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs sm:text-[13px] font-normal text-[#4B5563] mt-0.5">
               DGCA representative traffic basket comprising primary metro-to-metro and tier-1 regional corridors.
             </p>
           </div>
@@ -317,31 +317,31 @@ export const DataCollectionPage = () => {
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="border-b border-slate-200 text-slate-500 bg-slate-50 font-semibold">
-                <th className="py-2.5 px-4">Corridor Code</th>
-                <th className="py-2.5 px-4">Sector Description</th>
-                <th className="py-2.5 px-4 font-mono">Traffic Weight</th>
-                <th className="py-2.5 px-4 font-mono">Base Fare</th>
-                <th className="py-2.5 px-4 font-mono">Current Fare</th>
-                <th className="py-2.5 px-4 font-mono">Index Value</th>
-                <th className="py-2.5 px-4 font-mono">Active Carriers</th>
-                <th className="py-2.5 px-4 text-right">Collection Status</th>
+              <tr className="border-b border-slate-200 text-[#6B7280] bg-slate-50 font-medium">
+                <th className="py-2.5 px-4 font-medium">Corridor Code</th>
+                <th className="py-2.5 px-4 font-medium">Sector Description</th>
+                <th className="py-2.5 px-4 font-medium">Traffic Weight</th>
+                <th className="py-2.5 px-4 font-medium">Base Fare</th>
+                <th className="py-2.5 px-4 font-medium">Current Fare</th>
+                <th className="py-2.5 px-4 font-medium">Index Value</th>
+                <th className="py-2.5 px-4 font-medium">Active Carriers</th>
+                <th className="py-2.5 px-4 text-right font-medium">Collection Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+            <tbody className="divide-y divide-slate-100 font-normal text-[#4B5563]">
               {filteredRoutes.slice(0, 8).map((r) => (
                 <tr key={r.route} className="hover:bg-slate-50 transition-colors">
-                  <td className="py-3 px-4 font-mono font-bold text-blue-700">{r.route}</td>
-                  <td className="py-3 px-4 font-semibold text-slate-900">{r.name || `${r.city1} ↔ ${r.city2}`}</td>
-                  <td className="py-3 px-4 font-mono">{r.trafficWeightPct || r.weightPct}%</td>
-                  <td className="py-3 px-4 font-mono text-slate-500">₹{(r.baseFare2024 || r.baseFare || 0).toLocaleString()}</td>
-                  <td className="py-3 px-4 font-mono font-bold text-slate-900">₹{(r.currentFare || r.avgFare || 0).toLocaleString()}</td>
-                  <td className="py-3 px-4 font-mono font-bold text-blue-600">{r.index}</td>
-                  <td className="py-3 px-4 text-[11px] text-slate-600">
+                  <td className="py-3 px-4 font-mono font-medium text-blue-700 text-[13px]">{r.route}</td>
+                  <td className="py-3 px-4 font-medium text-[#111827] text-[13px]">{r.name || `${r.city1} ↔ ${r.city2}`}</td>
+                  <td className="py-3 px-4 font-mono tabular-nums">{r.trafficWeightPct || r.weightPct}%</td>
+                  <td className="py-3 px-4 font-mono tabular-nums text-[#6B7280]">₹{(r.baseFare2024 || r.baseFare || 0).toLocaleString()}</td>
+                  <td className="py-3 px-4 font-mono tabular-nums font-medium text-[#111827]">₹{(r.currentFare || r.avgFare || 0).toLocaleString()}</td>
+                  <td className="py-3 px-4 font-mono tabular-nums font-semibold text-blue-600">{r.index}</td>
+                  <td className="py-3 px-4 text-xs text-[#6B7280]">
                     IndiGo, Air India, Akasa, SpiceJet
                   </td>
                   <td className="py-3 px-4 text-right">
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                       <CheckCircle2 className="w-3 h-3" /> ACTIVE (T+1..T+45)
                     </span>
                   </td>
@@ -356,15 +356,15 @@ export const DataCollectionPage = () => {
       <div className="bg-white border border-slate-200 rounded-xl shadow-2xs overflow-hidden">
         <div className="p-4 border-b border-slate-100 flex items-center justify-between">
           <div>
-            <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+            <h2 className="text-base font-semibold text-[#111827] tracking-tight flex items-center gap-2">
               <Clock className="w-4 h-4 text-blue-600" />
               Raw Fare Quote Harvest Execution Log
             </h2>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs sm:text-[13px] font-normal text-[#4B5563] mt-0.5">
               Timestamped audit trail verifying Playwright Chromium headless and TLS direct extraction runs.
             </p>
           </div>
-          <span className="text-[11px] font-mono text-slate-400">Local audit storage: /runs/</span>
+          <span className="text-xs font-mono text-[#6B7280]">Local audit storage: /runs/</span>
         </div>
 
         <div className="overflow-x-auto">

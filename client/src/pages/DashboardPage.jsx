@@ -45,36 +45,36 @@ export const DashboardPage = () => {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-200 text-slate-900 font-sans">
+    <div className="space-y-6 animate-in fade-in duration-200 text-[#111827] font-sans">
       {/* 1. Standard Reusable PageHeader */}
       <PageHeader
         title="National Airfare Intelligence Dashboard"
         description="Real-time econometric monitoring of Indian domestic airfares, sector price trends, and index movements across key aviation corridors."
         actions={
           <>
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-medium">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
               Live Pipeline: 15m Sync
             </div>
             <button
               onClick={handleExport}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 transition-colors shadow-2xs cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-[13px] font-medium text-[#111827] transition-colors shadow-2xs cursor-pointer"
             >
-              <Download className="w-3.5 h-3.5 text-slate-500" />
+              <Download className="w-3.5 h-3.5 text-[#6B7280]" />
               Export Briefing
             </button>
           </>
         }
         filters={
-          <div className="flex items-center gap-3 flex-wrap w-full text-xs">
+          <div className="flex items-center gap-3 flex-wrap w-full text-[13px]">
             {/* Date Range */}
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-700 font-medium">
-              <Calendar className="w-3.5 h-3.5 text-slate-400" />
-              <span className="text-slate-400">Date:</span>
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-[#4B5563] font-medium">
+              <Calendar className="w-3.5 h-3.5 text-[#6B7280]" />
+              <span className="text-[#6B7280]">Date:</span>
               <select 
                 value={dateRange} 
                 onChange={(e) => setDateRange(e.target.value)}
-                className="bg-transparent font-bold text-slate-900 focus:outline-none cursor-pointer"
+                className="bg-transparent font-medium text-[#111827] focus:outline-none cursor-pointer"
               >
                 <option value="Aug 01 - Aug 31, 2026">Aug 01 - Aug 31, 2026</option>
                 <option value="Jul 01 - Jul 31, 2026">Jul 01 - Jul 31, 2026</option>
@@ -83,13 +83,13 @@ export const DashboardPage = () => {
             </div>
 
             {/* Corridor */}
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-700 font-medium">
-              <Plane className="w-3.5 h-3.5 text-slate-400" />
-              <span className="text-slate-400">Corridor:</span>
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-[#4B5563] font-medium">
+              <Plane className="w-3.5 h-3.5 text-[#6B7280]" />
+              <span className="text-[#6B7280]">Corridor:</span>
               <select 
                 value={selectedCorridor} 
                 onChange={(e) => setSelectedCorridor(e.target.value)}
-                className="bg-transparent font-bold text-slate-900 focus:outline-none cursor-pointer"
+                className="bg-transparent font-medium text-[#111827] focus:outline-none cursor-pointer"
               >
                 <option value="ALL">All Trunk Corridors</option>
                 <option value="DEL-BOM">DEL ↔ BOM (Delhi - Mumbai)</option>
@@ -101,13 +101,13 @@ export const DashboardPage = () => {
             </div>
 
             {/* Carrier */}
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-700 font-medium">
-              <Building2 className="w-3.5 h-3.5 text-slate-400" />
-              <span className="text-slate-400">Carrier:</span>
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-[#4B5563] font-medium">
+              <Building2 className="w-3.5 h-3.5 text-[#6B7280]" />
+              <span className="text-[#6B7280]">Carrier:</span>
               <select 
                 value={selectedAirline} 
                 onChange={(e) => setSelectedAirline(e.target.value)}
-                className="bg-transparent font-bold text-slate-900 focus:outline-none cursor-pointer"
+                className="bg-transparent font-medium text-[#111827] focus:outline-none cursor-pointer"
               >
                 <option value="ALL">All Carriers</option>
                 <option value="IndiGo">IndiGo (6E)</option>
@@ -121,7 +121,7 @@ export const DashboardPage = () => {
             {isFiltered && (
               <button
                 onClick={handleResetFilters}
-                className="flex items-center gap-1 text-slate-500 hover:text-slate-900 text-xs font-semibold ml-auto cursor-pointer"
+                className="flex items-center gap-1 text-[#6B7280] hover:text-[#111827] text-xs font-medium ml-auto cursor-pointer"
               >
                 <RotateCcw className="w-3 h-3" /> Reset
               </button>

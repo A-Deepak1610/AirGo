@@ -87,9 +87,9 @@ export const BacktestingPage = () => {
         actions={
           <button 
             onClick={handleExport}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 transition-colors shadow-2xs cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-[13px] font-medium text-[#111827] transition-colors shadow-2xs cursor-pointer"
           >
-            <Download className="w-3.5 h-3.5 text-slate-500" />
+            <Download className="w-3.5 h-3.5 text-[#6B7280]" />
             Export Validation Audit
           </button>
         }
@@ -97,13 +97,13 @@ export const BacktestingPage = () => {
           <div className="flex items-center justify-between gap-3 flex-wrap w-full text-xs">
             <div className="flex items-center gap-2.5 flex-wrap">
               {/* Evaluation Window */}
-              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-700 font-medium">
-                <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                <span className="text-slate-400">Backtest Window:</span>
+              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-[#4B5563] font-medium text-xs">
+                <Calendar className="w-3.5 h-3.5 text-[#6B7280]" />
+                <span className="text-[#6B7280]">Backtest Window:</span>
                 <select 
                   value={backtestHorizon}
                   onChange={(e) => setBacktestHorizon(e.target.value)}
-                  className="bg-transparent font-bold text-slate-900 focus:outline-none cursor-pointer"
+                  className="bg-transparent font-medium text-[#111827] focus:outline-none cursor-pointer"
                 >
                   <option value="30d">30-Day Trajectory (Aug 01 - Aug 31, 2026)</option>
                   <option value="60d">60-Day Trajectory (Jul - Aug 2026)</option>
@@ -112,14 +112,14 @@ export const BacktestingPage = () => {
               </div>
 
               {/* Benchmark Source */}
-              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-700 font-medium">
-                <Scale className="w-3.5 h-3.5 text-slate-400" />
-                <span className="text-slate-400">Benchmark:</span>
-                <span className="font-bold text-slate-900">DGCA Official Tariff + MoSPI CPI</span>
+              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-[#4B5563] font-medium text-xs">
+                <Scale className="w-3.5 h-3.5 text-[#6B7280]" />
+                <span className="text-[#6B7280]">Benchmark:</span>
+                <span className="font-medium text-[#111827]">DGCA Official Tariff + MoSPI CPI</span>
               </div>
             </div>
 
-            <span className="text-xs text-slate-500 font-medium hidden sm:inline">
+            <span className="text-xs text-[#6B7280] font-normal hidden sm:inline">
               Historical Sample: {backtestStats.sample_days} Daily Observations
             </span>
           </div>
@@ -129,43 +129,43 @@ export const BacktestingPage = () => {
       {/* 4 Core Econometric Validation Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Mean Absolute Pct Error (MAPE)</p>
-          <p className="text-2xl font-black text-emerald-600 mt-1 font-mono">
+          <p className="text-xs font-medium text-[#6B7280]">Mean Absolute Pct Error (MAPE)</p>
+          <p className="text-[26px] font-semibold text-emerald-600 mt-1 font-mono tabular-nums leading-none">
             {backtestStats.mape_pct}%
           </p>
-          <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium mt-1">
+          <div className="flex items-center gap-1.5 text-[11px] text-[#6B7280] mt-1.5">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
             <span>Target: &lt; 5.0% (Passed MoSPI threshold)</span>
           </div>
         </div>
 
         <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Correlation with CPI Transport (r)</p>
-          <p className="text-2xl font-black text-blue-600 mt-1 font-mono">
+          <p className="text-xs font-medium text-[#6B7280]">Correlation with CPI Transport (r)</p>
+          <p className="text-[26px] font-semibold text-blue-600 mt-1 font-mono tabular-nums leading-none">
             {backtestStats.correlation_with_cpi}
           </p>
-          <div className="flex items-center gap-1.5 text-[11px] text-blue-600 font-medium mt-1">
+          <div className="flex items-center gap-1.5 text-[11px] text-blue-600 font-medium mt-1.5">
             <TrendingUp className="w-3.5 h-3.5" />
             <span>High positive co-movement with official CPI</span>
           </div>
         </div>
 
         <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Tracking Error (TE)</p>
-          <p className="text-2xl font-black text-slate-900 mt-1 font-mono">
+          <p className="text-xs font-medium text-[#6B7280]">Tracking Error (TE)</p>
+          <p className="text-[26px] font-semibold text-[#111827] mt-1 font-mono tabular-nums leading-none">
             {backtestStats.tracking_error} pts
           </p>
-          <div className="text-[11px] text-slate-500 mt-1">
+          <div className="text-[11px] text-[#6B7280] mt-1.5">
             Standard deviation of daily benchmark delta
           </div>
         </div>
 
         <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Backtest Period</p>
-          <p className="text-2xl font-black text-purple-700 mt-1 font-mono">
+          <p className="text-xs font-medium text-[#6B7280]">Backtest Period</p>
+          <p className="text-[26px] font-semibold text-purple-700 mt-1 font-mono tabular-nums leading-none">
             30 Days
           </p>
-          <div className="text-[11px] text-slate-500 mt-1">
+          <div className="text-[11px] text-[#6B7280] mt-1.5">
             Continuous daily observed time series
           </div>
         </div>
@@ -175,17 +175,17 @@ export const BacktestingPage = () => {
       <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-2xs space-y-4">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-2 border-b border-slate-100">
           <div>
-            <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+            <h2 className="text-base font-semibold text-[#111827] flex items-center gap-2">
               <Scale className="w-4 h-4 text-blue-600" />
               <span>30-Day Historical Index Trajectory Comparison</span>
             </h2>
-            <p className="text-xs text-slate-500">
+            <p className="text-[13px] text-[#4B5563] mt-0.5">
               Benchmarking Real-Time APIx against DGCA Base Tariff (100.0) and MoSPI CPI Transport Sub-Index.
             </p>
           </div>
 
-          <span className="text-xs font-mono text-slate-500">
-            Baseline: <strong className="text-slate-800">2024 = 100.0</strong>
+          <span className="text-xs font-mono text-[#6B7280]">
+            Baseline: <strong className="text-[#111827] font-semibold">2024 = 100.0</strong>
           </span>
         </div>
 
@@ -240,32 +240,32 @@ export const BacktestingPage = () => {
       <div className="bg-white border border-slate-200 rounded-xl shadow-2xs overflow-hidden">
         <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
-            <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+            <h2 className="text-base font-semibold text-[#111827] flex items-center gap-2">
               <History className="w-4 h-4 text-blue-600" />
               Corridor-Level Baseline Benchmark Comparison
             </h2>
-            <p className="text-xs text-slate-500">
+            <p className="text-[13px] text-[#4B5563] mt-0.5">
               Detailed tracking comparison between observed market mean fares and official DGCA base tariffs.
             </p>
           </div>
-          <span className="text-[11px] font-mono text-slate-500">Tolerance Threshold: ±5.0%</span>
+          <span className="text-[11px] font-mono text-[#6B7280]">Tolerance Threshold: ±5.0%</span>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="border-b border-slate-200 text-slate-500 bg-slate-50 font-semibold">
-                <th className="py-2.5 px-4">Corridor Code</th>
-                <th className="py-2.5 px-4">Sector Description</th>
-                <th className="py-2.5 px-4 font-mono">DGCA Base Tariff</th>
-                <th className="py-2.5 px-4 font-mono">Observed Mean Fare</th>
-                <th className="py-2.5 px-4 font-mono">APIx Index Level</th>
-                <th className="py-2.5 px-4 font-mono">Tracking Variance</th>
-                <th className="py-2.5 px-4 font-mono">Corridor MAPE</th>
-                <th className="py-2.5 px-4 text-right">Validation Status</th>
+              <tr className="border-b border-slate-200 text-[#6B7280] bg-slate-50/75 font-medium">
+                <th className="py-2.5 px-4 font-medium">Corridor Code</th>
+                <th className="py-2.5 px-4 font-medium">Sector Description</th>
+                <th className="py-2.5 px-4 font-mono font-medium">DGCA Base Tariff</th>
+                <th className="py-2.5 px-4 font-mono font-medium">Observed Mean Fare</th>
+                <th className="py-2.5 px-4 font-mono font-medium">APIx Index Level</th>
+                <th className="py-2.5 px-4 font-mono font-medium">Tracking Variance</th>
+                <th className="py-2.5 px-4 font-mono font-medium">Corridor MAPE</th>
+                <th className="py-2.5 px-4 text-right font-medium">Validation Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+            <tbody className="divide-y divide-slate-100 font-medium text-[#4B5563]">
               {routeAnalyticsList.map((r) => {
                 const bFare = r.baseFare2024 || r.baseFare || 4500;
                 const cFare = r.currentFare || r.avgFare || 5000;
@@ -273,19 +273,19 @@ export const BacktestingPage = () => {
                 const corridorMape = +(Math.abs((r.index || 100.0) - 100.0) * 0.12).toFixed(2);
                 return (
                   <tr key={r.route} className="hover:bg-slate-50 transition-colors">
-                    <td className="py-3 px-4 font-mono font-bold text-blue-700">{r.route}</td>
-                    <td className="py-3 px-4 font-semibold text-slate-900">{r.name || `${r.city1} ↔ ${r.city2}`}</td>
-                    <td className="py-3 px-4 font-mono text-slate-500">₹{bFare.toLocaleString()}</td>
-                    <td className="py-3 px-4 font-mono font-bold text-slate-900">₹{cFare.toLocaleString()}</td>
-                    <td className="py-3 px-4 font-mono font-bold text-blue-600">{r.index}</td>
-                    <td className="py-3 px-4 font-mono font-semibold text-slate-800">
+                    <td className="py-3 px-4 font-mono font-medium text-blue-600 text-[13px]">{r.route}</td>
+                    <td className="py-3 px-4 font-medium text-[#111827]">{r.name || `${r.city1} ↔ ${r.city2}`}</td>
+                    <td className="py-3 px-4 font-mono text-[#6B7280] tabular-nums">₹{bFare.toLocaleString()}</td>
+                    <td className="py-3 px-4 font-mono font-semibold text-[#111827] tabular-nums">₹{cFare.toLocaleString()}</td>
+                    <td className="py-3 px-4 font-mono font-semibold text-blue-600 tabular-nums">{r.index}</td>
+                    <td className="py-3 px-4 font-mono font-medium text-[#111827] tabular-nums">
                       +{variancePct}%
                     </td>
-                    <td className="py-3 px-4 font-mono text-emerald-600 font-bold">
+                    <td className="py-3 px-4 font-mono text-emerald-600 font-medium tabular-nums">
                       {corridorMape}%
                     </td>
                     <td className="py-3 px-4 text-right">
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                         <CheckCircle2 className="w-3 h-3" /> PASS (&lt;3%)
                       </span>
                     </td>
@@ -299,29 +299,29 @@ export const BacktestingPage = () => {
 
       {/* Econometric Methodology Validation Card */}
       <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-2xs space-y-3">
-        <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+        <h3 className="text-base font-semibold text-[#111827] flex items-center gap-2">
           <FileText className="w-4 h-4 text-blue-600" />
           Statistical Soundness & Axiomatic Index Test Compliance
         </h3>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
           <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50">
-            <p className="text-xs font-bold text-slate-900">1. Time-Reversal Test (Fisher)</p>
-            <p className="text-[11px] text-slate-600 mt-1">
+            <p className="text-sm font-semibold text-[#111827]">1. Time-Reversal Test (Fisher)</p>
+            <p className="text-[13px] text-[#4B5563] mt-1">
               Fisher Ideal formulation satisfies time-reversal F(0,t) × F(t,0) = 1, ensuring symmetry and preventing directional ratchet drift.
             </p>
           </div>
 
           <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50">
-            <p className="text-xs font-bold text-slate-900">2. Transitivity & Base Period Invariance</p>
-            <p className="text-[11px] text-slate-600 mt-1">
+            <p className="text-sm font-semibold text-[#111827]">2. Transitivity & Base Period Invariance</p>
+            <p className="text-[13px] text-[#4B5563] mt-1">
               Fixed 2024 calendar weights prevent chain drift when evaluating price dynamics across different temporal horizons.
             </p>
           </div>
 
           <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50">
-            <p className="text-xs font-bold text-slate-900">3. CPI Alignment Protocol</p>
-            <p className="text-[11px] text-slate-600 mt-1">
+            <p className="text-sm font-semibold text-[#111827]">3. CPI Alignment Protocol</p>
+            <p className="text-[13px] text-[#4B5563] mt-1">
               Correlation of $r = 0.942$ against MoSPI Transport CPI verifies that real-time airfare index accurately leads monthly national statistical releases.
             </p>
           </div>
