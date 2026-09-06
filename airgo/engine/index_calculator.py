@@ -3,8 +3,8 @@ import math
 from datetime import date, timedelta
 from typing import Dict, List, Any, Optional, Tuple
 import numpy as np
-from sqlalchemy import select, delete, desc
-from airgo.pipeline.models import CleanFareDB, APIxIndexDB
+from sqlalchemy import select, delete, desc, func
+from airgo.pipeline.models import CanonicalFareDB, CleanFareDB, APIxIndexDB
 from airgo.pipeline.db import get_db_session
 from airgo.engine.dgca_weights import DGCA_ROUTES, ADVANCE_WINDOWS
 
@@ -20,33 +20,63 @@ class IndexCalculator:
     def compute_daily_index(self, calculation_date: date = None) -> Dict[str, Any]:
         """
         Compute daily APIx for all sectors and overall national index for a specific date.
+        Queries CanonicalFareDB first, falling back to legacy CleanFareDB.
         """
         target_date = calculation_date or date.today()
         logger.info(f"📊 [IndexCalculator] Computing APIx Index for date: {target_date}")
 
         with get_db_session() as session:
-            # 1. Fetch all clean non-outlier quotes for target_date
-            stmt = select(CleanFareDB).where(
-                CleanFareDB.booking_date == target_date,
-                CleanFareDB.is_outlier == False
+            # 1. First attempt to fetch canonical non-outlier quotes for target_date
+            canon_stmt = select(CanonicalFareDB).where(
+                CanonicalFareDB.observation_date == target_date,
+                CanonicalFareDB.is_outlier == False
             )
-            fares = session.scalars(stmt).all()
+            canon_fares = session.scalars(canon_stmt).all()
 
-            if not fares:
-                logger.warning(f"No clean fare quotes available for {target_date} to compute index.")
-                return {"status": "NO_DATA", "date": str(target_date)}
+            # If no canonical fares for target_date and target_date is today, check latest observation_date
+            if not canon_fares:
+                latest_date_stmt = select(func.max(CanonicalFareDB.observation_date))
+                latest_obs_date = session.scalar(latest_date_stmt)
+                if latest_obs_date:
+                    canon_stmt = select(CanonicalFareDB).where(
+                        CanonicalFareDB.observation_date == latest_obs_date,
+                        CanonicalFareDB.is_outlier == False
+                    )
+                    canon_fares = session.scalars(canon_stmt).all()
+                    target_date = latest_obs_date
 
-            # 2. Group by Sector -> Advance Window
-            # Structure: sector -> window -> list of total_fares
             sector_window_fares: Dict[str, Dict[str, List[float]]] = {}
-            for f in fares:
-                sec = f.sector
-                win = f.advance_window
-                if sec not in sector_window_fares:
-                    sector_window_fares[sec] = {}
-                if win not in sector_window_fares[sec]:
-                    sector_window_fares[sec][win] = []
-                sector_window_fares[sec][win].append(f.total_fare)
+
+            if canon_fares:
+                for f in canon_fares:
+                    sec = f.route
+                    win = f.advance_purchase_window
+                    if sec not in sector_window_fares:
+                        sector_window_fares[sec] = {}
+                    if win not in sector_window_fares[sec]:
+                        sector_window_fares[sec][win] = []
+                    fare_val = float(f.avg_total_fare if f.avg_total_fare is not None else f.min_total_fare)
+                    sector_window_fares[sec][win].append(fare_val)
+            else:
+                # Fallback to CleanFareDB
+                stmt = select(CleanFareDB).where(
+                    CleanFareDB.booking_date == target_date,
+                    CleanFareDB.is_outlier == False
+                )
+                fares = session.scalars(stmt).all()
+
+                if not fares:
+                    logger.warning(f"No clean fare quotes available for {target_date} to compute index.")
+                    return {"status": "NO_DATA", "date": str(target_date)}
+
+                for f in fares:
+                    sec = f.sector
+                    win = f.advance_window
+                    if sec not in sector_window_fares:
+                        sector_window_fares[sec] = {}
+                    if win not in sector_window_fares[sec]:
+                        sector_window_fares[sec][win] = []
+                    sector_window_fares[sec][win].append(float(f.total_fare))
 
             # 3. Compute Elementary Route-Level Indices
             sector_indices: Dict[str, Dict[str, Any]] = {}

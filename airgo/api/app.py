@@ -11,11 +11,14 @@ from fastapi import FastAPI, Query, BackgroundTasks, Depends
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, func
 from sqlalchemy.orm import Session
 
 from airgo.pipeline.db import get_db, init_db
-from airgo.pipeline.models import CleanFareDB, RawQuoteDB, APIxIndexDB, ScraperLogDB
+from airgo.pipeline.models import (
+    CleanFareDB, RawQuoteDB, APIxIndexDB, ScraperLogDB,
+    CanonicalFareDB, DailyAirfareAggregateDB, ScrapingRunDB, RawObservationDB
+)
 from airgo.engine.dgca_weights import DGCA_ROUTES
 from airgo.engine.index_calculator import IndexCalculator
 from airgo.engine.elasticity import ElasticityAnalyzer
@@ -80,22 +83,23 @@ def get_realtime_index(db: Session = Depends(get_db)):
 
     if not latest_index:
         res = index_calculator.compute_daily_index(date.today())
-        if res.get("status") == "NO_DATA":
-            return {
-                "status": "INITIALIZING",
-                "index_date": str(date.today()),
-                "national_apix": 153.69,
-                "laspeyres": 153.69,
-                "jevons": 153.68,
-                "fisher": 153.68,
-                "avg_fare": 6508.0,
-                "median_fare": 6425.0,
-                "dod_change_pct": 0.48,
-                "mom_change_pct": 2.15,
-                "quote_count": 294,
-                "sector_count": len(DGCA_ROUTES)
-            }
         latest_index = db.scalars(stmt).first()
+
+    if not latest_index:
+        return {
+            "status": "INITIALIZING",
+            "index_date": str(date.today()),
+            "national_apix": 100.0,
+            "laspeyres": 100.0,
+            "jevons": 100.0,
+            "fisher": 100.0,
+            "avg_fare": 5000.0,
+            "median_fare": 5000.0,
+            "dod_change_pct": 0.0,
+            "mom_change_pct": 0.0,
+            "quote_count": 0,
+            "sector_count": len(DGCA_ROUTES)
+        }
 
     return {
         "status": "SUCCESS",
@@ -108,8 +112,8 @@ def get_realtime_index(db: Session = Depends(get_db)):
         "median_fare": latest_index.median_fare,
         "min_fare": latest_index.min_fare,
         "max_fare": latest_index.max_fare,
-        "dod_change_pct": latest_index.dod_change_pct if latest_index.dod_change_pct is not None else 0.48,
-        "mom_change_pct": latest_index.mom_change_pct if latest_index.mom_change_pct is not None else 2.15,
+        "dod_change_pct": latest_index.dod_change_pct if latest_index.dod_change_pct is not None else 0.0,
+        "mom_change_pct": latest_index.mom_change_pct if latest_index.mom_change_pct is not None else 0.0,
         "quote_count": latest_index.quote_count,
         "sector_count": len(DGCA_ROUTES)
     }
@@ -119,21 +123,40 @@ def get_realtime_index(db: Session = Depends(get_db)):
 def get_sectors_summary(db: Session = Depends(get_db)):
     summaries = []
     for sec_code, meta in DGCA_ROUTES.items():
-        stmt = select(CleanFareDB).where(
-            CleanFareDB.sector == sec_code,
-            CleanFareDB.is_outlier == False
-        ).order_by(desc(CleanFareDB.created_at))
-        sector_fares = db.scalars(stmt).all()
+        rev_code = f"{sec_code.split('-')[1]}-{sec_code.split('-')[0]}" if "-" in sec_code else sec_code
 
-        if sector_fares:
-            fares_list = [x.total_fare for x in sector_fares]
+        # 1. Query CanonicalFareDB first
+        canon_stmt = select(CanonicalFareDB).where(
+            CanonicalFareDB.route.in_([sec_code, rev_code]),
+            CanonicalFareDB.is_outlier == False
+        ).order_by(desc(CanonicalFareDB.id))
+        sector_canon = db.scalars(canon_stmt).all()
+
+        if sector_canon:
+            fares_list = [float(x.avg_total_fare if x.avg_total_fare is not None else x.min_total_fare) for x in sector_canon]
             avg_fare = round(sum(fares_list) / len(fares_list), 2)
             index_val = round((avg_fare / meta["base_fare_baseline"]) * 100.0, 2)
-            carriers = list(set(x.carrier for x in sector_fares))
+            carriers = sorted(list(set(x.carrier for x in sector_canon)))
+            quote_cnt = len(sector_canon)
         else:
-            avg_fare = meta["base_fare_baseline"] * 1.045
-            index_val = 104.5
-            carriers = ["IndiGo", "Air India", "SpiceJet", "Akasa Air"]
+            # 2. Fallback to legacy CleanFareDB
+            stmt = select(CleanFareDB).where(
+                CleanFareDB.sector.in_([sec_code, rev_code]),
+                CleanFareDB.is_outlier == False
+            ).order_by(desc(CleanFareDB.created_at))
+            sector_fares = db.scalars(stmt).all()
+
+            if sector_fares:
+                fares_list = [x.total_fare for x in sector_fares]
+                avg_fare = round(sum(fares_list) / len(fares_list), 2)
+                index_val = round((avg_fare / meta["base_fare_baseline"]) * 100.0, 2)
+                carriers = sorted(list(set(x.carrier for x in sector_fares)))
+                quote_cnt = len(sector_fares)
+            else:
+                avg_fare = meta["base_fare_baseline"]
+                index_val = 100.0
+                carriers = ["IndiGo", "Air India", "SpiceJet", "Akasa Air"]
+                quote_cnt = 0
 
         summaries.append({
             "sector": sec_code,
@@ -146,6 +169,7 @@ def get_sectors_summary(db: Session = Depends(get_db)):
             "index_value": index_val,
             "dod_change_pct": round(((index_val - 100.0) / 100.0) * 0.15, 2),
             "active_carriers": carriers,
+            "quote_count": quote_cnt,
             "flight_time_mins": meta.get("avg_flight_time_mins", 120)
         })
 
@@ -176,75 +200,142 @@ def get_scraped_quotes(
     offset: int = 0,
     db: Session = Depends(get_db)
 ):
-    stmt = select(CleanFareDB)
+    # 1. Query CanonicalFareDB first (production deduplicated pipeline)
+    canon_stmt = select(CanonicalFareDB)
     if sector and sector != "ALL":
-        stmt = stmt.where(CleanFareDB.sector == sector)
+        rev_sec = f"{sector.split('-')[1]}-{sector.split('-')[0]}" if "-" in sector else sector
+        canon_stmt = canon_stmt.where(CanonicalFareDB.route.in_([sector, rev_sec]))
     if carrier and carrier != "ALL":
-        stmt = stmt.where(CleanFareDB.carrier == carrier)
+        canon_stmt = canon_stmt.where(CanonicalFareDB.carrier == carrier)
     if advance_window and advance_window != "ALL":
-        stmt = stmt.where(CleanFareDB.advance_window == advance_window)
+        canon_stmt = canon_stmt.where(CanonicalFareDB.advance_purchase_window == advance_window)
 
-    stmt = stmt.order_by(desc(CleanFareDB.id)).offset(offset).limit(limit)
-    rows = db.scalars(stmt).all()
+    total_canon = db.scalar(select(func.count()).select_from(canon_stmt.subquery()))
+    canon_rows = db.scalars(canon_stmt.order_by(desc(CanonicalFareDB.id)).offset(offset).limit(limit)).all()
 
-    if not rows:
-        raw_stmt = select(RawQuoteDB)
-        if sector and sector != "ALL":
-            orig, dest = sector.split("-")
-            raw_stmt = raw_stmt.where(RawQuoteDB.origin == orig, RawQuoteDB.destination == dest)
-        if advance_window and advance_window != "ALL":
-            raw_stmt = raw_stmt.where(RawQuoteDB.advance_window == advance_window)
-        raw_stmt = raw_stmt.order_by(desc(RawQuoteDB.id)).offset(offset).limit(limit)
-        raw_rows = db.scalars(raw_stmt).all()
+    if canon_rows:
         return {
-            "count": len(raw_rows),
+            "count": total_canon,
             "offset": offset,
             "limit": limit,
             "quotes": [
                 {
                     "id": r.id,
-                    "sector": f"{r.origin}-{r.destination}",
+                    "canonical_id": r.canonical_id,
+                    "sector": r.route,
+                    "origin": r.origin,
+                    "destination": r.destination,
                     "carrier": r.carrier,
                     "flight_number": r.flight_number,
-                    "departure_date": str(r.departure_datetime.date()),
-                    "departure_time": r.departure_datetime.strftime("%H:%M"),
-                    "advance_window": r.advance_window,
-                    "advance_days": r.advance_days,
-                    "base_fare": r.base_fare or round(r.total_fare * 0.74, 2),
-                    "taxes_and_fees": r.taxes or round(r.total_fare * 0.26, 2),
-                    "total_fare": r.total_fare,
-                    "source_url": r.source_url or f"https://www.google.com/travel/flights?q=Flights%20to%20{r.destination}%20from%20{r.origin}%20on%20{r.departure_datetime.strftime('%Y-%m-%d')}%20one%20way",
-                    "is_outlier": False,
-                    "sources": r.source
+                    "departure_date": str(r.travel_date),
+                    "departure_time": r.departure_time,
+                    "advance_window": r.advance_purchase_window,
+                    "advance_days": r.advance_purchase_days,
+                    "base_fare": r.base_fare,
+                    "taxes_and_fees": round((r.taxes or 0.0) + (r.fees or 0.0), 2),
+                    "total_fare": r.avg_total_fare if r.avg_total_fare is not None else r.min_total_fare,
+                    "min_fare": r.min_total_fare,
+                    "max_fare": r.max_total_fare,
+                    "source_url": f"https://www.google.com/travel/flights?q=Flights%20to%20{r.destination}%20from%20{r.origin}%20on%20{r.travel_date.strftime('%Y-%m-%d')}%20one%20way",
+                    "is_outlier": r.is_outlier,
+                    "sources": r.observed_platforms,
+                    "platform_count": r.platform_count,
+                    "cheapest_platform": r.cheapest_platform
                 }
-                for r in raw_rows
+                for r in canon_rows
             ]
         }
 
-    return {
-        "count": len(rows),
-        "offset": offset,
-        "limit": limit,
-        "quotes": [
-            {
-                "id": r.id,
-                "sector": r.sector,
-                "carrier": r.carrier,
-                "flight_number": r.flight_number,
-                "departure_date": str(r.departure_date),
-                "departure_time": r.departure_time,
-                "advance_window": r.advance_window,
-                "advance_days": r.advance_days,
-                "base_fare": r.base_fare,
-                "taxes_and_fees": r.taxes_and_fees,
-                "total_fare": r.total_fare,
-                "source_url": r.source_url or f"https://www.google.com/travel/flights?q=Flights%20to%20{r.destination}%20from%20{r.origin}%20on%20{r.departure_date.strftime('%Y-%m-%d')}%20one%20way",
-                "is_outlier": r.is_outlier,
-                "sources": r.sources
-            }
-            for r in rows
-        ]
-    }
+    # 2. Fallback to CleanFareDB
+    stmt = select(CleanFareDB)
+    if sector and sector != "ALL":
+        rev_sec = f"{sector.split('-')[1]}-{sector.split('-')[0]}" if "-" in sector else sector
+        stmt = stmt.where(CleanFareDB.sector.in_([sector, rev_sec]))
+    if carrier and carrier != "ALL":
+        stmt = stmt.where(CleanFareDB.carrier == carrier)
+    if advance_window and advance_window != "ALL":
+        stmt = stmt.where(CleanFareDB.advance_window == advance_window)
+
+    total_clean = db.scalar(select(func.count()).select_from(stmt.subquery()))
+    rows = db.scalars(stmt.order_by(desc(CleanFareDB.id)).offset(offset).limit(limit)).all()
+
+    if rows:
+        return {
+            "count": total_clean,
+            "offset": offset,
+            "limit": limit,
+            "quotes": [
+                {
+                    "id": r.id,
+                    "sector": r.sector,
+                    "origin": r.origin,
+                    "destination": r.destination,
+                    "carrier": r.carrier,
+                    "flight_number": r.flight_number,
+                    "departure_date": str(r.departure_date),
+                    "departure_time": r.departure_time,
+                    "advance_window": r.advance_window,
+                    "advance_days": r.advance_days,
+                    "base_fare": r.base_fare,
+                    "taxes_and_fees": r.taxes_and_fees,
+                    "total_fare": r.total_fare,
+                    "min_fare": r.total_fare,
+                    "max_fare": r.total_fare,
+                    "source_url": r.source_url or f"https://www.google.com/travel/flights?q=Flights%20to%20{r.destination}%20from%20{r.origin}%20on%20{r.departure_date.strftime('%Y-%m-%d')}%20one%20way",
+                    "is_outlier": r.is_outlier,
+                    "sources": r.sources,
+                    "platform_count": r.source_count,
+                    "cheapest_platform": r.sources.split(",")[0].strip() if r.sources else "OTA"
+                }
+                for r in rows
+            ]
+        }
+
+    # 3. Fallback to RawObservationDB
+    raw_obs_stmt = select(RawObservationDB)
+    if sector and sector != "ALL":
+        orig, dest = sector.split("-") if "-" in sector else (sector, "")
+        raw_obs_stmt = raw_obs_stmt.where(RawObservationDB.origin == orig, RawObservationDB.destination == dest)
+    if carrier and carrier != "ALL":
+        raw_obs_stmt = raw_obs_stmt.where(RawObservationDB.carrier == carrier)
+    if advance_window and advance_window != "ALL":
+        raw_obs_stmt = raw_obs_stmt.where(RawObservationDB.advance_purchase_window == advance_window)
+
+    total_raw = db.scalar(select(func.count()).select_from(raw_obs_stmt.subquery()))
+    raw_obs = db.scalars(raw_obs_stmt.order_by(desc(RawObservationDB.id)).offset(offset).limit(limit)).all()
+    if raw_obs:
+        return {
+            "count": total_raw,
+            "offset": offset,
+            "limit": limit,
+            "quotes": [
+                {
+                    "id": r.id,
+                    "sector": r.route,
+                    "origin": r.origin,
+                    "destination": r.destination,
+                    "carrier": r.carrier,
+                    "flight_number": r.flight_number,
+                    "departure_date": str(r.travel_date),
+                    "departure_time": r.departure_time,
+                    "advance_window": r.advance_purchase_window,
+                    "advance_days": r.advance_purchase_days,
+                    "base_fare": r.base_fare,
+                    "taxes_and_fees": round((r.taxes or 0.0) + (r.fees or 0.0), 2),
+                    "total_fare": r.total_fare,
+                    "min_fare": r.total_fare,
+                    "max_fare": r.total_fare,
+                    "source_url": r.source_url or f"https://www.google.com/travel/flights?q=Flights%20to%20{r.destination}%20from%20{r.origin}%20on%20{r.travel_date.strftime('%Y-%m-%d')}%20one%20way",
+                    "is_outlier": False,
+                    "sources": r.platform,
+                    "platform_count": 1,
+                    "cheapest_platform": r.platform
+                }
+                for r in raw_obs
+            ]
+        }
+
+    return {"count": 0, "offset": offset, "limit": limit, "quotes": []}
 
 
 @app.post("/api/v1/scrape/trigger")
@@ -282,6 +373,28 @@ def trigger_scrape_job(
 
 @app.get("/api/v1/scraper-logs")
 def get_scraper_logs(limit: int = 30, db: Session = Depends(get_db)):
+    # Query ScrapingRunDB runs first if available
+    run_stmt = select(ScrapingRunDB).order_by(desc(ScrapingRunDB.id)).limit(limit)
+    runs = db.scalars(run_stmt).all()
+    if runs:
+        return {
+            "logs": [
+                {
+                    "id": r.id,
+                    "run_id": r.scraping_run_id,
+                    "source": r.platform or "Harvester Pipeline",
+                    "route": "BOM-DEL",
+                    "window": "T+0, T+1, T+7, T+15, T+30, T+45",
+                    "departure_date": str(r.started_at.date()) if r.started_at else str(date.today()),
+                    "status": r.status,
+                    "flights_found": r.total_raw_records or 0,
+                    "duration_ms": int((r.completed_at - r.started_at).total_seconds() * 1000) if (r.completed_at and r.started_at) else 35000,
+                    "created_at": r.started_at.strftime("%H:%M:%S") if r.started_at else "N/A"
+                }
+                for r in runs
+            ]
+        }
+
     stmt = select(ScraperLogDB).order_by(desc(ScraperLogDB.id)).limit(limit)
     logs = db.scalars(stmt).all()
     return {
@@ -305,6 +418,48 @@ def get_scraper_logs(limit: int = 30, db: Session = Depends(get_db)):
 
 @app.get("/api/v1/export")
 def export_dataset(format: str = Query("csv", pattern="^(csv|json)$"), db: Session = Depends(get_db)):
+    canon_stmt = select(CanonicalFareDB).order_by(desc(CanonicalFareDB.id)).limit(5000)
+    canon_rows = db.scalars(canon_stmt).all()
+
+    if canon_rows:
+        if format == "json":
+            data = [
+                {
+                    "sector": r.route,
+                    "origin": r.origin,
+                    "destination": r.destination,
+                    "carrier": r.carrier,
+                    "flight_number": r.flight_number,
+                    "departure_date": str(r.travel_date),
+                    "departure_time": r.departure_time,
+                    "advance_window": r.advance_purchase_window,
+                    "advance_days": r.advance_purchase_days,
+                    "base_fare": r.base_fare,
+                    "taxes": r.taxes,
+                    "fees": r.fees,
+                    "total_fare": r.avg_total_fare if r.avg_total_fare is not None else r.min_total_fare,
+                    "sources": r.observed_platforms,
+                    "cheapest_platform": r.cheapest_platform,
+                    "booking_date": str(r.observation_date)
+                }
+                for r in canon_rows
+            ]
+            return JSONResponse(content=data)
+
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["Sector", "Origin", "Destination", "Carrier", "Flight_No", "Departure_Date", "Departure_Time", "Advance_Window", "Advance_Days", "Base_Fare", "Taxes", "Fees", "Total_Fare", "Sources", "Cheapest_Platform", "Booking_Date"])
+        for r in canon_rows:
+            writer.writerow([r.route, r.origin, r.destination, r.carrier, r.flight_number, r.travel_date, r.departure_time, r.advance_purchase_window, r.advance_purchase_days, r.base_fare, r.taxes, r.fees, r.avg_total_fare if r.avg_total_fare is not None else r.min_total_fare, r.observed_platforms, r.cheapest_platform, r.observation_date])
+
+        output.seek(0)
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename=AirGo_Canonical_Export_{date.today().strftime('%Y%m%d')}.csv"}
+        )
+
+    # Fallback to CleanFareDB
     stmt = select(CleanFareDB).order_by(desc(CleanFareDB.id)).limit(5000)
     rows = db.scalars(stmt).all()
 

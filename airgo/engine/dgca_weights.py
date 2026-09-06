@@ -131,34 +131,40 @@ for route in DGCA_ROUTES.values():
     route["traffic_weight"] = round(route["traffic_weight"] / TOTAL_RAW_WEIGHT, 4)
 
 ADVANCE_WINDOWS: Dict[str, Dict[str, Any]] = {
+    "T+0": {
+        "days": 0,
+        "description": "Same-Day Travel",
+        "weight": 0.10,
+        "target_lead_days": 0
+    },
     "T+1": {
         "days": 1,
         "description": "Next-Day Travel",
-        "weight": 0.28,
+        "weight": 0.25,
         "target_lead_days": 1
     },
     "T+7": {
         "days": 7,
         "description": "1-Week Advance",
-        "weight": 0.32,
+        "weight": 0.30,
         "target_lead_days": 7
     },
     "T+15": {
         "days": 15,
         "description": "2-Weeks Advance",
-        "weight": 0.22,
+        "weight": 0.20,
         "target_lead_days": 15
     },
     "T+30": {
         "days": 30,
         "description": "1-Month Advance",
-        "weight": 0.12,
+        "weight": 0.10,
         "target_lead_days": 30
     },
     "T+45": {
         "days": 45,
         "description": "45-Days Advance",
-        "weight": 0.06,
+        "weight": 0.05,
         "target_lead_days": 45
     }
 }
