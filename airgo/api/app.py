@@ -13,6 +13,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import json
 from pydantic import BaseModel
+from sqlalchemy import select, desc, func
+from sqlalchemy.orm import Session
 
 from airgo.pipeline.db import get_db, init_db
 from airgo.pipeline.models import (
