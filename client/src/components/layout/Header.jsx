@@ -43,8 +43,9 @@ export const Header = () => {
         </span>
         <div className="flex items-center gap-1.5 text-xs text-[#6B7280] font-medium">
           <button 
-            onClick={() => navigate('/dashboard')}
+            onClick={() => navigate('/')}
             className="hover:text-blue-600 transition-colors cursor-pointer"
+            title="Go to Landing Page"
           >
             AirGo
           </button>
