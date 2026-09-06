@@ -56,9 +56,10 @@ def execute_daily_cycle(
     horizons_list = [int(h.strip()) for h in horizons.split(",") if h.strip().isdigit()]
     csv_path = os.path.join(ROOT_DIR, "data", "processed", "dgca_top100_route_basket.csv")
 
-    # 3. Execute live multi-carrier harvesting
-    logger.info("📡 [Phase 1/4] Executing Live Multi-Carrier Web Harvesting...")
+    # 3. Execute live multi-carrier harvesting (Cleartrip & EaseMyTrip)
+    logger.info("📡 [Phase 1/4] Executing Live Multi-OTA Web Harvesting (Cleartrip & EaseMyTrip)...")
     try:
+        logger.info("  -> [OTA 1/2] Harvesting Cleartrip...")
         asyncio.run(
             run_cleartrip_harvest(
                 csv_path=csv_path,
@@ -68,8 +69,20 @@ def execute_daily_cycle(
             )
         )
     except Exception as e:
-        logger.error(f"❌ Harvest phase failed: {e}", exc_info=True)
-        # Still proceed to clean and index any quotes captured
+        logger.error(f"❌ Cleartrip harvest phase failed: {e}", exc_info=True)
+
+    try:
+        logger.info("  -> [OTA 2/2] Harvesting EaseMyTrip...")
+        from airgo.harvester.easemytrip_harvester import run_easemytrip_harvest
+        asyncio.run(
+            run_easemytrip_harvest(
+                csv_path=csv_path,
+                top_n=top_n,
+                horizons=horizons_list
+            )
+        )
+    except Exception as e:
+        logger.error(f"❌ EaseMyTrip harvest phase failed: {e}", exc_info=True)
 
     # 4. Clean, normalize and reject statistical outliers
     logger.info("🧹 [Phase 2/4] Running Data Cleaning, De-duplication & IQR Filtering...")

@@ -36,9 +36,8 @@ class EaseMyTripScraper(BaseScraper):
         advance_window: str,
         advance_days: int,
         run_id: str = "run_default"
-    ) -> List[RawObservationSchema]:
         formatted_date = departure_date.strftime("%d/%m/%Y")
-        web_search_url = f"https://flight.easemytrip.com/FlightList/Index?srch={origin}-{destination}-{formatted_date}&px=1-0-0&cbn=0&ar=undefined&isDM=true"
+        web_search_url = f"https://flight.easemytrip.com/FlightList/Index?srch={origin}|{destination}|{formatted_date}&px=1-0-0&cbn=0&ar=undefined&isow=true&isdm=true"
         
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
