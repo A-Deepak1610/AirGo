@@ -147,10 +147,10 @@ def get_sectors_summary(db: Session = Depends(get_db)):
             sector_fares = db.scalars(stmt).all()
 
             if sector_fares:
-                fares_list = [x.total_fare for x in sector_fares]
+                fares_list = [float(getattr(x, "total_fare", 0.0) or 0.0) for x in sector_fares]
                 avg_fare = round(sum(fares_list) / len(fares_list), 2)
                 index_val = round((avg_fare / meta["base_fare_baseline"]) * 100.0, 2)
-                carriers = sorted(list(set(x.carrier for x in sector_fares)))
+                carriers = sorted(list(set(str(x.carrier) for x in sector_fares)))
                 quote_cnt = len(sector_fares)
             else:
                 avg_fare = meta["base_fare_baseline"]
