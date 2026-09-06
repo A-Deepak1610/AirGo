@@ -128,12 +128,28 @@ def get_realtime_index(db: Session = Depends(get_db)):
 @app.get("/api/v1/sectors/summary")
 def get_sectors_summary(db: Session = Depends(get_db)):
     summaries = []
+    processed_pairs = set()
+
+    # Determine Earliest Scraped Observation Date (Base Reference Date)
+    base_date = db.scalar(select(func.min(CanonicalFareDB.observation_date)).where(
+        CanonicalFareDB.is_outlier == False
+    ))
+    latest_date = db.scalar(select(func.max(CanonicalFareDB.observation_date)).where(
+        CanonicalFareDB.is_outlier == False
+    ))
+
     for sec_code, meta in DGCA_ROUTES.items():
+        pair_key = tuple(sorted([meta["origin"], meta["destination"]]))
+        if pair_key in processed_pairs:
+            continue
+        processed_pairs.add(pair_key)
+
         rev_code = f"{sec_code.split('-')[1]}-{sec_code.split('-')[0]}" if "-" in sec_code else sec_code
 
-        # 1. Query CanonicalFareDB first
+        # 1. Query CanonicalFareDB for latest observation date
         canon_stmt = select(CanonicalFareDB).where(
             CanonicalFareDB.route.in_([sec_code, rev_code]),
+            CanonicalFareDB.observation_date == latest_date if latest_date else True,
             CanonicalFareDB.is_outlier == False
         ).order_by(desc(CanonicalFareDB.id))
         sector_canon = db.scalars(canon_stmt).all()
@@ -141,8 +157,7 @@ def get_sectors_summary(db: Session = Depends(get_db)):
         if sector_canon:
             fares_list: List[float] = [float(getattr(x, "avg_total_fare", None) or getattr(x, "min_total_fare", 0.0) or 0.0) for x in sector_canon]
             fares_clean = [f for f in fares_list if f > 0]
-            avg_fare: float = round(sum(fares_clean) / len(fares_clean), 2) if fares_clean else float(meta["base_fare_baseline"])
-            index_val = round((avg_fare / meta["base_fare_baseline"]) * 100.0, 2)
+            avg_fare: float = round(sum(fares_clean) / len(fares_clean), 2) if fares_clean else 0.0
             carriers = sorted(list(set(str(x.carrier) for x in sector_canon)))
             quote_cnt = len(sector_canon)
         else:
@@ -156,15 +171,39 @@ def get_sectors_summary(db: Session = Depends(get_db)):
             if sector_fares:
                 fares_list = [float(getattr(x, "total_fare", 0.0) or 0.0) for x in sector_fares]
                 fares_clean = [f for f in fares_list if f > 0]
-                avg_fare = round(sum(fares_clean) / len(fares_clean), 2) if fares_clean else float(meta["base_fare_baseline"])
-                index_val = round((avg_fare / meta["base_fare_baseline"]) * 100.0, 2)
+                avg_fare = round(sum(fares_clean) / len(fares_clean), 2) if fares_clean else 0.0
                 carriers = sorted(list(set(str(x.carrier) for x in sector_fares)))
                 quote_cnt = len(sector_fares)
             else:
-                avg_fare = float(meta["base_fare_baseline"])
-                index_val = 100.0
+                avg_fare = 0.0
                 carriers = ["IndiGo", "Air India", "SpiceJet", "Akasa Air"]
                 quote_cnt = 0
+
+        # Dynamically compute baseline fare from the first scrape (base_date)
+        if base_date and base_date != latest_date:
+            base_stmt = select(CanonicalFareDB).where(
+                CanonicalFareDB.route.in_([sec_code, rev_code]),
+                CanonicalFareDB.observation_date == base_date,
+                CanonicalFareDB.is_outlier == False
+            )
+            base_records = db.scalars(base_stmt).all()
+            if base_records:
+                base_vals = [float(getattr(x, "avg_total_fare", None) or getattr(x, "min_total_fare", 0.0) or 0.0) for x in base_records]
+                valid_b = [b for b in base_vals if b > 0]
+                baseline_fare = round(sum(valid_b) / len(valid_b), 2) if valid_b else avg_fare
+            else:
+                baseline_fare = avg_fare
+        else:
+            # On first scrape date, current average IS the baseline fare (Day 1 Index = 100.0)
+            baseline_fare = avg_fare
+
+        if avg_fare > 0 and baseline_fare > 0:
+            index_val = round((avg_fare / baseline_fare) * 100.0, 2)
+        else:
+            index_val = 100.0
+
+        is_first_day = (base_date is None) or (base_date == latest_date)
+        dod_change = 0.0 if is_first_day else round(((index_val - 100.0) / 100.0) * 100.0, 2)
 
         summaries.append({
             "sector": sec_code,
@@ -172,10 +211,10 @@ def get_sectors_summary(db: Session = Depends(get_db)):
             "origin": meta["origin"],
             "destination": meta["destination"],
             "weight_pct": round(meta["traffic_weight"] * 100, 2),
-            "baseline_fare": meta["base_fare_baseline"],
-            "current_avg_fare": round(avg_fare, 2),
+            "baseline_fare": baseline_fare,
+            "current_avg_fare": avg_fare,
             "index_value": index_val,
-            "dod_change_pct": round(((index_val - 100.0) / 100.0) * 0.15, 2),
+            "dod_change_pct": dod_change,
             "active_carriers": carriers,
             "quote_count": quote_cnt,
             "flight_time_mins": meta.get("avg_flight_time_mins", 120)

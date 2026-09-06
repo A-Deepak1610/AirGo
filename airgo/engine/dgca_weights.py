@@ -1,134 +1,75 @@
-"""
-DGCA (Directorate General of Civil Aviation) Sector Weights & Route Matrix
-"""
-
+import os
+import csv
 from typing import Dict, List, Any
 
-# Top domestic city pairs by passenger volume in India
-DGCA_ROUTES: Dict[str, Dict[str, Any]] = {
-    "DEL-BOM": {
-        "origin": "DEL",
-        "destination": "BOM",
-        "name": "Delhi - Mumbai",
-        "annual_pax_approx": 7200000,
-        "traffic_weight": 0.165,
-        "base_fare_baseline": 4850.0,
-        "avg_flight_time_mins": 130,
-    },
-    "DEL-BLR": {
-        "origin": "DEL",
-        "destination": "BLR",
-        "name": "Delhi - Bengaluru",
-        "annual_pax_approx": 5100000,
-        "traffic_weight": 0.125,
-        "base_fare_baseline": 5400.0,
-        "avg_flight_time_mins": 165,
-    },
-    "BOM-BLR": {
-        "origin": "BOM",
-        "destination": "BLR",
-        "name": "Mumbai - Bengaluru",
-        "annual_pax_approx": 3800000,
-        "traffic_weight": 0.095,
-        "base_fare_baseline": 3950.0,
-        "avg_flight_time_mins": 100,
-    },
-    "DEL-CCU": {
-        "origin": "DEL",
-        "destination": "CCU",
-        "name": "Delhi - Kolkata",
-        "annual_pax_approx": 3400000,
-        "traffic_weight": 0.085,
-        "base_fare_baseline": 5100.0,
-        "avg_flight_time_mins": 135,
-    },
-    "BLR-HYD": {
-        "origin": "BLR",
-        "destination": "HYD",
-        "name": "Bengaluru - Hyderabad",
-        "annual_pax_approx": 2900000,
-        "traffic_weight": 0.075,
-        "base_fare_baseline": 3100.0,
-        "avg_flight_time_mins": 75,
-    },
-    "MAA-DEL": {
-        "origin": "MAA",
-        "destination": "DEL",
-        "name": "Chennai - Delhi",
-        "annual_pax_approx": 2800000,
-        "traffic_weight": 0.070,
-        "base_fare_baseline": 5350.0,
-        "avg_flight_time_mins": 170,
-    },
-    "BOM-GOI": {
-        "origin": "BOM",
-        "destination": "GOI",
-        "name": "Mumbai - Goa",
-        "annual_pax_approx": 2600000,
-        "traffic_weight": 0.065,
-        "base_fare_baseline": 3300.0,
-        "avg_flight_time_mins": 75,
-    },
-    "DEL-HYD": {
-        "origin": "DEL",
-        "destination": "HYD",
-        "name": "Delhi - Hyderabad",
-        "annual_pax_approx": 2500000,
-        "traffic_weight": 0.065,
-        "base_fare_baseline": 4700.0,
-        "avg_flight_time_mins": 130,
-    },
-    "BOM-CCU": {
-        "origin": "BOM",
-        "destination": "CCU",
-        "name": "Mumbai - Kolkata",
-        "annual_pax_approx": 2300000,
-        "traffic_weight": 0.060,
-        "base_fare_baseline": 5600.0,
-        "avg_flight_time_mins": 160,
-    },
-    "DEL-PNQ": {
-        "origin": "DEL",
-        "destination": "PNQ",
-        "name": "Delhi - Pune",
-        "annual_pax_approx": 2200000,
-        "traffic_weight": 0.055,
-        "base_fare_baseline": 4600.0,
-        "avg_flight_time_mins": 125,
-    },
-    "DEL-GAU": {
-        "origin": "DEL",
-        "destination": "GAU",
-        "name": "Delhi - Guwahati",
-        "annual_pax_approx": 1900000,
-        "traffic_weight": 0.045,
-        "base_fare_baseline": 5800.0,
-        "avg_flight_time_mins": 150,
-    },
-    "CCU-BLR": {
-        "origin": "CCU",
-        "destination": "BLR",
-        "name": "Kolkata - Bengaluru",
-        "annual_pax_approx": 1800000,
-        "traffic_weight": 0.045,
-        "base_fare_baseline": 5200.0,
-        "avg_flight_time_mins": 155,
-    },
-    "MAA-BOM": {
-        "origin": "MAA",
-        "destination": "BOM",
-        "name": "Chennai - Mumbai",
-        "annual_pax_approx": 1900000,
-        "traffic_weight": 0.050,
-        "base_fare_baseline": 3800.0,
-        "avg_flight_time_mins": 115,
-    }
-}
+# Path to official DGCA Table 5.01 processed basket
+_CSV_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    "data", "processed", "dgca_top100_route_basket.csv"
+)
 
-# Normalize weights so sum is 1.0
+def _load_dgca_routes() -> Dict[str, Dict[str, Any]]:
+    """
+    Loads official top routes and passenger volume weights dynamically from DGCA Table 5.01 census data.
+    Provides bidirectional lookup (e.g. BOM-DEL and DEL-BOM).
+    Zero hardcoded baseline prices: baseline prices are derived from actual first scraped observations.
+    """
+    routes: Dict[str, Dict[str, Any]] = {}
+    
+    if os.path.exists(_CSV_PATH):
+        try:
+            with open(_CSV_PATH, mode="r", encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    r = row["route"].strip()
+                    parts = r.split("-")
+                    if len(parts) == 2:
+                        c1, c2 = parts[0].strip(), parts[1].strip()
+                        pax = int(row["total_pax"])
+                        weight = float(row["weight_traffic_within_basket"])
+
+                        meta = {
+                            "origin": c1,
+                            "destination": c2,
+                            "name": f"{row['city1']} - {row['city2']}",
+                            "annual_pax": pax,
+                            "annual_pax_approx": pax,
+                            "traffic_weight": weight,
+                            "share_of_national_traffic": float(row.get("share_of_national_traffic", 0.0)),
+                            "tier": row.get("tier", "Tier 1"),
+                            "rank": int(row.get("rank", 1)),
+                            "avg_flight_time_mins": 120
+                        }
+                        routes[r] = meta
+                        
+                        # Bidirectional reverse route entry
+                        rev_r = f"{c2}-{c1}"
+                        if rev_r not in routes:
+                            routes[rev_r] = dict(
+                                meta,
+                                origin=c2,
+                                destination=c1,
+                                name=f"{row['city2']} - {row['city1']}"
+                            )
+            return routes
+        except Exception:
+            pass
+
+    # Fallback to top primary trunk corridors from census if CSV is missing
+    return {
+        "DEL-BOM": {"origin": "DEL", "destination": "BOM", "name": "Delhi - Mumbai", "annual_pax": 6850869, "annual_pax_approx": 6850869, "traffic_weight": 0.0585, "avg_flight_time_mins": 130},
+        "BOM-DEL": {"origin": "BOM", "destination": "DEL", "name": "Mumbai - Delhi", "annual_pax": 6850869, "annual_pax_approx": 6850869, "traffic_weight": 0.0585, "avg_flight_time_mins": 130},
+        "BLR-DEL": {"origin": "BLR", "destination": "DEL", "name": "Bengaluru - Delhi", "annual_pax": 4681042, "annual_pax_approx": 4681042, "traffic_weight": 0.0400, "avg_flight_time_mins": 165},
+        "DEL-BLR": {"origin": "DEL", "destination": "BLR", "name": "Delhi - Bengaluru", "annual_pax": 4681042, "annual_pax_approx": 4681042, "traffic_weight": 0.0400, "avg_flight_time_mins": 165},
+        "BLR-BOM": {"origin": "BLR", "destination": "BOM", "name": "Bengaluru - Mumbai", "annual_pax": 4114574, "annual_pax_approx": 4114574, "traffic_weight": 0.0351, "avg_flight_time_mins": 100},
+        "BOM-BLR": {"origin": "BOM", "destination": "BLR", "name": "Mumbai - Bengaluru", "annual_pax": 4114574, "annual_pax_approx": 4114574, "traffic_weight": 0.0351, "avg_flight_time_mins": 100}
+    }
+
+
+# Dynamically load from official DGCA Table 5.01 census data
+DGCA_ROUTES: Dict[str, Dict[str, Any]] = _load_dgca_routes()
 TOTAL_RAW_WEIGHT = sum(r["traffic_weight"] for r in DGCA_ROUTES.values())
-for route in DGCA_ROUTES.values():
-    route["traffic_weight"] = round(route["traffic_weight"] / TOTAL_RAW_WEIGHT, 4)
+
 
 ADVANCE_WINDOWS: Dict[str, Dict[str, Any]] = {
     "T+0": {

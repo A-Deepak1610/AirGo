@@ -79,6 +79,16 @@ class IndexCalculator:
                     fare_val = float(getattr(f, "total_fare", 0.0) or 0.0)
                     sector_window_fares[sec][win].append(fare_val)
 
+            # Determine Earliest Scraped Observation Date (Base Reference Date)
+            earliest_canon_stmt = select(func.min(CanonicalFareDB.observation_date)).where(
+                CanonicalFareDB.is_outlier == False
+            )
+            base_date = session.scalar(earliest_canon_stmt)
+            if not base_date:
+                base_date = session.scalar(select(func.min(CleanFareDB.booking_date)).where(CleanFareDB.is_outlier == False))
+            
+            is_base_day = (base_date is None) or (target_date == base_date)
+
             # 3. Compute Elementary Route-Level Indices
             sector_indices: Dict[str, Dict[str, Any]] = {}
             national_laspeyres_sum = 0.0
@@ -89,7 +99,6 @@ class IndexCalculator:
             for sec_code, win_map in sector_window_fares.items():
                 route_meta = DGCA_ROUTES.get(sec_code, DGCA_ROUTES.get(f"{sec_code.split('-')[1]}-{sec_code.split('-')[0]}"))
                 route_weight = route_meta["traffic_weight"] if route_meta else 0.05
-                base_fare_p0 = route_meta["base_fare_baseline"] if route_meta else 4800.0
 
                 # Weighted average fare across advance windows for this sector
                 sector_window_weighted_fare = 0.0
@@ -107,12 +116,33 @@ class IndexCalculator:
                     sec_fares_all.extend(fare_list)
                     national_all_fares.extend(fare_list)
 
-                # Normalized sector price
+                # Normalized current sector price P_t
                 avg_sec_p1 = sector_window_weighted_fare / max(sector_window_weight_sum, 0.001)
-                
-                # Sector price relative to baseline P0 (Base 100.0)
-                sec_index_laspeyres = (avg_sec_p1 / base_fare_p0) * 100.0
-                sec_index_jevons = math.exp(math.log(avg_sec_p1 / base_fare_p0)) * 100.0
+
+                # Determine Base Price P_0 dynamically from First Scrape (Zero Hardcoded Data)
+                if is_base_day:
+                    base_fare_p0 = avg_sec_p1
+                else:
+                    rev_code = f"{sec_code.split('-')[1]}-{sec_code.split('-')[0]}" if "-" in sec_code else sec_code
+                    base_query = select(CanonicalFareDB).where(
+                        CanonicalFareDB.observation_date == base_date,
+                        CanonicalFareDB.route.in_([sec_code, rev_code]),
+                        CanonicalFareDB.is_outlier == False
+                    )
+                    base_records = session.scalars(base_query).all()
+                    if base_records:
+                        base_fares_vals = [
+                            float(getattr(x, "avg_total_fare", None) or getattr(x, "min_total_fare", 0.0) or 0.0)
+                            for x in base_records
+                        ]
+                        valid_base = [b for b in base_fares_vals if b > 0]
+                        base_fare_p0 = float(np.mean(valid_base)) if valid_base else avg_sec_p1
+                    else:
+                        base_fare_p0 = avg_sec_p1
+
+                # Sector price relative to baseline P0 (Base Day = 100.0)
+                sec_index_laspeyres = (avg_sec_p1 / max(base_fare_p0, 1.0)) * 100.0
+                sec_index_jevons = math.exp(math.log(avg_sec_p1 / max(base_fare_p0, 1.0))) * 100.0
 
                 sector_indices[sec_code] = {
                     "sector": sec_code,
