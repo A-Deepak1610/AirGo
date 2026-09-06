@@ -3,7 +3,7 @@ from datetime import date
 from typing import List, Dict, Any, Optional
 import numpy as np
 from sqlalchemy import select
-from airgo.pipeline.models import CleanFareDB, ElasticityPoint
+from airgo.pipeline.models import CleanFareDB, CanonicalFareDB, ElasticityPoint
 from airgo.pipeline.db import get_db_session
 from airgo.engine.dgca_weights import ADVANCE_WINDOWS
 
@@ -20,14 +20,20 @@ class ElasticityAnalyzer:
         Compute lead-time price elasticity curve across T+1, T+7, T+15, T+30, T+45 days.
         """
         with get_db_session() as session:
-            stmt = select(CleanFareDB).where(CleanFareDB.is_outlier == False)
+            # Check CanonicalFareDB first
+            canon_stmt = select(CanonicalFareDB).where(CanonicalFareDB.is_outlier == False)
             if sector and sector != "ALL":
-                stmt = stmt.where(CleanFareDB.sector == sector)
+                canon_stmt = canon_stmt.where(CanonicalFareDB.route == sector)
+            canon_fares = session.scalars(canon_stmt).all()
 
-            fares = session.scalars(stmt).all()
+            # Check CleanFareDB
+            clean_stmt = select(CleanFareDB).where(CleanFareDB.is_outlier == False)
+            if sector and sector != "ALL":
+                clean_stmt = clean_stmt.where(CleanFareDB.sector == sector)
+            clean_fares = session.scalars(clean_stmt).all()
 
-            if not fares:
-                # Default baseline points if no data yet
+            if not canon_fares and not clean_fares:
+                # Default calibrated baseline points if no data yet
                 return [
                     ElasticityPoint(advance_window="T+1", advance_days=1, avg_fare=8950.0, median_fare=8700.0, fare_multiplier=2.15, elasticity_score=-0.85, sample_size=50),
                     ElasticityPoint(advance_window="T+7", advance_days=7, avg_fare=6350.0, median_fare=6100.0, fare_multiplier=1.52, elasticity_score=-0.52, sample_size=50),
@@ -38,7 +44,12 @@ class ElasticityAnalyzer:
 
             # Group by advance window
             window_fares: Dict[str, List[float]] = {w: [] for w in ADVANCE_WINDOWS.keys()}
-            for f in fares:
+            for cf in canon_fares:
+                if cf.advance_purchase_window in window_fares:
+                    val = cf.avg_total_fare if (cf.avg_total_fare and cf.avg_total_fare > 0) else cf.min_total_fare
+                    window_fares[cf.advance_purchase_window].append(val)
+
+            for f in clean_fares:
                 if f.advance_window in window_fares:
                     window_fares[f.advance_window].append(f.total_fare)
 
