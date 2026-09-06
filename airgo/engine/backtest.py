@@ -2,8 +2,8 @@ import logging
 from datetime import date, timedelta
 from typing import Dict, List, Any
 import numpy as np
-from sqlalchemy import select
-from airgo.pipeline.models import DGCABenchmarkDB, APIxIndexDB
+from sqlalchemy import select, func
+from airgo.pipeline.models import DGCABenchmarkDB, APIxIndexDB, CanonicalFareDB
 from airgo.pipeline.db import get_db_session
 from airgo.engine.dgca_weights import DGCA_ROUTES
 
@@ -24,17 +24,34 @@ class BacktestEngine:
                 return
 
             records = []
+            base_date = session.scalar(select(func.min(CanonicalFareDB.observation_date)).where(
+                CanonicalFareDB.is_outlier == False
+            ))
+
             for sec_code, meta in DGCA_ROUTES.items():
+                rev_code = f"{sec_code.split('-')[1]}-{sec_code.split('-')[0]}" if "-" in sec_code else sec_code
+                sector_canon = session.scalars(select(CanonicalFareDB).where(
+                    CanonicalFareDB.route.in_([sec_code, rev_code]),
+                    CanonicalFareDB.observation_date == base_date if base_date else True,
+                    CanonicalFareDB.is_outlier == False
+                )).all()
+                if sector_canon:
+                    fares_vals = [float(getattr(x, "avg_total_fare", None) or getattr(x, "min_total_fare", 0.0) or 0.0) for x in sector_canon]
+                    valid_f = [f for f in fares_vals if f > 0]
+                    avg_fare_pub = round(float(np.mean(valid_f)), 2) if valid_f else 5000.0
+                else:
+                    avg_fare_pub = 5000.0
+
                 records.append(DGCABenchmarkDB(
                     sector=sec_code,
                     period="2026-Q1",
                     monthly_pax_traffic=meta["annual_pax_approx"] // 12,
                     traffic_weight=meta["traffic_weight"],
-                    avg_fare_published=meta["base_fare_baseline"],
+                    avg_fare_published=avg_fare_pub,
                     base_fare_index=100.0
                 ))
             session.bulk_save_objects(records)
-            logger.info("Seeded DGCA historical benchmark tariffs.")
+            logger.info("Seeded DGCA historical benchmark tariffs from actual scraped observations.")
 
     def run_30_day_backtest(self) -> Dict[str, Any]:
         """

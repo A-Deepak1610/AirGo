@@ -15,29 +15,7 @@ from airgo.engine.dgca_weights import INDIAN_AIRLINES
 
 logger = logging.getLogger("AirGoScraper.EaseMyTrip")
 
-# Base fare tables by advance purchase horizon (INR)
-HORIZON_BASE_FARES = {
-    "T+0": (6800.0, 9200.0),
-    "T+1": (5500.0, 7800.0),
-    "T+7": (4200.0, 5900.0),
-    "T+15": (3600.0, 4900.0),
-    "T+30": (3100.0, 4400.0),
-    "T+45": (2800.0, 3900.0),
-}
-
-# Standardized full-day flight schedule across top DGCA carriers
-FULL_DAY_SCHEDULE = [
-    {"carrier": "IndiGo", "code": "6E", "flt_no": "6E-201", "dep": "06:00", "arr": "08:15", "dur": 135, "stops": 0},
-    {"carrier": "Air India Express", "code": "IX", "flt_no": "IX-105", "dep": "07:30", "arr": "09:45", "dur": 135, "stops": 0},
-    {"carrier": "SpiceJet", "code": "SG", "flt_no": "SG-402", "dep": "09:15", "arr": "11:30", "dur": 135, "stops": 0},
-    {"carrier": "Akasa Air", "code": "QP", "flt_no": "QP-1102", "dep": "11:45", "arr": "14:05", "dur": 140, "stops": 0},
-    {"carrier": "IndiGo", "code": "6E", "flt_no": "6E-512", "dep": "13:30", "arr": "15:45", "dur": 135, "stops": 0},
-    {"carrier": "Air India", "code": "AI", "flt_no": "AI-806", "dep": "15:15", "arr": "17:35", "dur": 140, "stops": 0},
-    {"carrier": "IndiGo", "code": "6E", "flt_no": "6E-843", "dep": "17:45", "arr": "20:00", "dur": 135, "stops": 0},
-    {"carrier": "Air India Express", "code": "IX", "flt_no": "IX-220", "dep": "19:30", "arr": "21:45", "dur": 135, "stops": 0},
-    {"carrier": "SpiceJet", "code": "SG", "flt_no": "SG-819", "dep": "21:10", "arr": "23:25", "dur": 135, "stops": 0},
-    {"carrier": "Akasa Air", "code": "QP", "flt_no": "QP-1405", "dep": "22:45", "arr": "01:00", "dur": 135, "stops": 0},
-]
+logger = logging.getLogger("AirGoScraper.EaseMyTrip")
 
 
 class EaseMyTripScraper(BaseScraper):
@@ -114,48 +92,12 @@ class EaseMyTripScraper(BaseScraper):
         except Exception as e:
             self.logger.debug(f"EaseMyTrip API note: {e}")
 
-        # 2. Fallback full-day schedule generator if live API endpoint returns 0 items
+        # If live API yields 0 quotes, fail fast and honestly (Zero Dummy Data Policy)
         if not quotes:
-            min_fare, max_fare = HORIZON_BASE_FARES.get(advance_window, (3500.0, 5500.0))
-            route_code = f"{origin}-{destination}"
-
-            for idx, flt in enumerate(FULL_DAY_SCHEDULE):
-                # Calculate exact fare curve based on advance purchase window and carrier index
-                base_f = round(random.uniform(min_fare, max_fare) + (idx * 45.0), 2)
-                tax_f = round(base_f * 0.28, 2)
-                conv_f = 350.0
-                total_f = round(base_f + tax_f + conv_f, 2)
-
-                q = RawObservationSchema(
-                    scraping_run_id=run_id,
-                    platform="EaseMyTrip",
-                    carrier=flt["carrier"],
-                    carrier_code=flt["code"],
-                    flight_number=flt["flt_no"],
-                    origin=origin,
-                    destination=destination,
-                    route=route_code,
-                    observation_date=today_date,
-                    travel_date=departure_date,
-                    departure_time=flt["dep"],
-                    arrival_time=flt["arr"],
-                    duration_mins=flt["dur"],
-                    stops=flt["stops"],
-                    advance_purchase_days=advance_days,
-                    advance_purchase_window=advance_window,
-                    fare_class="Economy",
-                    fare_family="Standard",
-                    base_fare=base_f,
-                    taxes=tax_f,
-                    fees=0.0,
-                    convenience_fee=conv_f,
-                    total_fare=total_f,
-                    currency="INR",
-                    availability="AVAILABLE",
-                    source_url=web_search_url,
-                    raw_payload={"flight": flt["flt_no"], "price": total_f, "source": "EaseMyTrip"}
-                )
-                quotes.append(q)
+            self.logger.warning(
+                f"[EaseMyTrip] Live flight search returned 0 items for {origin}-{destination} on {departure_date}. "
+                "Returning empty list in strict accordance with Zero Dummy Data Policy."
+            )
 
         return quotes
 
