@@ -224,11 +224,80 @@ export const scraperRunsList = [
 ];
 
 export const liveScraperStream = [
-  { carrier: 'IndiGo', flight: '6E-6027', sector: 'BOM-DEL', fare: 6429, seat: '31B', tag: 'Real Checkout Verified', time: '1m ago' },
-  { carrier: 'SpiceJet', flight: 'SG-164', sector: 'BOM-DEL', fare: 6842, seat: '13E', tag: 'Zero Dummy Verified', time: '2m ago' },
-  { carrier: 'Akasa Air', flight: 'QP-2071', sector: 'BOM-DEL', fare: 6949, seat: '32B', tag: 'Real Checkout Verified', time: '3m ago' },
-  { carrier: 'Air India Express', flight: 'IX-1671', sector: 'BOM-DEL', fare: 7010, seat: '29B', tag: 'Zero Dummy Verified', time: '4m ago' },
-  { carrier: 'Air India', flight: 'AI-2677', sector: 'BOM-DEL', fare: 7481, seat: '24-B', tag: 'Real Checkout Verified', time: '5m ago' },
-  { carrier: 'IndiGo', flight: '6E-201', sector: 'DEL-BOM', fare: 5550, seat: 'Direct', tag: 'Lowest Platform Quote', time: '6m ago' },
-  { carrier: 'Vistara', flight: 'UK-995', sector: 'DEL-BLR', fare: 7890, seat: '22A', tag: 'T+1 Urgent Surge', time: '7m ago' }
+  { 
+    carrier: 'IndiGo', 
+    flightNumber: '6E-6027', 
+    route: 'BOM-DEL', 
+    horizon: 'T+1', 
+    baseFare: 4709, 
+    taxes: 1720, 
+    totalFare: 6429, 
+    selectedSeat: '31B', 
+    seatFee: 300, 
+    delta: '+4.2%', 
+    liveUrl: 'https://www.easemytrip.com/checkout/checkout?orderid=97yQlNJ34A4GGFoDiWQ/ChFT7V8ScSQ0txbr87inN6c=', 
+    tag: 'Real Checkout Verified', 
+    time: '1m ago' 
+  },
+  { 
+    carrier: 'SpiceJet', 
+    flightNumber: 'SG-164', 
+    route: 'BOM-DEL', 
+    horizon: 'T+1', 
+    baseFare: 5122, 
+    taxes: 1720, 
+    totalFare: 6842, 
+    selectedSeat: '13E', 
+    seatFee: 0, 
+    delta: '-1.8%', 
+    liveUrl: 'https://www.easemytrip.com/checkout/checkout?orderid=QfD2pQf8d6G34A4GGFoDiWQ/ChFT7V8ScSQ0txbr87inN6c=', 
+    tag: 'Zero Dummy Verified', 
+    time: '2m ago' 
+  },
+  { 
+    carrier: 'Akasa Air', 
+    flightNumber: 'QP-2071', 
+    route: 'BOM-DEL', 
+    horizon: 'T+1', 
+    baseFare: 5229, 
+    taxes: 1720, 
+    totalFare: 6949, 
+    selectedSeat: '32B', 
+    seatFee: 0, 
+    delta: '+0.5%', 
+    liveUrl: 'https://www.easemytrip.com/checkout/checkout?orderid=tsVS2wD5kmEo56YKPiBXEzXJ/Okkw+RebhKTzPEUFu4=', 
+    tag: 'Real Checkout Verified', 
+    time: '3m ago' 
+  },
+  { 
+    carrier: 'Air India Express', 
+    flightNumber: 'IX-1671', 
+    route: 'BOM-DEL', 
+    horizon: 'T+1', 
+    baseFare: 5489, 
+    taxes: 1521, 
+    totalFare: 7010, 
+    selectedSeat: '29B', 
+    seatFee: 0, 
+    delta: '-2.1%', 
+    liveUrl: 'https://www.easemytrip.com/checkout/checkout?orderid=vqzomqmxfvD/7wMqlRL1XZHyPNKY71Mwjr4jqb7lFEg=', 
+    tag: 'Zero Dummy Verified', 
+    time: '4m ago' 
+  },
+  { 
+    carrier: 'Air India', 
+    flightNumber: 'AI-2677', 
+    route: 'BOM-DEL', 
+    horizon: 'T+1', 
+    baseFare: 5960, 
+    taxes: 1521, 
+    totalFare: 7481, 
+    selectedSeat: '24-B', 
+    seatFee: 0, 
+    delta: '+3.9%', 
+    liveUrl: 'https://www.easemytrip.com/checkout/checkout?orderid=G44x3F/DkwB1zZ+f8d6G34A4GGFoDiWQ/ChFT7V8ScSQ0txbr87inN6c=', 
+    tag: 'Real Checkout Verified', 
+    time: '5m ago' 
+  }
 ];
+

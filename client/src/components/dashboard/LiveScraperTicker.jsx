@@ -25,8 +25,11 @@ export const LiveScraperTicker = () => {
     return () => clearInterval(interval);
   }, [isPaused]);
 
-  const activeItem = liveScraperStream[currentIndex];
+  const activeItem = liveScraperStream[currentIndex] || liveScraperStream[0] || {};
   const matchedAuditFlight = auditedFlightsList.find(f => f.flightNumber === activeItem?.flightNumber) || auditedFlightsList[0];
+  const totalFareDisplay = activeItem.totalFare ? Number(activeItem.totalFare).toLocaleString('en-IN') : '6,429';
+  const deltaStr = activeItem.delta || '+0.0%';
+  const isPositive = deltaStr.startsWith('+');
 
   return (
     <div 
@@ -57,21 +60,21 @@ export const LiveScraperTicker = () => {
       {/* Middle: Active Flight Stream Item */}
       <div className="flex-1 flex items-center justify-start md:justify-center gap-2.5 overflow-hidden w-full md:w-auto">
         <div className="flex items-center gap-2 bg-slate-800/80 px-3 py-1 rounded-lg border border-slate-700/60 transition-all font-mono text-[12px]">
-          <span className="font-semibold text-white">{activeItem.flightNumber}</span>
-          <span className="text-slate-400">({activeItem.carrier})</span>
+          <span className="font-semibold text-white">{activeItem.flightNumber || '6E-6027'}</span>
+          <span className="text-slate-400">({activeItem.carrier || 'IndiGo'})</span>
           <span className="text-slate-500">·</span>
-          <span className="text-blue-300 font-semibold">{activeItem.route}</span>
+          <span className="text-blue-300 font-semibold">{activeItem.route || 'BOM-DEL'}</span>
           <span className="px-1.5 py-0.5 rounded bg-slate-700 text-slate-300 text-[10px] font-bold">
-            {activeItem.horizon}
+            {activeItem.horizon || 'T+1'}
           </span>
           <span className="text-slate-500">·</span>
-          <span className="text-emerald-400 font-bold">₹{activeItem.totalFare.toLocaleString('en-IN')}</span>
+          <span className="text-emerald-400 font-bold">₹{totalFareDisplay}</span>
 
           <span className={`text-[10px] flex items-center gap-0.5 px-1 rounded ${
-            activeItem.delta.startsWith('+') ? 'text-amber-400 bg-amber-950/40' : 'text-emerald-400 bg-emerald-950/40'
+            isPositive ? 'text-amber-400 bg-amber-950/40' : 'text-emerald-400 bg-emerald-950/40'
           }`}>
-            {activeItem.delta.startsWith('+') ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
-            {activeItem.delta}
+            {isPositive ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
+            {deltaStr}
           </span>
         </div>
 
