@@ -164,6 +164,8 @@ async def audit_single_flight_checkout(
             await page.wait_for_timeout(4000)
 
         # 2. Deterministically find and click the EXACT flight card by matching flight number & carrier
+        digits_match = re.search(r'\d+', flight_num)
+        digits_str = digits_match.group(0) if digits_match is not None else flight_num
         click_result = await page.evaluate("""(target) => {
             const cleanStr = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
             const targetCarrierClean = cleanStr(target.carrier);
@@ -208,7 +210,7 @@ async def audit_single_flight_checkout(
         }""", {
             "flightNum": flight_num,
             "carrier": carrier,
-            "digits": re.search(r'\d+', flight_num).group(0) if re.search(r'\d+', flight_num) else flight_num
+            "digits": digits_str
         })
 
         if not click_result.get("success"):

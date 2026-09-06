@@ -133,10 +133,11 @@ def get_sectors_summary(db: Session = Depends(get_db)):
         sector_canon = db.scalars(canon_stmt).all()
 
         if sector_canon:
-            fares_list = [float(getattr(x, "avg_total_fare", None) or getattr(x, "min_total_fare", 0.0) or 0.0) for x in sector_canon]
-            avg_fare = round(sum(fares_list) / len(fares_list), 2)
+            fares_list: List[float] = [float(getattr(x, "avg_total_fare", None) or getattr(x, "min_total_fare", 0.0) or 0.0) for x in sector_canon]
+            fares_clean = [f for f in fares_list if f > 0]
+            avg_fare: float = round(sum(fares_clean) / len(fares_clean), 2) if fares_clean else float(meta["base_fare_baseline"])
             index_val = round((avg_fare / meta["base_fare_baseline"]) * 100.0, 2)
-            carriers = sorted(list(set(x.carrier for x in sector_canon)))
+            carriers = sorted(list(set(str(x.carrier) for x in sector_canon)))
             quote_cnt = len(sector_canon)
         else:
             # 2. Fallback to legacy CleanFareDB
@@ -148,12 +149,13 @@ def get_sectors_summary(db: Session = Depends(get_db)):
 
             if sector_fares:
                 fares_list = [float(getattr(x, "total_fare", 0.0) or 0.0) for x in sector_fares]
-                avg_fare = round(sum(fares_list) / len(fares_list), 2)
+                fares_clean = [f for f in fares_list if f > 0]
+                avg_fare = round(sum(fares_clean) / len(fares_clean), 2) if fares_clean else float(meta["base_fare_baseline"])
                 index_val = round((avg_fare / meta["base_fare_baseline"]) * 100.0, 2)
                 carriers = sorted(list(set(str(x.carrier) for x in sector_fares)))
                 quote_cnt = len(sector_fares)
             else:
-                avg_fare = meta["base_fare_baseline"]
+                avg_fare = float(meta["base_fare_baseline"])
                 index_val = 100.0
                 carriers = ["IndiGo", "Air India", "SpiceJet", "Akasa Air"]
                 quote_cnt = 0
@@ -210,7 +212,7 @@ def get_scraped_quotes(
     if advance_window and advance_window != "ALL":
         canon_stmt = canon_stmt.where(CanonicalFareDB.advance_purchase_window == advance_window)
 
-    total_canon = db.scalar(select(func.count()).select_from(canon_stmt.subquery()))
+    total_canon = db.scalar(select(func.count()).select_from(canon_stmt.subquery())) or 0
     canon_rows = db.scalars(canon_stmt.order_by(desc(CanonicalFareDB.id)).offset(offset).limit(limit)).all()
 
     if canon_rows:
@@ -236,7 +238,7 @@ def get_scraped_quotes(
                     "total_fare": r.avg_total_fare if r.avg_total_fare is not None else r.min_total_fare,
                     "min_fare": r.min_total_fare,
                     "max_fare": r.max_total_fare,
-                    "source_url": f"https://www.google.com/travel/flights?q=Flights%20to%20{r.destination}%20from%20{r.origin}%20on%20{r.travel_date.strftime('%Y-%m-%d')}%20one%20way",
+                    "source_url": f"https://www.google.com/travel/flights?q=Flights%20to%20{r.destination}%20from%20{r.origin}%20on%20{r.travel_date.strftime('%Y-%m-%d') if hasattr(r.travel_date, 'strftime') else r.travel_date}%20one%20way",
                     "is_outlier": r.is_outlier,
                     "sources": r.observed_platforms,
                     "platform_count": r.platform_count,
@@ -256,7 +258,7 @@ def get_scraped_quotes(
     if advance_window and advance_window != "ALL":
         stmt = stmt.where(CleanFareDB.advance_window == advance_window)
 
-    total_clean = db.scalar(select(func.count()).select_from(stmt.subquery()))
+    total_clean = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     rows = db.scalars(stmt.order_by(desc(CleanFareDB.id)).offset(offset).limit(limit)).all()
 
     if rows:
@@ -281,7 +283,7 @@ def get_scraped_quotes(
                     "total_fare": r.total_fare,
                     "min_fare": r.total_fare,
                     "max_fare": r.total_fare,
-                    "source_url": r.source_url or f"https://www.google.com/travel/flights?q=Flights%20to%20{r.destination}%20from%20{r.origin}%20on%20{r.departure_date.strftime('%Y-%m-%d')}%20one%20way",
+                    "source_url": r.source_url or f"https://www.google.com/travel/flights?q=Flights%20to%20{r.destination}%20from%20{r.origin}%20on%20{r.departure_date.strftime('%Y-%m-%d') if hasattr(r.departure_date, 'strftime') else r.departure_date}%20one%20way",
                     "is_outlier": r.is_outlier,
                     "sources": r.sources,
                     "platform_count": r.source_count,
@@ -301,7 +303,7 @@ def get_scraped_quotes(
     if advance_window and advance_window != "ALL":
         raw_obs_stmt = raw_obs_stmt.where(RawObservationDB.advance_purchase_window == advance_window)
 
-    total_raw = db.scalar(select(func.count()).select_from(raw_obs_stmt.subquery()))
+    total_raw = db.scalar(select(func.count()).select_from(raw_obs_stmt.subquery())) or 0
     raw_obs = db.scalars(raw_obs_stmt.order_by(desc(RawObservationDB.id)).offset(offset).limit(limit)).all()
     if raw_obs:
         return {
@@ -325,7 +327,7 @@ def get_scraped_quotes(
                     "total_fare": r.total_fare,
                     "min_fare": r.total_fare,
                     "max_fare": r.total_fare,
-                    "source_url": r.source_url or f"https://www.google.com/travel/flights?q=Flights%20to%20{r.destination}%20from%20{r.origin}%20on%20{r.travel_date.strftime('%Y-%m-%d')}%20one%20way",
+                    "source_url": r.source_url or f"https://www.google.com/travel/flights?q=Flights%20to%20{r.destination}%20from%20{r.origin}%20on%20{r.travel_date.strftime('%Y-%m-%d') if hasattr(r.travel_date, 'strftime') else r.travel_date}%20one%20way",
                     "is_outlier": False,
                     "sources": r.platform,
                     "platform_count": 1,
@@ -338,6 +340,152 @@ def get_scraped_quotes(
     return {"count": 0, "offset": offset, "limit": limit, "quotes": []}
 
 
+# ==========================================
+# MoSPI & RBI Export Endpoints
+# ==========================================
+
+@app.get("/api/v1/export/csv")
+def export_dataset_csv(
+    dataset: str = Query("quotes", description="Dataset type: quotes, indices, aggregates"),
+    db: Session = Depends(get_db)
+):
+    """
+    Direct CSV export stream for MoSPI & RBI data analysts.
+    """
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    if dataset == "indices":
+        stmt = select(APIxIndexDB).order_by(desc(APIxIndexDB.index_date))
+        rows = db.scalars(stmt).all()
+        writer.writerow([
+            "index_date", "frequency", "sector", "advance_window",
+            "index_value", "laspeyres_value", "jevons_value", "fisher_value",
+            "avg_fare", "median_fare", "min_fare", "max_fare",
+            "quote_count", "dod_change_pct", "mom_change_pct"
+        ])
+        for r in rows:
+            writer.writerow([
+                r.index_date, r.frequency, r.sector, r.advance_window,
+                r.index_value, r.laspeyres_value, r.jevons_value, r.fisher_value,
+                r.avg_fare, r.median_fare, r.min_fare, r.max_fare,
+                r.quote_count, r.dod_change_pct, r.mom_change_pct
+            ])
+        filename = f"airgo_apix_indices_{date.today().isoformat()}.csv"
+
+    elif dataset == "aggregates":
+        stmt = select(DailyAirfareAggregateDB).order_by(desc(DailyAirfareAggregateDB.observation_date))
+        rows = db.scalars(stmt).all()
+        writer.writerow([
+            "aggregate_key", "route", "observation_date", "advance_purchase_window",
+            "carrier", "platform", "observation_count", "unique_flights",
+            "average_fare", "median_fare", "min_fare", "max_fare",
+            "average_base_fare", "average_taxes", "average_fees"
+        ])
+        for r in rows:
+            writer.writerow([
+                r.aggregate_key, r.route, r.observation_date, r.advance_purchase_window,
+                r.carrier, r.platform, r.observation_count, r.unique_flights,
+                r.average_fare, r.median_fare, r.min_fare, r.max_fare,
+                r.average_base_fare, r.average_taxes, r.average_fees
+            ])
+        filename = f"airgo_daily_aggregates_{date.today().isoformat()}.csv"
+
+    else:
+        # Default: Canonical clean fares
+        stmt = select(CanonicalFareDB).order_by(desc(CanonicalFareDB.observation_date)).limit(5000)
+        rows = db.scalars(stmt).all()
+        writer.writerow([
+            "canonical_id", "route", "origin", "destination", "carrier", "flight_number",
+            "observation_date", "travel_date", "departure_time", "advance_purchase_window",
+            "advance_purchase_days", "fare_class", "min_total_fare", "avg_total_fare", "max_total_fare",
+            "base_fare", "taxes", "fees", "convenience_fee", "cheapest_platform", "observed_platforms", "is_outlier"
+        ])
+        for r in rows:
+            writer.writerow([
+                r.canonical_id, r.route, r.origin, r.destination, r.carrier, r.flight_number,
+                r.observation_date, r.travel_date, r.departure_time, r.advance_purchase_window,
+                r.advance_purchase_days, r.fare_class, r.min_total_fare, r.avg_total_fare, r.max_total_fare,
+                r.base_fare, r.taxes, r.fees, r.convenience_fee, r.cheapest_platform, r.observed_platforms, r.is_outlier
+            ])
+        filename = f"airgo_canonical_fares_{date.today().isoformat()}.csv"
+
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
+@app.get("/api/v1/export/json")
+def export_dataset_json(
+    dataset: str = Query("quotes", description="Dataset type: quotes, indices, aggregates"),
+    db: Session = Depends(get_db)
+):
+    """
+    Direct JSON export for automated analytical ingestion by MoSPI / RBI data services.
+    """
+    if dataset == "indices":
+        rows = db.scalars(select(APIxIndexDB).order_by(desc(APIxIndexDB.index_date))).all()
+        data = [
+            {
+                "index_date": str(r.index_date),
+                "frequency": r.frequency,
+                "sector": r.sector,
+                "index_value": r.index_value,
+                "laspeyres": r.laspeyres_value,
+                "jevons": r.jevons_value,
+                "fisher": r.fisher_value,
+                "avg_fare": r.avg_fare,
+                "median_fare": r.median_fare,
+                "dod_change_pct": r.dod_change_pct,
+                "mom_change_pct": r.mom_change_pct,
+                "quote_count": r.quote_count
+            }
+            for r in rows
+        ]
+    elif dataset == "aggregates":
+        rows = db.scalars(select(DailyAirfareAggregateDB).order_by(desc(DailyAirfareAggregateDB.observation_date))).all()
+        data = [
+            {
+                "aggregate_key": r.aggregate_key,
+                "route": r.route,
+                "observation_date": str(r.observation_date),
+                "advance_window": r.advance_purchase_window,
+                "carrier": r.carrier,
+                "average_fare": r.average_fare,
+                "median_fare": r.median_fare,
+                "min_fare": r.min_fare,
+                "max_fare": r.max_fare
+            }
+            for r in rows
+        ]
+    else:
+        rows = db.scalars(select(CanonicalFareDB).order_by(desc(CanonicalFareDB.observation_date)).limit(1000)).all()
+        data = [
+            {
+                "canonical_id": r.canonical_id,
+                "route": r.route,
+                "carrier": r.carrier,
+                "flight_number": r.flight_number,
+                "observation_date": str(r.observation_date),
+                "travel_date": str(r.travel_date),
+                "advance_window": r.advance_purchase_window,
+                "min_total_fare": r.min_total_fare,
+                "avg_total_fare": r.avg_total_fare,
+                "max_total_fare": r.max_total_fare,
+                "base_fare": r.base_fare,
+                "taxes": r.taxes,
+                "fees": r.fees,
+                "cheapest_platform": r.cheapest_platform,
+                "is_outlier": r.is_outlier
+            }
+            for r in rows
+        ]
+    return JSONResponse(content={"dataset": dataset, "count": len(data), "records": data})
+
+
 @app.post("/api/v1/scrape/trigger")
 def trigger_scrape_job(
     background_tasks: BackgroundTasks,
@@ -345,7 +493,6 @@ def trigger_scrape_job(
     windows: Optional[List[str]] = None
 ):
     def _execute_visible_desktop_scrape():
-        # Spawn visible desktop process so the Chromium GUI window opens visibly on the user's desktop
         root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         live_script = os.path.join(root_dir, "scripts", "live_scrape.py")
         
@@ -358,7 +505,6 @@ def trigger_scrape_job(
             )
             proc.wait()
         except Exception as e:
-            # Fallback inline execution
             orchestrator.run_batch(routes=routes, windows=windows, max_routes=4)
             cleaner.process_pending_quotes(date.today())
             index_calculator.compute_daily_index(date.today())

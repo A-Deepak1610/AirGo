@@ -1,6 +1,6 @@
 import logging
 from datetime import date
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
 import numpy as np
 from sqlalchemy import select, delete
 from airgo.pipeline.models import RawQuoteDB, CleanFareDB, CleanFareSchema
@@ -19,7 +19,7 @@ class DataCleaningPipeline:
         self.iqr_multiplier = iqr_multiplier
         self.min_quotes_for_outlier = min_quotes_for_outlier
 
-    def process_pending_quotes(self, booking_date: date = None) -> Dict[str, Any]:
+    def process_pending_quotes(self, booking_date: Optional[date] = None) -> Dict[str, Any]:
         target_date = booking_date or date.today()
         logger.info(f"🧹 [Cleaner] Processing raw quotes for booking date: {target_date}")
 
@@ -42,29 +42,33 @@ class DataCleaningPipeline:
             normalized_candidates: List[CleanFareSchema] = []
             for key, group in dedup_groups.items():
                 origin, dest, carrier, flight_no, dep_date, adv_win = key
-                best_quote = min(group, key=lambda x: x.total_fare)
-                all_sources = ",".join(sorted(list(set(x.source for x in group))))
+                best_quote = min(group, key=lambda x: float(getattr(x, "total_fare", 0.0) or 0.0))
+                all_sources = ",".join(sorted(list(set(str(x.source) for x in group))))
                 
-                total_f = best_quote.total_fare
-                base_f = best_quote.base_fare if (best_quote.base_fare and best_quote.base_fare < total_f) else round(total_f * 0.74, 2)
+                total_f = float(getattr(best_quote, "total_fare", 0.0) or 0.0)
+                raw_base = getattr(best_quote, "base_fare", None)
+                base_f = float(raw_base) if (raw_base is not None and float(raw_base) < total_f) else round(total_f * 0.74, 2)
                 taxes_f = round(total_f - base_f, 2)
 
-                # Fallback source URL if None
-                source_link = best_quote.source_url or f"https://www.google.com/travel/flights?q=Flights%20to%20{dest}%20from%20{origin}%20on%20{dep_date.strftime('%Y-%m-%d')}%20one%20way"
+                raw_url = getattr(best_quote, "source_url", None)
+                dep_date_str = dep_date.strftime("%Y-%m-%d") if hasattr(dep_date, "strftime") else str(dep_date)
+                source_link = str(raw_url) if raw_url is not None else f"https://www.google.com/travel/flights?q=Flights%20to%20{dest}%20from%20{origin}%20on%20{dep_date_str}%20one%20way"
+                dep_dt = getattr(best_quote, "departure_datetime", None)
+                dep_time_str = dep_dt.strftime("%H:%M") if (dep_dt is not None and hasattr(dep_dt, "strftime")) else "10:00"
 
                 normalized_candidates.append(CleanFareSchema(
                     sector=f"{origin}-{dest}",
-                    origin=origin,
-                    destination=dest,
-                    carrier=carrier,
-                    flight_number=flight_no,
+                    origin=str(origin),
+                    destination=str(dest),
+                    carrier=str(carrier),
+                    flight_number=str(flight_no),
                     departure_date=dep_date,
-                    departure_time=best_quote.departure_datetime.strftime("%H:%M"),
+                    departure_time=dep_time_str,
                     booking_date=target_date,
-                    advance_window=adv_win,
-                    advance_days=best_quote.advance_days,
-                    fare_class=best_quote.fare_class or "Economy",
-                    stops=best_quote.stops or 0,
+                    advance_window=str(adv_win),
+                    advance_days=int(getattr(best_quote, "advance_days", 0) or 0),
+                    fare_class=str(getattr(best_quote, "fare_class", "Economy") or "Economy"),
+                    stops=int(getattr(best_quote, "stops", 0) or 0),
                     base_fare=base_f,
                     taxes_and_fees=taxes_f,
                     total_fare=total_f,

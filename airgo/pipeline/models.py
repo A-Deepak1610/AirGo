@@ -54,24 +54,24 @@ class RawObservationDB(Base):
     carrier = Column(String(50), nullable=False, index=True)
     carrier_code = Column(String(10), nullable=True)
     flight_number = Column(String(20), nullable=False, index=True)
-
+    
     origin = Column(String(10), nullable=False, index=True)
     destination = Column(String(10), nullable=False, index=True)
     route = Column(String(20), nullable=False, index=True)
-
+    
     observation_date = Column(Date, nullable=False, index=True)
     travel_date = Column(Date, nullable=False, index=True)
     departure_time = Column(String(10), nullable=False)
     arrival_time = Column(String(10), nullable=True)
     duration_mins = Column(Integer, nullable=True)
     stops = Column(Integer, default=0)
-
+    
     advance_purchase_days = Column(Integer, nullable=False, index=True)
     advance_purchase_window = Column(String(10), nullable=False, index=True)  # e.g., T+0, T+1, T+7, T+15, T+30, T+45
-
+    
     fare_class = Column(String(30), default="Economy")
     fare_family = Column(String(50), default="Standard")
-
+    
     base_fare = Column(Float, nullable=True)
     taxes = Column(Float, nullable=True)
     fees = Column(Float, nullable=True)
@@ -79,7 +79,7 @@ class RawObservationDB(Base):
     total_fare = Column(Float, nullable=False, index=True)
     currency = Column(String(10), default="INR")
     availability = Column(String(20), default="AVAILABLE")
-
+    
     source_url = Column(String(500), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
     raw_payload = Column(JSON, nullable=True)
@@ -105,38 +105,38 @@ class CanonicalFareDB(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     canonical_id = Column(String(150), nullable=False, unique=True, index=True)
-
+    
     route = Column(String(20), nullable=False, index=True)
     origin = Column(String(10), nullable=False, index=True)
     destination = Column(String(10), nullable=False, index=True)
     carrier = Column(String(50), nullable=False, index=True)
     flight_number = Column(String(20), nullable=False, index=True)
-
+    
     observation_date = Column(Date, nullable=False, index=True)
     travel_date = Column(Date, nullable=False, index=True)
     departure_time = Column(String(10), nullable=False)
     arrival_time = Column(String(10), nullable=True)
-
+    
     advance_purchase_days = Column(Integer, nullable=False, index=True)
     advance_purchase_window = Column(String(10), nullable=False, index=True)
-
+    
     fare_class = Column(String(30), default="Economy")
     fare_family = Column(String(50), default="Standard")
     stops = Column(Integer, default=0)
-
+    
     min_total_fare = Column(Float, nullable=False, index=True)
     avg_total_fare = Column(Float, nullable=False)
     max_total_fare = Column(Float, nullable=False)
-
+    
     base_fare = Column(Float, nullable=False)
     taxes = Column(Float, nullable=False)
     fees = Column(Float, nullable=False)
     convenience_fee = Column(Float, default=0.0)
-
+    
     cheapest_platform = Column(String(50), nullable=False)
     platform_count = Column(Integer, default=1)
     observed_platforms = Column(String(200), nullable=False)  # Comma-separated list of OTAs/Airlines
-
+    
     is_outlier = Column(Boolean, default=False, index=True)
     outlier_reason = Column(String(100), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -159,25 +159,25 @@ class DailyAirfareAggregateDB(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     aggregate_key = Column(String(150), nullable=False, unique=True, index=True)
-
+    
     route = Column(String(20), nullable=False, index=True)
     observation_date = Column(Date, nullable=False, index=True)
     advance_purchase_window = Column(String(10), nullable=False, index=True)
     carrier = Column(String(50), default="ALL", index=True)
     platform = Column(String(50), default="ALL", index=True)
-
+    
     observation_count = Column(Integer, nullable=False)
     unique_flights = Column(Integer, nullable=False)
-
+    
     average_fare = Column(Float, nullable=False)
     median_fare = Column(Float, nullable=False)
     min_fare = Column(Float, nullable=False)
     max_fare = Column(Float, nullable=False)
-
+    
     average_base_fare = Column(Float, nullable=False)
     average_taxes = Column(Float, nullable=False)
     average_fees = Column(Float, nullable=False)
-
+    
     created_at = Column(DateTime, default=datetime.utcnow)
 
     __table_args__ = (
@@ -287,79 +287,8 @@ class DailyAirfareAggregateSchema(BaseModel):
 
 
 # ==========================================
-# Legacy & APIx Engine Compatibility Models
+# 6. Index & Macro Benchmark Tables
 # ==========================================
-
-class RawQuoteDB(Base):
-    """Raw scraped price quote directly from airline/OTA sources."""
-    __tablename__ = "raw_quotes"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    source = Column(String(50), nullable=False, index=True)
-    carrier = Column(String(50), nullable=False, index=True)
-    carrier_code = Column(String(10), nullable=True)
-    flight_number = Column(String(20), nullable=False)
-    origin = Column(String(10), nullable=False, index=True)
-    destination = Column(String(10), nullable=False, index=True)
-    departure_datetime = Column(DateTime, nullable=False, index=True)
-    arrival_datetime = Column(DateTime, nullable=True)
-    duration_mins = Column(Integer, nullable=True)
-    stops = Column(Integer, default=0)
-
-    booking_date = Column(Date, nullable=False, index=True)
-    advance_window = Column(String(10), nullable=False, index=True)
-    advance_days = Column(Integer, nullable=False)
-    fare_class = Column(String(30), default="Economy")
-
-    base_fare = Column(Float, nullable=True)
-    surcharges = Column(Float, nullable=True)
-    taxes = Column(Float, nullable=True)
-    convenience_fee = Column(Float, nullable=True)
-    total_fare = Column(Float, nullable=False)
-
-    source_url = Column(String(500), nullable=True)
-    is_sold_out = Column(Boolean, default=False)
-    seats_remaining = Column(Integer, nullable=True)
-    scraped_at = Column(DateTime, default=datetime.utcnow, index=True)
-    metadata_json = Column(JSON, nullable=True)
-
-
-class CleanFareDB(Base):
-    """De-duplicated, normalized, and outlier-filtered fare data."""
-    __tablename__ = "clean_fares"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    raw_quote_id = Column(Integer, nullable=True)
-
-    sector = Column(String(20), nullable=False, index=True)
-    origin = Column(String(10), nullable=False)
-    destination = Column(String(10), nullable=False)
-    carrier = Column(String(50), nullable=False, index=True)
-    flight_number = Column(String(20), nullable=False)
-
-    departure_date = Column(Date, nullable=False, index=True)
-    departure_time = Column(String(10), nullable=True)
-    booking_date = Column(Date, nullable=False, index=True)
-    advance_window = Column(String(10), nullable=False, index=True)
-    advance_days = Column(Integer, nullable=False)
-    fare_class = Column(String(30), default="Economy")
-    stops = Column(Integer, default=0)
-
-    base_fare = Column(Float, nullable=False)
-    taxes_and_fees = Column(Float, nullable=False)
-    total_fare = Column(Float, nullable=False, index=True)
-
-    source_url = Column(String(500), nullable=True)
-    is_outlier = Column(Boolean, default=False, index=True)
-    outlier_reason = Column(String(100), nullable=True)
-    source_count = Column(Integer, default=1)
-    sources = Column(String(100), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-    __table_args__ = (
-        Index("ix_sector_booking_advance", "sector", "booking_date", "advance_window"),
-    )
-
 
 class APIxIndexDB(Base):
     """Calculated Airfare Price Index (APIx) across time frequencies."""
@@ -370,22 +299,22 @@ class APIxIndexDB(Base):
     frequency = Column(String(20), nullable=False, index=True)
     sector = Column(String(20), default="ALL", index=True)
     advance_window = Column(String(10), default="ALL")
-
+    
     index_value = Column(Float, nullable=False)
     laspeyres_value = Column(Float, nullable=True)
     jevons_value = Column(Float, nullable=True)
     fisher_value = Column(Float, nullable=True)
-
+    
     avg_fare = Column(Float, nullable=False)
     median_fare = Column(Float, nullable=False)
     min_fare = Column(Float, nullable=True)
     max_fare = Column(Float, nullable=True)
     quote_count = Column(Integer, nullable=False)
-
+    
     dod_change_pct = Column(Float, nullable=True)
     wow_change_pct = Column(Float, nullable=True)
     mom_change_pct = Column(Float, nullable=True)
-
+    
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
@@ -402,9 +331,76 @@ class DGCABenchmarkDB(Base):
     base_fare_index = Column(Float, default=100.0)
 
 
-# ==========================================
-# Legacy & APIx Engine Compatibility Schemas
-# ==========================================
+class RawQuoteDB(Base):
+    """Legacy raw quotes table for backward compatibility."""
+    __tablename__ = "raw_quotes"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    source = Column(String(50), nullable=False, index=True)
+    carrier = Column(String(50), nullable=False, index=True)
+    carrier_code = Column(String(10), nullable=True)
+    flight_number = Column(String(20), nullable=False)
+    origin = Column(String(10), nullable=False, index=True)
+    destination = Column(String(10), nullable=False, index=True)
+    departure_datetime = Column(DateTime, nullable=False, index=True)
+    arrival_datetime = Column(DateTime, nullable=True)
+    duration_mins = Column(Integer, nullable=True)
+    stops = Column(Integer, default=0)
+    
+    booking_date = Column(Date, nullable=False, index=True)
+    advance_window = Column(String(10), nullable=False, index=True)
+    advance_days = Column(Integer, nullable=False)
+    fare_class = Column(String(30), default="Economy")
+    
+    base_fare = Column(Float, nullable=True)
+    surcharges = Column(Float, nullable=True)
+    taxes = Column(Float, nullable=True)
+    convenience_fee = Column(Float, nullable=True)
+    total_fare = Column(Float, nullable=False)
+    
+    source_url = Column(String(500), nullable=True)
+    is_sold_out = Column(Boolean, default=False)
+    seats_remaining = Column(Integer, nullable=True)
+    scraped_at = Column(DateTime, default=datetime.utcnow, index=True)
+    metadata_json = Column(JSON, nullable=True)
+
+
+class CleanFareDB(Base):
+    """Normalized clean fares table."""
+    __tablename__ = "clean_fares"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    raw_quote_id = Column(Integer, nullable=True)
+    
+    sector = Column(String(20), nullable=False, index=True)
+    origin = Column(String(10), nullable=False)
+    destination = Column(String(10), nullable=False)
+    carrier = Column(String(50), nullable=False, index=True)
+    flight_number = Column(String(20), nullable=False)
+    
+    departure_date = Column(Date, nullable=False, index=True)
+    departure_time = Column(String(10), nullable=True)
+    booking_date = Column(Date, nullable=False, index=True)
+    advance_window = Column(String(10), nullable=False, index=True)
+    advance_days = Column(Integer, nullable=False)
+    fare_class = Column(String(30), default="Economy")
+    stops = Column(Integer, default=0)
+    
+    base_fare = Column(Float, nullable=False)
+    taxes_and_fees = Column(Float, nullable=False)
+    total_fare = Column(Float, nullable=False, index=True)
+    
+    source_url = Column(String(500), nullable=True)
+    is_outlier = Column(Boolean, default=False, index=True)
+    outlier_reason = Column(String(100), nullable=True)
+    source_count = Column(Integer, default=1)
+    sources = Column(String(100), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index("ix_clean_sector_booking_advance", "sector", "booking_date", "advance_window"),
+    )
+
 
 class RawQuoteSchema(BaseModel):
     source: str
@@ -463,3 +459,4 @@ class ElasticityPoint(BaseModel):
     fare_multiplier: float
     elasticity_score: float
     sample_size: int
+
