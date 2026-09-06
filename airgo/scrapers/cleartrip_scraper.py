@@ -182,7 +182,7 @@ class CleartripScraper(BaseScraper):
 
                     quotes.append(RawQuoteSchema(
                         source="Cleartrip",
-                        carrier=carrier_name,
+                        carrier=carrier_name or "Unknown",
                         carrier_code=airline_code,
                         flight_number=flight_no,
                         origin=origin,

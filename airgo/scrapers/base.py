@@ -53,8 +53,9 @@ class BaseScraper(ABC):
         departure_date: date,
         advance_window: str,
         advance_days: int,
-        run_id: str = "run_default"
-    ) -> List[RawObservationSchema]:
+        *args: Any,
+        **kwargs: Any
+    ) -> Any:
         pass
 
     def run_safe(

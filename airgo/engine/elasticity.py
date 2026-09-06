@@ -33,9 +33,9 @@ class ElasticityAnalyzer:
 
             if canon_fares:
                 for f in canon_fares:
-                    win = f.advance_purchase_window
+                    win = str(f.advance_purchase_window)
                     if win in window_fares:
-                        fare_val = float(f.avg_total_fare if f.avg_total_fare is not None else f.min_total_fare)
+                        fare_val = float(getattr(f, "avg_total_fare", None) or getattr(f, "min_total_fare", 0.0) or 0.0)
                         window_fares[win].append(fare_val)
             else:
                 # Fallback to CleanFareDB
@@ -58,8 +58,10 @@ class ElasticityAnalyzer:
                     ]
 
                 for f in fares:
-                    if f.advance_window in window_fares:
-                        window_fares[f.advance_window].append(f.total_fare)
+                    win = str(f.advance_window)
+                    if win in window_fares:
+                        fare_val = float(getattr(f, "total_fare", 0.0) or 0.0)
+                        window_fares[win].append(fare_val)
 
             # Baseline fare is T+45 (or highest advance window available)
             base_t45 = np.median(window_fares.get("T+45", [4200.0])) if window_fares.get("T+45") else (

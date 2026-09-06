@@ -42,7 +42,7 @@ class ScrapingOrchestrator:
 
         logger.info(f"🚀 [Orchestrator] Starting VISIBLE BROWSER Scrape {run_id} | Routes: {len(target_routes)} | Windows: {len(target_windows)}")
         
-        total_quotes: List[RawQuoteSchema] = []
+        total_quotes: List[Any] = []
         today = date.today()
 
         for route_code in target_routes:

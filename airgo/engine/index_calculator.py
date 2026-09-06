@@ -17,7 +17,7 @@ class IndexCalculator:
     Applies official DGCA city-pair traffic weights and advance-purchase booking distributions.
     """
 
-    def compute_daily_index(self, calculation_date: date = None) -> Dict[str, Any]:
+    def compute_daily_index(self, calculation_date: Optional[date] = None) -> Dict[str, Any]:
         """
         Compute daily APIx for all sectors and overall national index for a specific date.
         Queries CanonicalFareDB first, falling back to legacy CleanFareDB.
@@ -49,13 +49,13 @@ class IndexCalculator:
 
             if canon_fares:
                 for f in canon_fares:
-                    sec = f.route
-                    win = f.advance_purchase_window
+                    sec = str(f.route)
+                    win = str(f.advance_purchase_window)
                     if sec not in sector_window_fares:
                         sector_window_fares[sec] = {}
                     if win not in sector_window_fares[sec]:
                         sector_window_fares[sec][win] = []
-                    fare_val = float(f.avg_total_fare if f.avg_total_fare is not None else f.min_total_fare)
+                    fare_val = float(getattr(f, "avg_total_fare", None) or getattr(f, "min_total_fare", 0.0) or 0.0)
                     sector_window_fares[sec][win].append(fare_val)
             else:
                 # Fallback to CleanFareDB
@@ -70,13 +70,14 @@ class IndexCalculator:
                     return {"status": "NO_DATA", "date": str(target_date)}
 
                 for f in fares:
-                    sec = f.sector
-                    win = f.advance_window
+                    sec = str(f.sector)
+                    win = str(f.advance_window)
                     if sec not in sector_window_fares:
                         sector_window_fares[sec] = {}
                     if win not in sector_window_fares[sec]:
                         sector_window_fares[sec][win] = []
-                    sector_window_fares[sec][win].append(float(f.total_fare))
+                    fare_val = float(getattr(f, "total_fare", 0.0) or 0.0)
+                    sector_window_fares[sec][win].append(fare_val)
 
             # 3. Compute Elementary Route-Level Indices
             sector_indices: Dict[str, Dict[str, Any]] = {}
@@ -145,8 +146,10 @@ class IndexCalculator:
             )
             prev_index_record = session.scalars(prev_stmt).first()
             dod_change = None
-            if prev_index_record and prev_index_record.index_value > 0:
-                dod_change = round(((national_composite_index - prev_index_record.index_value) / prev_index_record.index_value) * 100.0, 2)
+            if prev_index_record is not None:
+                prev_val = float(getattr(prev_index_record, "index_value", 0.0) or 0.0)
+                if prev_val > 0:
+                    dod_change = round(((national_composite_index - prev_val) / prev_val) * 100.0, 2)
 
             # 6. Fetch 30 days prior index to calculate MoM change %
             prev_month_date = target_date - timedelta(days=30)
@@ -157,8 +160,10 @@ class IndexCalculator:
             )
             mom_record = session.scalars(mom_stmt).first()
             mom_change = None
-            if mom_record and mom_record.index_value > 0:
-                mom_change = round(((national_composite_index - mom_record.index_value) / mom_record.index_value) * 100.0, 2)
+            if mom_record is not None:
+                mom_val = float(getattr(mom_record, "index_value", 0.0) or 0.0)
+                if mom_val > 0:
+                    mom_change = round(((national_composite_index - mom_val) / mom_val) * 100.0, 2)
 
             # 7. Persist to apix_indices table
             session.execute(delete(APIxIndexDB).where(

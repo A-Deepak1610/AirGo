@@ -60,7 +60,7 @@ class BacktestEngine:
                         "date": str(pt.index_date),
                         "apix_index": pt.index_value,
                         "dgca_benchmark_index": 100.0,
-                        "transport_cpi_subindex": round(100.0 + (pt.index_value - 100.0) * 0.4, 2),
+                        "transport_cpi_subindex": round(100.0 + (float(getattr(pt, "index_value", 100.0) or 100.0) - 100.0) * 0.4, 2),
                         "avg_fare": pt.avg_fare
                     })
             else:

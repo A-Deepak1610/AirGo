@@ -133,7 +133,7 @@ def get_sectors_summary(db: Session = Depends(get_db)):
         sector_canon = db.scalars(canon_stmt).all()
 
         if sector_canon:
-            fares_list = [float(x.avg_total_fare if x.avg_total_fare is not None else x.min_total_fare) for x in sector_canon]
+            fares_list = [float(getattr(x, "avg_total_fare", None) or getattr(x, "min_total_fare", 0.0) or 0.0) for x in sector_canon]
             avg_fare = round(sum(fares_list) / len(fares_list), 2)
             index_val = round((avg_fare / meta["base_fare_baseline"]) * 100.0, 2)
             carriers = sorted(list(set(x.carrier for x in sector_canon)))
@@ -232,7 +232,7 @@ def get_scraped_quotes(
                     "advance_window": r.advance_purchase_window,
                     "advance_days": r.advance_purchase_days,
                     "base_fare": r.base_fare,
-                    "taxes_and_fees": round((r.taxes or 0.0) + (r.fees or 0.0), 2),
+                    "taxes_and_fees": round(float(getattr(r, "taxes", 0.0) or 0.0) + float(getattr(r, "fees", 0.0) or 0.0), 2),
                     "total_fare": r.avg_total_fare if r.avg_total_fare is not None else r.min_total_fare,
                     "min_fare": r.min_total_fare,
                     "max_fare": r.max_total_fare,
@@ -285,7 +285,7 @@ def get_scraped_quotes(
                     "is_outlier": r.is_outlier,
                     "sources": r.sources,
                     "platform_count": r.source_count,
-                    "cheapest_platform": r.sources.split(",")[0].strip() if r.sources else "OTA"
+                    "cheapest_platform": str(r.sources).split(",")[0].strip() if r.sources is not None else "OTA"
                 }
                 for r in rows
             ]
@@ -321,7 +321,7 @@ def get_scraped_quotes(
                     "advance_window": r.advance_purchase_window,
                     "advance_days": r.advance_purchase_days,
                     "base_fare": r.base_fare,
-                    "taxes_and_fees": round((r.taxes or 0.0) + (r.fees or 0.0), 2),
+                    "taxes_and_fees": round(float(getattr(r, "taxes", 0.0) or 0.0) + float(getattr(r, "fees", 0.0) or 0.0), 2),
                     "total_fare": r.total_fare,
                     "min_fare": r.total_fare,
                     "max_fare": r.total_fare,
@@ -385,11 +385,11 @@ def get_scraper_logs(limit: int = 30, db: Session = Depends(get_db)):
                     "source": r.platform or "Harvester Pipeline",
                     "route": "BOM-DEL",
                     "window": "T+0, T+1, T+7, T+15, T+30, T+45",
-                    "departure_date": str(r.started_at.date()) if r.started_at else str(date.today()),
+                    "departure_date": str(r.started_at.date()) if getattr(r, "started_at", None) is not None else str(date.today()),
                     "status": r.status,
                     "flights_found": r.total_raw_records or 0,
-                    "duration_ms": int((r.completed_at - r.started_at).total_seconds() * 1000) if (r.completed_at and r.started_at) else 35000,
-                    "created_at": r.started_at.strftime("%H:%M:%S") if r.started_at else "N/A"
+                    "duration_ms": int((r.completed_at - r.started_at).total_seconds() * 1000) if (getattr(r, "completed_at", None) is not None and getattr(r, "started_at", None) is not None) else 35000,
+                    "created_at": r.started_at.strftime("%H:%M:%S") if getattr(r, "started_at", None) is not None else "N/A"
                 }
                 for r in runs
             ]
