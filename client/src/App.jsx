@@ -1,9 +1,12 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { RoleProvider } from './context/RoleContext';
 import { FilterProvider } from './context/FilterContext';
 import { Sidebar } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
+
+// Public Landing Page
+import { LandingPage } from './pages/LandingPage';
 
 // 7 Core Workflow Pages for SIH26056
 import { DashboardPage } from './pages/DashboardPage';
@@ -17,7 +20,7 @@ import { SystemStatusPage } from './pages/SystemStatusPage';
 // Corridor Micro-Level Deep Dive
 import { RouteDetailPage } from './pages/RouteDetailPage';
 
-function AppLayout() {
+function PlatformLayout() {
   return (
     <div className="flex min-h-screen bg-[#f8fafc] text-slate-900 font-sans antialiased">
       {/* Streamlined Left Navigation Sidebar */}
@@ -30,49 +33,7 @@ function AppLayout() {
 
         {/* Page Content Body */}
         <main className="flex-1 p-6 space-y-6 max-w-[1600px] w-full mx-auto">
-          <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            
-            {/* 7 Core Workflow Routes */}
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/data-collection" element={<DataCollectionPage />} />
-            <Route path="/airfare-data" element={<AirfareDataPage />} />
-            <Route path="/index-apix" element={<IndexApixPage />} />
-            <Route path="/analytics" element={<AnalyticsPage />} />
-            <Route path="/backtesting" element={<BacktestingPage />} />
-            <Route path="/system-status" element={<SystemStatusPage />} />
-
-            {/* Corridor Drill-down */}
-            <Route path="/index/routes/:routeId" element={<RouteDetailPage />} />
-
-            {/* Backward Compatibility Aliases & Safe Redirects */}
-            <Route path="/index/routes" element={<Navigate to="/index-apix" replace />} />
-            <Route path="/airfare-index" element={<Navigate to="/index-apix" replace />} />
-            <Route path="/route-intelligence" element={<Navigate to="/index-apix" replace />} />
-            <Route path="/index/overview" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/index/booking-window" element={<Navigate to="/analytics" replace />} />
-            <Route path="/index/airlines" element={<Navigate to="/index-apix" replace />} />
-            <Route path="/index/flights" element={<Navigate to="/airfare-data" replace />} />
-            <Route path="/index/flights/:flightId" element={<Navigate to="/airfare-data" replace />} />
-            <Route path="/index/platforms" element={<Navigate to="/analytics" replace />} />
-            <Route path="/index/price-analytics" element={<Navigate to="/analytics" replace />} />
-            <Route path="/index/inflation" element={<Navigate to="/index-apix" replace />} />
-            <Route path="/index/raw-data" element={<Navigate to="/airfare-data" replace />} />
-            <Route path="/index/data-quality" element={<Navigate to="/system-status" replace />} />
-            <Route path="/index/methodology" element={<Navigate to="/backtesting" replace />} />
-            <Route path="/fare-analytics" element={<Navigate to="/analytics" replace />} />
-            <Route path="/passenger-demand" element={<Navigate to="/analytics" replace />} />
-            <Route path="/anomaly-detection" element={<Navigate to="/analytics" replace />} />
-            <Route path="/data-sources" element={<Navigate to="/data-collection" replace />} />
-            <Route path="/scraping-monitor" element={<Navigate to="/data-collection" replace />} />
-            <Route path="/data-quality" element={<Navigate to="/system-status" replace />} />
-            <Route path="/historical-data" element={<Navigate to="/backtesting" replace />} />
-            <Route path="/govt-reports" element={<Navigate to="/index-apix" replace />} />
-            <Route path="/export-centre" element={<Navigate to="/airfare-data" replace />} />
-            <Route path="/users-roles" element={<Navigate to="/system-status" replace />} />
-            <Route path="/system-settings" element={<Navigate to="/system-status" replace />} />
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Routes>
+          <Outlet />
 
           {/* Institutional Compliance Footer */}
           <footer className="text-center text-[11px] text-slate-400 py-4 border-t border-slate-200/60 mt-10">
@@ -89,7 +50,53 @@ function App() {
     <BrowserRouter>
       <RoleProvider>
         <FilterProvider>
-          <AppLayout />
+          <Routes>
+            {/* 1. Public Landing Page */}
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/landing" element={<Navigate to="/" replace />} />
+
+            {/* 2. Platform Statistical Workspace */}
+            <Route element={<PlatformLayout />}>
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/data-collection" element={<DataCollectionPage />} />
+              <Route path="/airfare-data" element={<AirfareDataPage />} />
+              <Route path="/index-apix" element={<IndexApixPage />} />
+              <Route path="/analytics" element={<AnalyticsPage />} />
+              <Route path="/backtesting" element={<BacktestingPage />} />
+              <Route path="/system-status" element={<SystemStatusPage />} />
+
+              {/* Corridor Drill-down */}
+              <Route path="/index/routes/:routeId" element={<RouteDetailPage />} />
+
+              {/* Backward Compatibility Aliases & Safe Redirects */}
+              <Route path="/index/routes" element={<Navigate to="/index-apix" replace />} />
+              <Route path="/airfare-index" element={<Navigate to="/index-apix" replace />} />
+              <Route path="/route-intelligence" element={<Navigate to="/index-apix" replace />} />
+              <Route path="/index/overview" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/index/booking-window" element={<Navigate to="/analytics" replace />} />
+              <Route path="/index/airlines" element={<Navigate to="/index-apix" replace />} />
+              <Route path="/index/flights" element={<Navigate to="/airfare-data" replace />} />
+              <Route path="/index/flights/:flightId" element={<Navigate to="/airfare-data" replace />} />
+              <Route path="/index/platforms" element={<Navigate to="/analytics" replace />} />
+              <Route path="/index/price-analytics" element={<Navigate to="/analytics" replace />} />
+              <Route path="/index/inflation" element={<Navigate to="/index-apix" replace />} />
+              <Route path="/index/raw-data" element={<Navigate to="/airfare-data" replace />} />
+              <Route path="/index/data-quality" element={<Navigate to="/system-status" replace />} />
+              <Route path="/index/methodology" element={<Navigate to="/backtesting" replace />} />
+              <Route path="/fare-analytics" element={<Navigate to="/analytics" replace />} />
+              <Route path="/passenger-demand" element={<Navigate to="/analytics" replace />} />
+              <Route path="/anomaly-detection" element={<Navigate to="/analytics" replace />} />
+              <Route path="/data-sources" element={<Navigate to="/data-collection" replace />} />
+              <Route path="/scraping-monitor" element={<Navigate to="/data-collection" replace />} />
+              <Route path="/data-quality" element={<Navigate to="/system-status" replace />} />
+              <Route path="/historical-data" element={<Navigate to="/backtesting" replace />} />
+              <Route path="/govt-reports" element={<Navigate to="/index-apix" replace />} />
+              <Route path="/export-centre" element={<Navigate to="/airfare-data" replace />} />
+              <Route path="/users-roles" element={<Navigate to="/system-status" replace />} />
+              <Route path="/system-settings" element={<Navigate to="/system-status" replace />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Route>
+          </Routes>
         </FilterProvider>
       </RoleProvider>
     </BrowserRouter>

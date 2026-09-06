@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useRole } from '../../context/RoleContext';
+import { Globe, ArrowUpRight } from 'lucide-react';
 
 export const Sidebar = () => {
   const { currentRole } = useRole();
@@ -69,9 +70,21 @@ export const Sidebar = () => {
         ))}
       </div>
 
-      {/* Sidebar Footer */}
-      <div className="p-4 border-t border-slate-100 text-[10px] text-slate-400 tracking-tight font-medium">
-        MoSPI & DGCA compliant · Base 2024=100
+      {/* Sidebar Footer with Link to Public Landing Page */}
+      <div className="p-3 border-t border-slate-100 space-y-2">
+        <button
+          onClick={() => navigate('/')}
+          className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-slate-50 hover:bg-blue-50/80 border border-slate-200/80 text-[11px] font-semibold text-slate-700 hover:text-blue-700 transition-colors cursor-pointer shadow-2xs"
+        >
+          <div className="flex items-center gap-2">
+            <Globe className="w-3.5 h-3.5 text-blue-600" />
+            <span>Public Landing Page</span>
+          </div>
+          <ArrowUpRight className="w-3 h-3 text-slate-400" />
+        </button>
+        <div className="text-[10px] text-slate-400 tracking-tight font-medium text-center">
+          MoSPI & DGCA compliant · Base 2024=100
+        </div>
       </div>
     </aside>
   );
