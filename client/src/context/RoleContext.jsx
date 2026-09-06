@@ -4,10 +4,10 @@ import { USER_ROLES } from '../config/roles';
 const RoleContext = createContext();
 
 export const RoleProvider = ({ children }) => {
-  const [activeRoleKey, setActiveRoleKey] = useState('POLICY_ANALYST');
+  const [activeRoleKey, setActiveRoleKey] = useState('STATISTICAL_OFFICER');
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
 
-  const currentRole = USER_ROLES[activeRoleKey] || USER_ROLES.POLICY_ANALYST;
+  const currentRole = USER_ROLES[activeRoleKey] || USER_ROLES.STATISTICAL_OFFICER;
 
   const setRole = (roleKey) => {
     if (USER_ROLES[roleKey]) {

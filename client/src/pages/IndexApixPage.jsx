@@ -1,0 +1,438 @@
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { 
+  TrendingUp, 
+  Plane, 
+  Compass, 
+  ArrowUpRight, 
+  ChevronRight,
+  Download,
+  Calendar,
+  Tag,
+  Building2,
+  RotateCcw
+} from 'lucide-react';
+import { 
+  ResponsiveContainer, 
+  LineChart, 
+  Line, 
+  XAxis, 
+  YAxis, 
+  Tooltip, 
+  CartesianGrid, 
+  Legend 
+} from 'recharts';
+import { 
+  historicalTimeSeries, 
+  routeAnalyticsList, 
+  airlineAnalyticsList 
+} from '../data/analyticsData';
+import { RouteHeatmapGrid } from '../components/analytics/RouteHeatmapGrid';
+import { PageHeader } from '../components/layout/PageHeader';
+
+export const IndexApixPage = () => {
+  const navigate = useNavigate();
+  const [activeFormula, setActiveFormula] = useState('laspeyres'); // 'laspeyres' | 'jevons' | 'fisher'
+  const [activeHorizon, setActiveHorizon] = useState('daily'); // 'daily' | 'weekly' | 'monthly'
+
+  // Calculations for formula variants based on current data
+  const formulaStats = {
+    laspeyres: {
+      name: 'Laspeyres Price Index',
+      symbol: 'L_t',
+      currentValue: 118.4,
+      change24h: '+1.4%',
+      change7d: '+2.8%',
+      description: 'Fixed-weight base-period traffic basket. Official baseline standard used by DGCA & MoSPI.',
+      equation: 'L_t = \\sum w_{i,0} \\cdot (P_{i,t} / P_{i,0})'
+    },
+    jevons: {
+      name: 'Jevons Geometric Index',
+      symbol: 'J_t',
+      currentValue: 117.65,
+      change24h: '+1.2%',
+      change7d: '+2.5%',
+      description: 'Geometric mean weighting. Eliminates upward substitution bias under dynamic pricing shifts.',
+      equation: 'J_t = \\prod (P_{i,t} / P_{i,0})^{w_{i,0}}'
+    },
+    fisher: {
+      name: 'Fisher Ideal Index',
+      symbol: 'F_t',
+      currentValue: 118.02,
+      change24h: '+1.3%',
+      change7d: '+2.6%',
+      description: 'Superlative geometric mean of Laspeyres and Paasche formulations, satisfying time-reversal tests.',
+      equation: 'F_t = \\sqrt{L_t \\times P_t}'
+    }
+  };
+
+  const currentFormula = formulaStats[activeFormula];
+
+  // Horizon multiplier adjustments for chart
+  const horizonData = historicalTimeSeries.map((pt) => {
+    let multiplier = 1.0;
+    if (activeFormula === 'jevons') multiplier = 0.994;
+    if (activeFormula === 'fisher') multiplier = 0.997;
+
+    return {
+      date: pt.date,
+      HeadlineIndex: +(pt.index * multiplier).toFixed(1),
+      T1SurgeIndex: +(pt.t1Index * multiplier).toFixed(1),
+      T45BaseIndex: +(pt.t45Index * multiplier).toFixed(1)
+    };
+  });
+
+  const [dateRange, setDateRange] = useState('Aug 01 - Aug 31, 2026');
+  const [selectedCategory, setSelectedCategory] = useState('ALL');
+  const [selectedCarrier, setSelectedCarrier] = useState('ALL');
+
+  const handleExport = () => {
+    const exportPayload = {
+      series: 'APIx Real-time Index Series',
+      formula: activeFormula,
+      horizon: activeHorizon,
+      base: '2024 = 100.0',
+      data: horizonData
+    };
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportPayload, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", `apix_index_${activeFormula}_${activeHorizon}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+  };
+
+  return (
+    <div className="space-y-6 text-slate-900 font-sans animate-in fade-in duration-200">
+      {/* 1. Standard Reusable PageHeader */}
+      <PageHeader
+        title="Real-Time Airfare Price Index (APIx)"
+        description="Econometric price index for Indian domestic civil aviation with multi-horizon tracking and Laspeyres, Jevons, and Fisher formulations."
+        badge={
+          <span className="px-2.5 py-1 rounded-lg bg-blue-50 border border-blue-200 text-blue-800 text-xs font-bold font-mono">
+            Base 2024 = 100.0
+          </span>
+        }
+        actions={
+          <div className="flex items-center gap-2.5 flex-wrap">
+            {/* Horizon Toggle */}
+            <div className="flex items-center bg-slate-100 p-1 rounded-lg text-xs font-semibold">
+              {['daily', 'weekly', 'monthly'].map((h) => (
+                <button
+                  key={h}
+                  onClick={() => setActiveHorizon(h)}
+                  className={`px-3 py-1 rounded-md capitalize transition-all cursor-pointer ${
+                    activeHorizon === h
+                      ? 'bg-white text-blue-700 shadow-2xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {h}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={handleExport}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 transition-colors shadow-2xs cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5 text-slate-500" />
+              Export Series
+            </button>
+          </div>
+        }
+        filters={
+          <div className="flex items-center justify-between gap-3 flex-wrap w-full text-xs">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              {/* Date Range */}
+              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-700 font-medium">
+                <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                <span className="text-slate-400">Date:</span>
+                <select 
+                  value={dateRange}
+                  onChange={(e) => setDateRange(e.target.value)}
+                  className="bg-transparent font-bold text-slate-900 focus:outline-none cursor-pointer"
+                >
+                  <option value="Aug 01 - Aug 31, 2026">Aug 01 - Aug 31, 2026</option>
+                  <option value="Jul 01 - Jul 31, 2026">Jul 01 - Jul 31, 2026</option>
+                  <option value="Jun 01 - Jun 30, 2026">Jun 01 - Jun 30, 2026</option>
+                </select>
+              </div>
+
+              {/* Corridor Category */}
+              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-700 font-medium">
+                <Tag className="w-3.5 h-3.5 text-slate-400" />
+                <span className="text-slate-400">Sector:</span>
+                <select 
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  className="bg-transparent font-bold text-slate-900 focus:outline-none cursor-pointer"
+                >
+                  <option value="ALL">All Route Categories</option>
+                  <option value="Metro to Metro">Metro to Metro</option>
+                  <option value="Metro to Non-Metro">Metro to Non-Metro</option>
+                  <option value="Tier-2 Feeder">Tier-2 Feeder Corridors</option>
+                  <option value="Tourist & Regional">Tourist & Regional</option>
+                </select>
+              </div>
+
+              {/* Carrier */}
+              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-700 font-medium">
+                <Building2 className="w-3.5 h-3.5 text-slate-400" />
+                <span className="text-slate-400">Carrier:</span>
+                <select 
+                  value={selectedCarrier}
+                  onChange={(e) => setSelectedCarrier(e.target.value)}
+                  className="bg-transparent font-bold text-slate-900 focus:outline-none cursor-pointer"
+                >
+                  <option value="ALL">All Carriers</option>
+                  <option value="IndiGo">IndiGo (6E)</option>
+                  <option value="Air India">Air India (AI)</option>
+                  <option value="Akasa Air">Akasa Air (QP)</option>
+                  <option value="SpiceJet">SpiceJet (SG)</option>
+                </select>
+              </div>
+            </div>
+
+            {(selectedCategory !== 'ALL' || selectedCarrier !== 'ALL' || dateRange !== 'Aug 01 - Aug 31, 2026') && (
+              <button
+                onClick={() => {
+                  setDateRange('Aug 01 - Aug 31, 2026');
+                  setSelectedCategory('ALL');
+                  setSelectedCarrier('ALL');
+                }}
+                className="flex items-center gap-1 text-slate-500 hover:text-slate-900 text-xs font-semibold cursor-pointer"
+              >
+                <RotateCcw className="w-3 h-3" /> Reset
+              </button>
+            )}
+          </div>
+        }
+      />
+
+      {/* Formula Selector Tabs & Headline Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {Object.entries(formulaStats).map(([key, f]) => (
+          <div
+            key={key}
+            onClick={() => setActiveFormula(key)}
+            className={`p-5 rounded-xl border cursor-pointer transition-all shadow-2xs ${
+              activeFormula === key
+                ? 'bg-blue-50/50 border-blue-400 ring-2 ring-blue-500/20'
+                : 'bg-white border-slate-200 hover:border-slate-300'
+            }`}
+          >
+            <div className="flex justify-between items-start">
+              <div>
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  {f.name}
+                </span>
+                <p className="text-2xl font-black text-slate-900 mt-1 font-mono">
+                  {f.currentValue.toFixed(2)}
+                </p>
+              </div>
+              <span className={`text-xs font-bold px-2 py-0.5 rounded font-mono ${
+                activeFormula === key ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'
+              }`}>
+                {f.symbol}
+              </span>
+            </div>
+
+            <p className="text-xs text-slate-600 mt-2 line-clamp-2 leading-relaxed">
+              {f.description}
+            </p>
+
+            <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+              <span className="text-emerald-700 font-bold flex items-center gap-1 font-mono">
+                <ArrowUpRight className="w-3.5 h-3.5" /> 24h: {f.change24h}
+              </span>
+              <span className="text-slate-500 font-medium font-mono">
+                7d: {f.change7d}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Main Section: Index Trajectory Time Series Chart */}
+      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-2xs space-y-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-2 border-b border-slate-100">
+          <div>
+            <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-blue-600" />
+              <span>National APIx Historical Trajectory ({currentFormula.name})</span>
+            </h2>
+            <p className="text-xs text-slate-500">
+              Tracking Headline APIx vs. Urgent Booking Surge (T+1) vs. Long-Lead Base Inventory (T+45).
+            </p>
+          </div>
+
+          <div className="text-xs font-mono text-slate-500">
+            Observation Frequency: <span className="font-bold text-slate-800 capitalize">{activeHorizon}</span>
+          </div>
+        </div>
+
+        <div className="h-72 w-full pt-2">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={horizonData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis dataKey="date" stroke="#94a3b8" fontSize={11} tickLine={false} />
+              <YAxis stroke="#94a3b8" fontSize={11} domain={[90, 150]} tickLine={false} />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: '#ffffff',
+                  borderColor: '#e2e8f0',
+                  borderRadius: '0.75rem',
+                  fontSize: '12px',
+                  boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
+                }}
+              />
+              <Legend verticalAlign="top" height={36} iconType="circle" />
+              <Line 
+                type="monotone" 
+                name="APIx Headline Index" 
+                dataKey="HeadlineIndex" 
+                stroke="#2563eb" 
+                strokeWidth={2.5} 
+                dot={false} 
+              />
+              <Line 
+                type="monotone" 
+                name="T+1 Surge Window Index" 
+                dataKey="T1SurgeIndex" 
+                stroke="#dc2626" 
+                strokeWidth={1.8} 
+                strokeDasharray="4 4" 
+                dot={false} 
+              />
+              <Line 
+                type="monotone" 
+                name="T+45 Base Inventory Index" 
+                dataKey="T45BaseIndex" 
+                stroke="#10b981" 
+                strokeWidth={1.8} 
+                strokeDasharray="4 4" 
+                dot={false} 
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Section: Carrier-Wise Price Indices */}
+      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-2xs space-y-4">
+        <div className="pb-2 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <Plane className="w-4 h-4 text-blue-600" />
+              Carrier-Wise Airfare Indices & Market Shares
+            </h2>
+            <p className="text-xs text-slate-500">
+              Domestic scheduled airline pricing indices computed from weighted elementary price relatives.
+            </p>
+          </div>
+          <span className="text-[11px] font-mono text-slate-500">Weighted by domestic seat capacity</span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {airlineAnalyticsList.map((a) => (
+            <div key={a.code} className="p-4 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-bold text-slate-900">{a.name}</span>
+                <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-700">
+                  {a.code}
+                </span>
+              </div>
+
+              <div className="flex items-baseline justify-between pt-1">
+                <span className="text-2xl font-black text-slate-900 font-mono">{a.index}</span>
+                <span className="text-xs font-semibold text-emerald-600 font-mono">
+                  +{a.yoyPct}% YoY
+                </span>
+              </div>
+
+              <div className="pt-2 border-t border-slate-100 space-y-1 text-xs">
+                <div className="flex justify-between text-slate-600">
+                  <span>DGCA Market Share:</span>
+                  <span className="font-bold text-slate-900 font-mono">{a.marketSharePct}%</span>
+                </div>
+                <div className="flex justify-between text-slate-600">
+                  <span>Mean Fare:</span>
+                  <span className="font-bold text-slate-900 font-mono">₹{a.avgFare.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between text-slate-600">
+                  <span>T+1 Surge Multiplier:</span>
+                  <span className="font-bold text-red-600 font-mono">{a.surgeMultiplier}x</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Section: Corridor-Wise Price Indices Table */}
+      <div className="bg-white border border-slate-200 rounded-xl shadow-2xs overflow-hidden">
+        <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <Compass className="w-4 h-4 text-blue-600" />
+              DGCA Monitored Corridors — Index & Price Movements
+            </h2>
+            <p className="text-xs text-slate-500">
+              Corridor-specific Laspeyres price index numbers with base 2024 tariffs and 24-hour rate of change.
+            </p>
+          </div>
+          <span className="text-xs text-slate-500 font-mono">Total Corridors: {routeAnalyticsList.length}</span>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr className="border-b border-slate-200 text-slate-500 bg-slate-50 font-semibold">
+                <th className="py-2.5 px-4">Corridor Code</th>
+                <th className="py-2.5 px-4">Sector Description</th>
+                <th className="py-2.5 px-4 font-mono">DGCA Weight (w_i)</th>
+                <th className="py-2.5 px-4 font-mono">2024 Base Fare</th>
+                <th className="py-2.5 px-4 font-mono">Current Fare</th>
+                <th className="py-2.5 px-4 font-mono font-bold text-slate-900">APIx Corridor Index</th>
+                <th className="py-2.5 px-4 font-mono">24h Shift</th>
+                <th className="py-2.5 px-4 font-mono">YoY Change</th>
+                <th className="py-2.5 px-4 text-right">Route Deep Dive</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+              {routeAnalyticsList.map((r) => (
+                <tr key={r.route} className="hover:bg-slate-50 transition-colors">
+                  <td className="py-3 px-4 font-mono font-bold text-blue-700">{r.route}</td>
+                  <td className="py-3 px-4 font-semibold text-slate-900">{r.name || `${r.city1} ↔ ${r.city2}`}</td>
+                  <td className="py-3 px-4 font-mono">{r.trafficWeightPct || r.weightPct}%</td>
+                  <td className="py-3 px-4 font-mono text-slate-500">₹{(r.baseFare2024 || r.baseFare || 0).toLocaleString()}</td>
+                  <td className="py-3 px-4 font-mono font-bold text-slate-900">₹{(r.currentFare || r.avgFare || 0).toLocaleString()}</td>
+                  <td className="py-3 px-4 font-mono font-bold text-blue-600 text-sm">{r.index}</td>
+                  <td className="py-3 px-4 font-mono text-emerald-600 font-semibold">
+                    +{r.dodPct || '0.4'}%
+                  </td>
+                  <td className="py-3 px-4 font-mono text-slate-700">
+                    +{r.yoyPct}%
+                  </td>
+                  <td className="py-3 px-4 text-right">
+                    <button
+                      onClick={() => navigate(`/index/routes/${r.route}`)}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold transition-colors cursor-pointer"
+                    >
+                      Inspect Micro-Data <ChevronRight className="w-3 h-3" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Section: Route Heatmap Grid */}
+      <RouteHeatmapGrid />
+    </div>
+  );
+};

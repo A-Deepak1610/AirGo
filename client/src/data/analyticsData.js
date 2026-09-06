@@ -58,24 +58,32 @@ export const routeAnalyticsList = dgcaBasket.map((item, idx) => {
   const momPct = parseFloat((1.2 + (idx % 5) * 0.4 - (idx % 2) * 0.8).toFixed(2));
   const volatility = parseFloat((2.5 + (idx % 4) * 1.2).toFixed(2));
 
+  const routeName = `${item.city1} ↔ ${item.city2}`;
+
   return {
     rank: item.rank,
     route: item.route,
+    name: routeName,
     city1: item.city1,
     city2: item.city2,
     totalPax: item.total_pax,
+    annualPaxM: (item.total_pax / 1000000).toFixed(2),
     weightWithinBasket: item.weight_traffic_within_basket,
     weightPct: parseFloat((item.weight_traffic_within_basket * 100).toFixed(2)),
+    trafficWeightPct: parseFloat((item.weight_traffic_within_basket * 100).toFixed(2)),
     nationalPaxSharePct: parseFloat((item.share_of_national_traffic * 100).toFixed(2)),
     tier: item.tier,
     index: indexVal,
     baseFare: baseline,
+    baseFare2024: baseline,
+    currentFare: avgFare,
     avgFare: avgFare,
     medianFare: Math.round(avgFare * 0.97),
     minFare: Math.round(baseline * 0.85),
     maxFare: Math.round(avgFare * 1.85),
     yoyPct: yoyPct,
     momPct: momPct,
+    dodPct: '0.4',
     wowPct: parseFloat((momPct * 0.22).toFixed(2)),
     volatilityScore: volatility,
     t1SurgePct: parseFloat((35 + (idx % 5) * 8).toFixed(1)),

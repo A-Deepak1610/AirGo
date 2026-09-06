@@ -9,7 +9,7 @@ import {
   CartesianGrid,
   Tooltip
 } from 'recharts';
-import { TrendingUp, ArrowUpRight } from 'lucide-react';
+import { ArrowUpRight } from 'lucide-react';
 
 export const HistoricalTrendChart = () => {
   const [activeMetric, setActiveMetric] = useState('index'); // 'index' | 'avgFare' | 'yoy'

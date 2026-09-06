@@ -1,5 +1,4 @@
 import React from 'react';
-import { Layers, ShieldCheck, AlertCircle, ArrowUpRight, DollarSign, Tag } from 'lucide-react';
 
 export const PlatformComparisonTable = ({ flight = null }) => {
   const defaultFlight = {

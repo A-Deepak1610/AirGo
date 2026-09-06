@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Compass, Flame, ArrowUpRight, ArrowDownRight, Layers } from 'lucide-react';
+import { Flame } from 'lucide-react';
 import { getRouteAnalyticsList } from '../../services/api';
 
 export const RouteHeatmapGrid = () => {
@@ -15,7 +15,7 @@ export const RouteHeatmapGrid = () => {
     fare: { label: 'Average Fare (₹)', getVal: r => r.avgFare, format: v => `₹${v.toLocaleString()}`, getHeat: v => v > 6000 ? 'bg-purple-50 text-purple-900 border-purple-200 hover:bg-purple-100' : v > 4800 ? 'bg-blue-50 text-blue-900 border-blue-200 hover:bg-blue-100' : 'bg-slate-50 text-slate-800 border-slate-200 hover:bg-slate-100' },
     volatility: { label: 'Price Volatility (σ)', getVal: r => r.volatilityScore, format: v => v, getHeat: v => v > 4.5 ? 'bg-red-50 text-red-900 border-red-200 hover:bg-red-100' : v > 3.0 ? 'bg-amber-50 text-amber-900 border-amber-200 hover:bg-amber-100' : 'bg-blue-50 text-blue-900 border-blue-200 hover:bg-blue-100' },
     t1Surge: { label: 'T+1 Premium (%)', getVal: r => r.t1SurgePct, format: v => `+${v}%`, getHeat: v => v > 45 ? 'bg-red-50 text-red-900 border-red-200 hover:bg-red-100' : 'bg-amber-50 text-amber-900 border-amber-200 hover:bg-amber-100' },
-    t45Discount: { label: 'T+45 Discount (%)', getVal: r => r.t45DiscountPct, format: v => `-${v}%`, getHeat: v => 'bg-emerald-50 text-emerald-900 border-emerald-200 hover:bg-emerald-100' }
+    t45Discount: { label: 'T+45 Discount (%)', getVal: r => r.t45DiscountPct, format: v => `-${v}%`, getHeat: () => 'bg-emerald-50 text-emerald-900 border-emerald-200 hover:bg-emerald-100' }
   };
 
   const currCfg = metricsConfig[selectedMetric];

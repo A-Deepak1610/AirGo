@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BarChart3, Info, AlertTriangle } from 'lucide-react';
+import { BarChart3 } from 'lucide-react';
 
 export const PriceDistributionChart = ({ routeCode = 'DEL-BOM', fares = [3400, 3800, 4200, 4500, 4700, 4900, 5100, 5200, 5400, 5600, 5800, 6100, 6400, 6800, 7200, 7800, 8500, 9200, 11500] }) => {
   const [metric, setMetric] = useState('total'); // 'total' | 'base' | 'relative'

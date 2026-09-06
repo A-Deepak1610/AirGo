@@ -1,6 +1,6 @@
 import React from 'react';
 import { KPI_METRICS } from '../../config/dashboardData';
-import { TrendingUp, AlertCircle, ArrowUpRight } from 'lucide-react';
+import { ArrowUpRight } from 'lucide-react';
 
 export const MetricCards = () => {
   return (

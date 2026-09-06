@@ -4,99 +4,82 @@ import { RoleProvider } from './context/RoleContext';
 import { FilterProvider } from './context/FilterContext';
 import { Sidebar } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
-import { FilterBar } from './components/layout/FilterBar';
-import { RoleSwitcherModal } from './components/common/RoleSwitcherModal';
 
-// Dedicated Pages
+// 7 Core Workflow Pages for SIH26056
 import { DashboardPage } from './pages/DashboardPage';
-import { RouteIntelligencePage } from './pages/RouteIntelligencePage';
-import { FareAnalyticsPage } from './pages/FareAnalyticsPage';
-import { PassengerDemandPage } from './pages/PassengerDemandPage';
-import { AnomalyDetectionPage } from './pages/AnomalyDetectionPage';
-import { DataSourcesPage } from './pages/DataSourcesPage';
-import { ScrapingMonitorPage } from './pages/ScrapingMonitorPage';
-import { DataQualityPage } from './pages/DataQualityPage';
-import { HistoricalDataPage } from './pages/HistoricalDataPage';
-import { GovtReportsPage } from './pages/GovtReportsPage';
-import { ExportCentrePage } from './pages/ExportCentrePage';
-import { UsersRolesPage } from './pages/UsersRolesPage';
-import { SystemSettingsPage } from './pages/SystemSettingsPage';
+import { DataCollectionPage } from './pages/DataCollectionPage';
+import { AirfareDataPage } from './pages/AirfareDataPage';
+import { IndexApixPage } from './pages/IndexApixPage';
+import { AnalyticsPage } from './pages/AnalyticsPage';
+import { BacktestingPage } from './pages/BacktestingPage';
+import { SystemStatusPage } from './pages/SystemStatusPage';
 
-// Complete Airfare Index & Analytics Module Pages
-import { NationalOverviewPage } from './pages/NationalOverviewPage';
-import { RouteIndexPage } from './pages/RouteIndexPage';
+// Corridor Micro-Level Deep Dive
 import { RouteDetailPage } from './pages/RouteDetailPage';
-import { BookingWindowPage } from './pages/BookingWindowPage';
-import { AirlineAnalyticsPage } from './pages/AirlineAnalyticsPage';
-import { FlightAnalyticsPage } from './pages/FlightAnalyticsPage';
-import { FlightDetailPage } from './pages/FlightDetailPage';
-import { PlatformAnalyticsPage } from './pages/PlatformAnalyticsPage';
-import { PriceAnalyticsPage } from './pages/PriceAnalyticsPage';
-import { InflationPage } from './pages/InflationPage';
-import { RawDataPage } from './pages/RawDataPage';
-import { MethodologyPage } from './pages/MethodologyPage';
 
 function AppLayout() {
   return (
     <div className="flex min-h-screen bg-[#f8fafc] text-slate-900 font-sans antialiased">
-      {/* Role-Specific Dark Sidebar */}
+      {/* Streamlined Left Navigation Sidebar */}
       <Sidebar />
 
-      {/* Main Content View Container */}
+      {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Dynamic Header with Route Breadcrumbs & Persona */}
+        {/* Dynamic Header with Breadcrumbs & Official Persona */}
         <Header />
-
-        {/* Properly Aligned Global Filter Bar */}
-        <FilterBar />
 
         {/* Page Content Body */}
         <main className="flex-1 p-6 space-y-6 max-w-[1600px] w-full mx-auto">
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<DashboardPage />} />
             
-            {/* Airfare Index & Analytics Module Routes */}
-            <Route path="/airfare-index" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/index/overview" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/index/routes" element={<RouteIndexPage />} />
-            <Route path="/index/routes/:routeId" element={<RouteDetailPage />} />
-            <Route path="/index/booking-window" element={<BookingWindowPage />} />
-            <Route path="/index/airlines" element={<AirlineAnalyticsPage />} />
-            <Route path="/index/flights" element={<FlightAnalyticsPage />} />
-            <Route path="/index/flights/:flightId" element={<FlightDetailPage />} />
-            <Route path="/index/platforms" element={<PlatformAnalyticsPage />} />
-            <Route path="/index/price-analytics" element={<PriceAnalyticsPage />} />
-            <Route path="/index/inflation" element={<InflationPage />} />
-            <Route path="/index/raw-data" element={<RawDataPage />} />
-            <Route path="/index/data-quality" element={<DataQualityPage />} />
-            <Route path="/index/methodology" element={<MethodologyPage />} />
+            {/* 7 Core Workflow Routes */}
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/data-collection" element={<DataCollectionPage />} />
+            <Route path="/airfare-data" element={<AirfareDataPage />} />
+            <Route path="/index-apix" element={<IndexApixPage />} />
+            <Route path="/analytics" element={<AnalyticsPage />} />
+            <Route path="/backtesting" element={<BacktestingPage />} />
+            <Route path="/system-status" element={<SystemStatusPage />} />
 
-            {/* Platform Feature Routes */}
-            <Route path="/route-intelligence" element={<RouteIntelligencePage />} />
-            <Route path="/fare-analytics" element={<FareAnalyticsPage />} />
-            <Route path="/passenger-demand" element={<PassengerDemandPage />} />
-            <Route path="/anomaly-detection" element={<AnomalyDetectionPage />} />
-            <Route path="/data-sources" element={<DataSourcesPage />} />
-            <Route path="/scraping-monitor" element={<ScrapingMonitorPage />} />
-            <Route path="/data-quality" element={<DataQualityPage />} />
-            <Route path="/historical-data" element={<HistoricalDataPage />} />
-            <Route path="/govt-reports" element={<GovtReportsPage />} />
-            <Route path="/export-centre" element={<ExportCentrePage />} />
-            <Route path="/users-roles" element={<UsersRolesPage />} />
-            <Route path="/system-settings" element={<SystemSettingsPage />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
+            {/* Corridor Drill-down */}
+            <Route path="/index/routes/:routeId" element={<RouteDetailPage />} />
+
+            {/* Backward Compatibility Aliases & Safe Redirects */}
+            <Route path="/index/routes" element={<Navigate to="/index-apix" replace />} />
+            <Route path="/airfare-index" element={<Navigate to="/index-apix" replace />} />
+            <Route path="/route-intelligence" element={<Navigate to="/index-apix" replace />} />
+            <Route path="/index/overview" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/index/booking-window" element={<Navigate to="/analytics" replace />} />
+            <Route path="/index/airlines" element={<Navigate to="/index-apix" replace />} />
+            <Route path="/index/flights" element={<Navigate to="/airfare-data" replace />} />
+            <Route path="/index/flights/:flightId" element={<Navigate to="/airfare-data" replace />} />
+            <Route path="/index/platforms" element={<Navigate to="/analytics" replace />} />
+            <Route path="/index/price-analytics" element={<Navigate to="/analytics" replace />} />
+            <Route path="/index/inflation" element={<Navigate to="/index-apix" replace />} />
+            <Route path="/index/raw-data" element={<Navigate to="/airfare-data" replace />} />
+            <Route path="/index/data-quality" element={<Navigate to="/system-status" replace />} />
+            <Route path="/index/methodology" element={<Navigate to="/backtesting" replace />} />
+            <Route path="/fare-analytics" element={<Navigate to="/analytics" replace />} />
+            <Route path="/passenger-demand" element={<Navigate to="/analytics" replace />} />
+            <Route path="/anomaly-detection" element={<Navigate to="/analytics" replace />} />
+            <Route path="/data-sources" element={<Navigate to="/data-collection" replace />} />
+            <Route path="/scraping-monitor" element={<Navigate to="/data-collection" replace />} />
+            <Route path="/data-quality" element={<Navigate to="/system-status" replace />} />
+            <Route path="/historical-data" element={<Navigate to="/backtesting" replace />} />
+            <Route path="/govt-reports" element={<Navigate to="/index-apix" replace />} />
+            <Route path="/export-centre" element={<Navigate to="/airfare-data" replace />} />
+            <Route path="/users-roles" element={<Navigate to="/system-status" replace />} />
+            <Route path="/system-settings" element={<Navigate to="/system-status" replace />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
 
-          {/* Page Footer */}
+          {/* Institutional Compliance Footer */}
           <footer className="text-center text-[11px] text-slate-400 py-4 border-t border-slate-200/60 mt-10">
-            Official Data Integration: Ministry of Statistics & Programme Implementation (MoSPI) • Directorate General of Civil Aviation (DGCA) • Reserve Bank of India (RBI)
+            SIH26056: Real-time Airfare Price Index for India · Ministry of Statistics & Programme Implementation (MoSPI) · Directorate General of Civil Aviation (DGCA)
           </footer>
         </main>
       </div>
-
-      {/* RBAC Role Switcher Modal */}
-      <RoleSwitcherModal />
     </div>
   );
 }

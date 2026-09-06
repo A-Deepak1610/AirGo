@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Layers, TrendingUp, AlertCircle, Info } from 'lucide-react';
+import { TrendingUp } from 'lucide-react';
 
 export const LeadTimeCurveChart = ({ routeCode = 'DEL-BOM', windowData = null }) => {
   const [metric, setMetric] = useState('fare'); // 'fare' | 'index'

@@ -1,6 +1,6 @@
 import React from 'react';
 import { ROUTES_INFLATION_DATA } from '../../config/dashboardData';
-import { ArrowRight, TrendingUp } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
 export const RoutesInflationTable = ({ onNavigateRoutes }) => {
   return (

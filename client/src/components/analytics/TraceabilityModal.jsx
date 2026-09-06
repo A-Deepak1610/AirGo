@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { X, ArrowDown, Database, Globe, Compass, Calendar, Layers, ExternalLink, CheckCircle2 } from 'lucide-react';
+import { X, ArrowDown, Database, CheckCircle2 } from 'lucide-react';
 import { getRouteByCode, getFlightProductsList, getRawObservationsList } from '../../services/api';
 
-export const TraceabilityModal = ({ isOpen, onClose, initialRoute = 'DEL-BOM', initialIndex = 118.42 }) => {
+export const TraceabilityModal = ({ isOpen, onClose, initialRoute = 'DEL-BOM' }) => {
   const [selectedRoute, setSelectedRoute] = useState(initialRoute);
   const [selectedWindow, setSelectedWindow] = useState('T+15');
 

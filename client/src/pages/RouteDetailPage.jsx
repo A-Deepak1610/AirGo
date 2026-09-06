@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Database, Layers } from 'lucide-react';
-import { StatisticalBreadcrumbs } from '../components/analytics/StatisticalBreadcrumbs';
 import { LeadTimeCurveChart } from '../components/analytics/LeadTimeCurveChart';
 import { PriceDistributionChart } from '../components/analytics/PriceDistributionChart';
 import { TraceabilityModal } from '../components/analytics/TraceabilityModal';
+import { PageHeader } from '../components/layout/PageHeader';
 import { getRouteByCode, getFlightProductsList } from '../services/api';
 
 export const RouteDetailPage = () => {
@@ -18,53 +18,53 @@ export const RouteDetailPage = () => {
 
   return (
     <div className="space-y-6 text-slate-900 font-sans">
-      {/* Breadcrumb Navigation */}
-      <StatisticalBreadcrumbs items={[
-        { label: 'Route Index', path: '/index/routes' },
-        { label: `Corridor ${routeData.route}`, path: `/index/routes/${routeData.route}` }
-      ]} />
+      {/* 1. Standard Reusable PageHeader with Breadcrumbs */}
+      <PageHeader
+        breadcrumbs={[
+          { label: 'Index / APIx', path: '/index-apix' },
+          { label: `Corridor ${routeData.route}` }
+        ]}
+        title={`${routeData.route} (${routeData.city1} ↔ ${routeData.city2})`}
+        description={`DGCA Passenger Volume Rank: #${routeData.rank} · Annual Pax: ${routeData.totalPax.toLocaleString()} · Basket Weight: ${routeData.weightPct}%`}
+        actions={
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate('/index-apix')}
+              className="text-xs font-semibold text-slate-600 hover:text-slate-900 border border-slate-200 bg-white hover:bg-slate-50 px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" /> Back to Index
+            </button>
+            <button
+              onClick={() => setIsTraceModalOpen(true)}
+              className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+            >
+              <Database className="w-3.5 h-3.5" /> Trace Lineage
+            </button>
+          </div>
+        }
+      />
 
-      {/* Header Banner */}
-      <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-2xs space-y-4">
-        <div className="flex justify-between items-center">
-          <button
-            onClick={() => navigate('/index/routes')}
-            className="text-xs font-semibold text-slate-500 hover:text-slate-900 flex items-center gap-1.5 transition-colors cursor-pointer"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" /> Back to Route List
-          </button>
-
-          <button
-            onClick={() => setIsTraceModalOpen(true)}
-            className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
-          >
-            <Database className="w-3.5 h-3.5" /> Trace Lineage
-          </button>
+      {/* Corridor Key Summary Metric Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs">
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Corridor Index</span>
+          <span className="text-2xl font-black text-blue-600 font-mono mt-0.5 block">{routeData.index}</span>
+          <span className="text-[11px] text-emerald-600 font-medium">Base 2024 = 100.0</span>
         </div>
-
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-black text-slate-900 tracking-tight">{routeData.route}</h1>
-              <span className="px-2.5 py-0.5 rounded bg-slate-100 text-slate-800 text-xs font-bold border border-slate-200">
-                {routeData.city1} ↔ {routeData.city2}
-              </span>
-            </div>
-            <p className="text-xs md:text-sm text-slate-500 font-medium">
-              DGCA Passenger Volume Rank: #{routeData.rank} | Annual Pax: {routeData.totalPax.toLocaleString()} | Basket Weight: {routeData.weightPct}%
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-center min-w-[100px]">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Corridor Index</span>
-              <span className="text-2xl font-black text-blue-600 font-mono">{routeData.index}</span>
-            </div>
-            <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-center min-w-[110px]">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Avg Fare (T+15)</span>
-              <span className="text-2xl font-black text-slate-900 font-mono">₹{routeData.avgFare.toLocaleString()}</span>
-            </div>
-          </div>
+        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs">
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Avg Fare (T+15)</span>
+          <span className="text-2xl font-black text-slate-900 font-mono mt-0.5 block">₹{routeData.avgFare.toLocaleString()}</span>
+          <span className="text-[11px] text-slate-500 font-medium">Mid-lead booking window</span>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs">
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">DGCA Volume Rank</span>
+          <span className="text-2xl font-black text-slate-900 font-mono mt-0.5 block">#{routeData.rank}</span>
+          <span className="text-[11px] text-slate-500 font-medium">{routeData.totalPax.toLocaleString()} pax</span>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs">
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Basket Weight</span>
+          <span className="text-2xl font-black text-slate-900 font-mono mt-0.5 block">{routeData.weightPct}%</span>
+          <span className="text-[11px] text-blue-600 font-medium">National Index Weight</span>
         </div>
       </div>
 
@@ -108,8 +108,8 @@ export const RouteDetailPage = () => {
                   <td className="py-2.5 px-3 font-mono font-bold text-slate-900 text-sm">₹{f.totalFare.toLocaleString()}</td>
                   <td className="py-2.5 px-3 text-right">
                     <button
-                      onClick={() => navigate(`/index/flights/${f.flightNumber}`)}
-                      className="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold transition-colors"
+                      onClick={() => navigate('/airfare-data')}
+                      className="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold transition-colors cursor-pointer"
                     >
                       Compare OTAs →
                     </button>

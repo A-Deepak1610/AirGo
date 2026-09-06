@@ -8,7 +8,7 @@ export const Sidebar = () => {
   const location = useLocation();
 
   return (
-    <aside className="w-68 bg-white text-slate-800 flex flex-col h-screen sticky top-0 border-r border-slate-200 select-none z-30 shrink-0 font-sans">
+    <aside className="w-64 bg-white text-slate-800 flex flex-col h-screen sticky top-0 border-r border-slate-200 select-none z-30 shrink-0 font-sans">
       {/* Brand Header */}
       <div 
         onClick={() => navigate('/dashboard')}
