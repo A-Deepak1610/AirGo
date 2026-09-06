@@ -10,6 +10,7 @@
 - **DGCA-Weighted Index Formulation (APIx)**: Computes Laspeyres, Jevons, and Fisher index numbers across Daily, Weekly, and Monthly frequencies.
 - **30-Day DGCA Backtesting**: Evaluates historical APIx accuracy against published DGCA average passenger tariffs (MAPE 2.14%, $R^2 = 0.942$).
 - **Executive Web Dashboard & REST API**: High-fidelity dark glassmorphism dashboard and REST API for MoSPI & RBI data analysts.
+- **Formal Econometric Methodology**: Comprehensive academic working paper with mathematical formulas for Jevons, Laspeyres, Fisher indexation, Akamai/Patchright anti-bot bypass, and lead-time elasticity curves available in [docs/airgo_methodology.tex](docs/airgo_methodology.tex) and [docs/airgo_methodology.pdf](docs/airgo_methodology.pdf).
 
 ---
 

@@ -17,7 +17,8 @@ if sys.stdout.encoding != "utf-8":
 PROFILE_DIR = os.path.join(os.getcwd(), "runs", "patchright_chrome_profile")
 
 @pytest.mark.anyio
-async def test_best_practice_cleartrip():
+@pytest.mark.parametrize("anyio_backend", ["asyncio"])
+async def test_best_practice_cleartrip(anyio_backend):
     # Create isolated timestamped audit folder per RULE 4
     run_dir = create_run_directory("patchright_cleartrip")
     print(f"📁 Created timestamped run folder: {run_dir}")
