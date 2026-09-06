@@ -147,11 +147,14 @@ def get_sectors_summary(db: Session = Depends(get_db)):
         rev_code = f"{sec_code.split('-')[1]}-{sec_code.split('-')[0]}" if "-" in sec_code else sec_code
 
         # 1. Query CanonicalFareDB for latest observation date
-        canon_stmt = select(CanonicalFareDB).where(
+        filters = [
             CanonicalFareDB.route.in_([sec_code, rev_code]),
-            CanonicalFareDB.observation_date == latest_date if latest_date else True,
             CanonicalFareDB.is_outlier == False
-        ).order_by(desc(CanonicalFareDB.id))
+        ]
+        if latest_date:
+            filters.append(CanonicalFareDB.observation_date == latest_date)
+
+        canon_stmt = select(CanonicalFareDB).where(*filters).order_by(desc(CanonicalFareDB.id))
         sector_canon = db.scalars(canon_stmt).all()
 
         if sector_canon:
