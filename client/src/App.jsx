@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { RoleProvider } from './context/RoleContext';
 import { FilterProvider } from './context/FilterContext';
+import { AuditModalProvider, useAuditModal } from './context/AuditModalContext';
 import { Sidebar } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
 
@@ -17,7 +18,24 @@ import { SystemStatusPage } from './pages/SystemStatusPage';
 // Corridor Micro-Level Deep Dive
 import { RouteDetailPage } from './pages/RouteDetailPage';
 
+// Interactive AI & Scraper Audit Modals
+import { GroundTruthAuditModal } from './components/scraper/GroundTruthAuditModal';
+import { HeadlessDemoRunnerModal } from './components/scraper/HeadlessDemoRunnerModal';
+import { AICopilotDrawer } from './components/ai/AICopilotDrawer';
+
 function AppLayout() {
+  const { 
+    isAuditOpen, 
+    auditFlight, 
+    closeAuditModal, 
+    openAuditModal,
+    isHeadlessOpen, 
+    closeHeadless, 
+    openHeadless,
+    isCopilotOpen, 
+    closeCopilot 
+  } = useAuditModal();
+
   return (
     <div className="flex min-h-screen bg-[#f8fafc] text-slate-900 font-sans antialiased">
       {/* Streamlined Left Navigation Sidebar */}
@@ -80,6 +98,33 @@ function AppLayout() {
           </footer>
         </main>
       </div>
+
+      {/* Ground-Truth Audit Modal (4-Step Screenshot Lightbox) */}
+      <GroundTruthAuditModal 
+        isOpen={isAuditOpen} 
+        onClose={closeAuditModal} 
+        flight={auditFlight} 
+      />
+
+      {/* Interactive Headless Demo Runner Modal */}
+      <HeadlessDemoRunnerModal 
+        isOpen={isHeadlessOpen} 
+        onClose={closeHeadless} 
+        onInspectFlight={(flight) => {
+          closeHeadless();
+          openAuditModal(flight);
+        }}
+      />
+
+      {/* AeroIntel AI Econometric Copilot Drawer */}
+      <AICopilotDrawer 
+        isOpen={isCopilotOpen} 
+        onClose={closeCopilot}
+        onLaunchScraperDemo={() => {
+          closeCopilot();
+          openHeadless({ route: 'BOM-DEL', horizon: 'T+1' });
+        }}
+      />
     </div>
   );
 }
@@ -89,7 +134,9 @@ function App() {
     <BrowserRouter>
       <RoleProvider>
         <FilterProvider>
-          <AppLayout />
+          <AuditModalProvider>
+            <AppLayout />
+          </AuditModalProvider>
         </FilterProvider>
       </RoleProvider>
     </BrowserRouter>

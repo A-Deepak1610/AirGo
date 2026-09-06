@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Download, Calendar, Plane, Building2, RotateCcw } from 'lucide-react';
 import { PageHeader } from '../components/layout/PageHeader';
+import { LiveScraperTicker } from '../components/dashboard/LiveScraperTicker';
 import { MetricCards } from '../components/dashboard/MetricCards';
 import { HistoricalTrendChart } from '../components/dashboard/HistoricalTrendChart';
 import { DomesticFareMovement } from '../components/dashboard/DomesticFareMovement';
@@ -129,6 +130,10 @@ export const DashboardPage = () => {
           </div>
         }
       />
+
+      {/* Real-time Webscraped Flight Stream & Interactive Headless/Copilot Triggers */}
+      <LiveScraperTicker />
+
       {/* 1. Key Statistics (Top KPI Metric Cards) */}
       <MetricCards />
 
