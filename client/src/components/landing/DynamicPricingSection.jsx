@@ -8,7 +8,7 @@ import {
   Tooltip, 
   CartesianGrid 
 } from 'recharts';
-import { Clock, Calendar, TrendingUp, Sparkles, Info, Plane } from 'lucide-react';
+import { Clock, Calendar, TrendingUp, Info, Plane } from 'lucide-react';
 
 const WINDOW_PROFILES = {
   'T+1': {

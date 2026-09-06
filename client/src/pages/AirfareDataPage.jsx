@@ -9,8 +9,7 @@ import {
   Download, 
   ShieldCheck,
   Percent,
-  Camera,
-  Sparkles
+  Camera
 } from 'lucide-react';
 import { rawObservationsList, flightProductsList, dataQualitySummary } from '../data/analyticsData';
 import { auditedFlightsList } from '../data/scrapedRunsData';
@@ -18,7 +17,7 @@ import { useAuditModal } from '../context/AuditModalContext';
 import { PageHeader } from '../components/layout/PageHeader';
 
 export const AirfareDataPage = () => {
-  const { openAuditModal, openCopilot } = useAuditModal();
+  const { openAuditModal } = useAuditModal();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRoute, setSelectedRoute] = useState('ALL');
   const [selectedWindow, setSelectedWindow] = useState('ALL');
@@ -64,14 +63,6 @@ export const AirfareDataPage = () => {
         }
         actions={
           <div className="flex items-center gap-2">
-            <button 
-              onClick={() => openCopilot("Audit fare components: base vs statutory taxes vs convenience charges across domestic sectors")}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-blue-200 bg-blue-50 hover:bg-blue-100 text-xs font-semibold text-blue-700 transition-colors shadow-2xs cursor-pointer"
-              title="Audit fare disaggregation and taxes with AI"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-              <span>AI Fare Audit</span>
-            </button>
             <button 
               onClick={handleExport}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-[13px] font-medium text-[#111827] transition-colors shadow-2xs cursor-pointer"

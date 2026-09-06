@@ -15,7 +15,6 @@ import {
   Maximize2,
   Minimize2,
   Filter,
-  Sparkles,
   ShieldCheck,
   TrendingUp,
   Clock

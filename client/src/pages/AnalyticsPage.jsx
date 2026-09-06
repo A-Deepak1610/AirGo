@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { 
+import {
   Compass,
   Download,
   Plane
@@ -43,7 +43,7 @@ export const AnalyticsPage = () => {
         title="Advance Purchase & Volatility Analytics"
         description="Econometric lead-time curves (T+1 to T+45), price dispersion quantiles, corridor volatility ranking, and OTA convenience fee spreads."
         actions={
-            <button
+          <button
             onClick={handleExport}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-[13px] font-medium text-[#111827] transition-colors shadow-2xs cursor-pointer"
           >
@@ -123,14 +123,14 @@ export const AnalyticsPage = () => {
       <RouteHeatmapGrid />
 
       {/* Section 2: Lead-Time Elasticity Curve */}
-      <LeadTimeCurveChart 
-        routeCode={selectedRouteCode} 
-        windowData={activeRoute.windows} 
+      <LeadTimeCurveChart
+        routeCode={selectedRouteCode}
+        windowData={activeRoute.windows}
       />
 
       {/* Section 2: Statistical Price Distribution Histogram */}
-      <PriceDistributionChart 
-        routeCode={selectedRouteCode} 
+      <PriceDistributionChart
+        routeCode={selectedRouteCode}
       />
 
       {/* Section 3: Corridor Volatility Ranking Table */}
@@ -164,12 +164,11 @@ export const AnalyticsPage = () => {
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium text-[#4B5563]">
               {volatilityRanking.map((r, idx) => (
-                <tr 
-                  key={r.route} 
+                <tr
+                  key={r.route}
                   onClick={() => setSelectedRouteCode(r.route)}
-                  className={`hover:bg-slate-50 transition-colors cursor-pointer ${
-                    r.route === selectedRouteCode ? 'bg-blue-50/50' : ''
-                  }`}
+                  className={`hover:bg-slate-50 transition-colors cursor-pointer ${r.route === selectedRouteCode ? 'bg-blue-50/50' : ''
+                    }`}
                 >
                   <td className="py-3 px-4 font-mono text-[#6B7280]">#{idx + 1}</td>
                   <td className="py-3 px-4 font-mono font-medium text-blue-600 text-[13px]">{r.route}</td>
@@ -185,13 +184,12 @@ export const AnalyticsPage = () => {
                     +{r.yoyPct}%
                   </td>
                   <td className="py-3 px-4 text-right">
-                    <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium border ${
-                      r.volatilityScore > 4.2
+                    <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium border ${r.volatilityScore > 4.2
                         ? 'bg-red-50 text-red-700 border-red-200'
                         : r.volatilityScore > 3.2
-                        ? 'bg-amber-50 text-amber-700 border-amber-200'
-                        : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                    }`}>
+                          ? 'bg-amber-50 text-amber-700 border-amber-200'
+                          : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      }`}>
                       {r.volatilityScore > 4.2 ? 'High Volatility' : r.volatilityScore > 3.2 ? 'Moderate' : 'Stable'}
                     </span>
                   </td>

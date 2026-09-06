@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, TrendingUp, Sparkles } from 'lucide-react';
+import { ArrowRight, TrendingUp } from 'lucide-react';
 
 export const IndexIntroduction = () => {
   const navigate = useNavigate();

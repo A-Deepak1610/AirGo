@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowRight, AlertCircle, Sparkles, Check, X } from 'lucide-react';
+import { ArrowRight, AlertCircle, Check, X } from 'lucide-react';
 
 export const DataGapSection = () => {
   return (

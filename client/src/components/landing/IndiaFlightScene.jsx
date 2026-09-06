@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { 
-  INDIA_MAINLAND_COORDS, 
-  INDIA_ISLANDS_COORDS, 
-  AIRPORTS, 
-  EDITORIAL_ROUTES, 
-  projectGeo 
+import {
+  INDIA_MAINLAND_COORDS,
+  INDIA_ISLANDS_COORDS,
+  AIRPORTS,
+  EDITORIAL_ROUTES,
+  projectGeo
 } from '../network/indiaGeoData';
 
 // High-fidelity procedural commercial airliner 3D model
@@ -379,8 +379,7 @@ export const IndiaFlightScene = () => {
 
       routeObjects.push({ lineMesh, curve, route: r, defaultColor: r.color });
 
-      // Dual In-flight glowing photon packets (Continuous Bidirectional Traffic)
-      // 1. Outbound photon (White/Cyan, forward direction)
+      // Outbound photon packet
       const photonOutGeo = new THREE.SphereGeometry(0.16, 12, 12);
       const photonOutMat = new THREE.MeshBasicMaterial({
         color: 0xffffff,
@@ -393,17 +392,17 @@ export const IndiaFlightScene = () => {
       photonParticles.push({
         mesh: photonOut,
         curve,
-        t: (idx * 0.28) % 1.0,
-        speed: 0.0035,
+        t: (idx * 0.32) % 1.0,
+        speed: 0.0036,
         direction: 1
       });
 
-      // 2. Inbound return photon (Cyan/Sky glow, return direction)
+      // Inbound return photon packet
       const photonInGeo = new THREE.SphereGeometry(0.14, 12, 12);
       const photonInMat = new THREE.MeshBasicMaterial({
         color: 0x38bdf8,
         transparent: true,
-        opacity: 0.9
+        opacity: 0.90
       });
       const photonIn = new THREE.Mesh(photonInGeo, photonInMat);
       worldGroup.add(photonIn);
@@ -411,31 +410,17 @@ export const IndiaFlightScene = () => {
       photonParticles.push({
         mesh: photonIn,
         curve,
-        t: ((idx * 0.28) + 0.5) % 1.0,
+        t: ((idx * 0.32) + 0.5) % 1.0,
         speed: 0.0032,
         direction: -1
       });
     });
 
-    // 10. Active Bidirectional 3D Commercial Aircraft Fleet
-    // Air traffic flows both ways with realistic RVSM vertical airway separation
+    // 10. Exactly 2 Active 3D Commercial Aircraft Models with Continuous Bidirectional Flow
     const activeAircraft = [];
 
-    // Helper to create a vertically separated return airway corridor
-    const createReturnCurve = (baseCurve, altOffset = 0.38, latOffset = -0.15) => {
-      const v0 = baseCurve.v0;
-      const v2 = baseCurve.v2;
-      const mid = baseCurve.v1.clone().add(new THREE.Vector3(latOffset, 0.1, altOffset));
-      return new THREE.QuadraticBezierCurve3(v0, mid, v2);
-    };
-
-    // Corridor references
+    // Aircraft 1: Primary Trunk DEL ✈ BOM (IndiGo Cyan livery, ping-pong bidirectional)
     const delBom = routeObjects.find((o) => o.route.id === 'DEL-BOM');
-    const delBlr = routeObjects.find((o) => o.route.id === 'DEL-BLR');
-    const delCcu = routeObjects.find((o) => o.route.id === 'DEL-CCU');
-    const maaDel = routeObjects.find((o) => o.route.id === 'MAA-DEL');
-
-    // 1. DEL ✈ BOM Outbound (IndiGo Cyan livery, Southbound)
     if (delBom) {
       const plane1 = createAirlinerMesh(1.05, 0x0284c7);
       plane1.up.set(0, 0, 1);
@@ -444,82 +429,25 @@ export const IndiaFlightScene = () => {
         id: '6E-204-DEL-BOM',
         mesh: plane1,
         curve: delBom.curve,
-        t: 0.22,
-        speed: 0.0036,
-        direction: 1
+        t: 0.28,
+        speed: 0.0035,
+        direction: 1 // 1: DEL -> BOM, -1: BOM -> DEL
       });
+    }
 
-      // 2. BOM ✈ DEL Inbound Return (Vistara / AI Royal Violet, Northbound)
-      const returnCurveBom = createReturnCurve(delBom.curve, 0.38, 0.2);
-      const plane2 = createAirlinerMesh(1.02, 0x6366f1);
+    // Aircraft 2: Long-haul Trunk DEL ✈ BLR (Air India Amber livery, ping-pong bidirectional)
+    const delBlr = routeObjects.find((o) => o.route.id === 'DEL-BLR');
+    if (delBlr) {
+      const plane2 = createAirlinerMesh(0.98, 0xf59e0b);
       plane2.up.set(0, 0, 1);
       worldGroup.add(plane2);
       activeAircraft.push({
-        id: 'AI-805-BOM-DEL',
-        mesh: plane2,
-        curve: returnCurveBom,
-        t: 0.78,
-        speed: 0.0034,
-        direction: -1
-      });
-    }
-
-    // 3. DEL ✈ BLR Outbound (Air India Saffron Amber livery, Southbound)
-    if (delBlr) {
-      const plane3 = createAirlinerMesh(1.0, 0xf59e0b);
-      plane3.up.set(0, 0, 1);
-      worldGroup.add(plane3);
-      activeAircraft.push({
         id: 'AI-506-DEL-BLR',
-        mesh: plane3,
+        mesh: plane2,
         curve: delBlr.curve,
-        t: 0.62,
-        speed: 0.0031,
-        direction: 1
-      });
-
-      // 4. BLR ✈ DEL Inbound Return (Akasa Sunset Orange livery, Northbound)
-      const returnCurveBlr = createReturnCurve(delBlr.curve, 0.38, -0.2);
-      const plane4 = createAirlinerMesh(0.98, 0xf97316);
-      plane4.up.set(0, 0, 1);
-      worldGroup.add(plane4);
-      activeAircraft.push({
-        id: 'QP-1312-BLR-DEL',
-        mesh: plane4,
-        curve: returnCurveBlr,
-        t: 0.26,
-        speed: 0.0030,
-        direction: -1
-      });
-    }
-
-    // 5. CCU ✈ DEL Inbound Return (Teal Emerald livery, Westbound)
-    if (delCcu) {
-      const plane5 = createAirlinerMesh(0.95, 0x10b981);
-      plane5.up.set(0, 0, 1);
-      worldGroup.add(plane5);
-      activeAircraft.push({
-        id: '6E-618-CCU-DEL',
-        mesh: plane5,
-        curve: delCcu.curve,
-        t: 0.54,
-        speed: 0.0033,
-        direction: -1
-      });
-    }
-
-    // 6. MAA ✈ DEL Outbound (Crimson Red livery, Northbound from Chennai)
-    if (maaDel) {
-      const plane6 = createAirlinerMesh(0.94, 0xef4444);
-      plane6.up.set(0, 0, 1);
-      worldGroup.add(plane6);
-      activeAircraft.push({
-        id: 'SG-102-MAA-DEL',
-        mesh: plane6,
-        curve: maaDel.curve,
-        t: 0.40,
-        speed: 0.0030,
-        direction: 1
+        t: 0.74,
+        speed: 0.0032,
+        direction: -1 // -1: BLR -> DEL, 1: DEL -> BLR
       });
     }
 
@@ -621,7 +549,7 @@ export const IndiaFlightScene = () => {
       // Smooth camera parallax interpolation
       currentParallaxX += (targetParallaxX - currentParallaxX) * 0.05;
       currentParallaxY += (targetParallaxY - currentParallaxY) * 0.05;
-      
+
       const aspect = camera.aspect;
       const padding = aspect < 1.1 ? 1.36 : 1.30;
       const apparentHeight = geoHeight * Math.cos(mapTiltAngle) + 5.0 * Math.sin(mapTiltAngle);
@@ -656,23 +584,28 @@ export const IndiaFlightScene = () => {
         pt.mesh.position.copy(pos);
       });
 
-      // Move 3D aircraft bidirectionally with authentic pitch, heading and RVSM separation
+      // Move 3D aircraft with smooth continuous bidirectional ping-pong motion
       activeAircraft.forEach((ac) => {
-        if (ac.direction === 1) {
-          ac.t = (ac.t + ac.speed) % 1.0;
-          const pos = ac.curve.getPoint(ac.t);
-          const nextT = Math.min(ac.t + 0.012, 0.999);
-          const nextPos = ac.curve.getPoint(nextT);
-          ac.mesh.position.copy(pos);
-          ac.mesh.lookAt(nextPos);
-        } else {
-          ac.t -= ac.speed;
-          if (ac.t < 0) ac.t += 1.0;
-          const pos = ac.curve.getPoint(ac.t);
-          const nextT = Math.max(ac.t - 0.012, 0.001);
-          const nextPos = ac.curve.getPoint(nextT);
-          ac.mesh.position.copy(pos);
-          ac.mesh.lookAt(nextPos);
+        ac.t += ac.speed * ac.direction;
+        if (ac.t >= 1.0) {
+          ac.t = 1.0;
+          ac.direction = -1;
+        } else if (ac.t <= 0.0) {
+          ac.t = 0.0;
+          ac.direction = 1;
+        }
+
+        const pos = ac.curve.getPoint(ac.t);
+        ac.mesh.position.copy(pos);
+
+        // Forward looking direction based on active travel direction
+        const lookT = ac.direction === 1
+          ? Math.min(ac.t + 0.015, 1.0)
+          : Math.max(ac.t - 0.015, 0.0);
+        const lookPos = ac.curve.getPoint(lookT);
+
+        if (pos.distanceTo(lookPos) > 0.0005) {
+          ac.mesh.lookAt(lookPos);
         }
       });
 

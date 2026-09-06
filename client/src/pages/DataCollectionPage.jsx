@@ -10,7 +10,6 @@ import {
   Camera,
   Terminal,
   ExternalLink,
-  Sparkles,
   Globe,
   Server,
   Zap,
@@ -22,7 +21,7 @@ import { useAuditModal } from '../context/AuditModalContext';
 import { PageHeader } from '../components/layout/PageHeader';
 
 export const DataCollectionPage = () => {
-  const { openAuditModal, openHeadless, openCopilot } = useAuditModal();
+  const { openAuditModal, openHeadless } = useAuditModal();
   const [selectedWindow, setSelectedWindow] = useState('ALL');
   const [sectorSearch, setSectorSearch] = useState('');
 
@@ -545,14 +544,6 @@ export const DataCollectionPage = () => {
                           <span className="hidden sm:inline">Live URL</span>
                         </a>
                       )}
-
-                      <button
-                        onClick={() => openCopilot(`Analyze fare disaggregation and taxes on flight ${f.flightNumber} (${f.carrier}) on corridor ${f.route}`)}
-                        className="inline-flex items-center p-1 rounded-md hover:bg-indigo-50 text-indigo-600 border border-transparent hover:border-indigo-200 transition-colors cursor-pointer"
-                        title="Ask AeroIntel AI Copilot about this flight"
-                      >
-                        <Sparkles className="w-3.5 h-3.5" />
-                      </button>
                     </div>
                   </td>
                 </tr>

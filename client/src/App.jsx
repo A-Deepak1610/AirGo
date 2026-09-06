@@ -22,10 +22,9 @@ import { LandingPage } from './pages/LandingPage';
 // Corridor Micro-Level Deep Dive
 import { RouteDetailPage } from './pages/RouteDetailPage';
 
-// Interactive AI & Scraper Audit Modals
+// Interactive Audit & Scraper Simulation Modals
 import { GroundTruthAuditModal } from './components/scraper/GroundTruthAuditModal';
 import { HeadlessDemoRunnerModal } from './components/scraper/HeadlessDemoRunnerModal';
-import { AICopilotDrawer } from './components/ai/AICopilotDrawer';
 
 function AppLayout() {
   const { 
@@ -35,9 +34,7 @@ function AppLayout() {
     openAuditModal,
     isHeadlessOpen, 
     closeHeadless, 
-    openHeadless,
-    isCopilotOpen, 
-    closeCopilot 
+    openHeadless
   } = useAuditModal();
 
   return (
@@ -115,16 +112,6 @@ function AppLayout() {
         onInspectFlight={(flight) => {
           closeHeadless();
           openAuditModal(flight);
-        }}
-      />
-
-      {/* AeroIntel AI Econometric Copilot Drawer */}
-      <AICopilotDrawer 
-        isOpen={isCopilotOpen} 
-        onClose={closeCopilot}
-        onLaunchScraperDemo={() => {
-          closeCopilot();
-          openHeadless({ route: 'BOM-DEL', horizon: 'T+1' });
         }}
       />
     </div>

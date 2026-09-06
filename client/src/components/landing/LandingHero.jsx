@@ -13,10 +13,10 @@ export const LandingHero = () => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 w-full">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
-          
+
           {/* Left Side: Editorial Typography & CTAs (5-6 Cols) */}
           <div className="lg:col-span-5 space-y-7">
-            
+
             {/* Small Label */}
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-800 text-xs font-semibold uppercase tracking-widest">
               <span className="w-2 h-2 rounded-full bg-blue-600" />

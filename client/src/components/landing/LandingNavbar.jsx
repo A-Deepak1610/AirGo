@@ -15,15 +15,14 @@ export const LandingNavbar = () => {
   }, []);
 
   return (
-    <header className={`sticky top-0 z-40 w-full transition-all duration-200 ${
-      isScrolled 
-        ? 'bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-xs' 
+    <header className={`sticky top-0 z-40 w-full transition-all duration-200 ${isScrolled
+        ? 'bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-xs'
         : 'bg-white border-b border-slate-200/60'
-    }`}>
+      }`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-        
+
         {/* Brand Logo */}
-        <div 
+        <div
           onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
           className="flex items-center gap-3 cursor-pointer group"
         >

@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  TrendingUp, 
-  Plane, 
-  Compass, 
-  ArrowUpRight, 
+import {
+  TrendingUp,
+  Plane,
+  Compass,
+  ArrowUpRight,
   ChevronRight,
   Download,
   Calendar,
@@ -16,20 +16,20 @@ import {
   Copy,
   ShieldCheck
 } from 'lucide-react';
-import { 
-  ResponsiveContainer, 
-  LineChart, 
-  Line, 
-  XAxis, 
-  YAxis, 
-  Tooltip, 
-  CartesianGrid, 
-  Legend 
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  Legend
 } from 'recharts';
-import { 
-  historicalTimeSeries, 
-  routeAnalyticsList, 
-  airlineAnalyticsList 
+import {
+  historicalTimeSeries,
+  routeAnalyticsList,
+  airlineAnalyticsList
 } from '../data/analyticsData';
 import { PageHeader } from '../components/layout/PageHeader';
 
@@ -127,11 +127,10 @@ export const IndexApixPage = () => {
                 <button
                   key={h}
                   onClick={() => setActiveHorizon(h)}
-                  className={`px-3 py-1 rounded-md capitalize transition-all cursor-pointer ${
-                    activeHorizon === h
+                  className={`px-3 py-1 rounded-md capitalize transition-all cursor-pointer ${activeHorizon === h
                       ? 'bg-white text-blue-700 shadow-2xs font-bold'
                       : 'text-slate-600 hover:text-slate-900'
-                  }`}
+                    }`}
                 >
                   {h}
                 </button>
@@ -154,7 +153,7 @@ export const IndexApixPage = () => {
               <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-700 font-medium">
                 <Calendar className="w-3.5 h-3.5 text-slate-400" />
                 <span className="text-slate-400">Date:</span>
-                <select 
+                <select
                   value={dateRange}
                   onChange={(e) => setDateRange(e.target.value)}
                   className="bg-transparent font-bold text-slate-900 focus:outline-none cursor-pointer"
@@ -169,7 +168,7 @@ export const IndexApixPage = () => {
               <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-700 font-medium">
                 <Tag className="w-3.5 h-3.5 text-slate-400" />
                 <span className="text-slate-400">Sector:</span>
-                <select 
+                <select
                   value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
                   className="bg-transparent font-bold text-slate-900 focus:outline-none cursor-pointer"
@@ -186,7 +185,7 @@ export const IndexApixPage = () => {
               <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-700 font-medium">
                 <Building2 className="w-3.5 h-3.5 text-slate-400" />
                 <span className="text-slate-400">Carrier:</span>
-                <select 
+                <select
                   value={selectedCarrier}
                   onChange={(e) => setSelectedCarrier(e.target.value)}
                   className="bg-transparent font-bold text-slate-900 focus:outline-none cursor-pointer"
@@ -222,11 +221,10 @@ export const IndexApixPage = () => {
           <div
             key={key}
             onClick={() => setActiveFormula(key)}
-            className={`p-5 rounded-xl border cursor-pointer transition-all shadow-2xs ${
-              activeFormula === key
+            className={`p-5 rounded-xl border cursor-pointer transition-all shadow-2xs ${activeFormula === key
                 ? 'bg-blue-50/50 border-blue-400 ring-2 ring-blue-500/20'
                 : 'bg-white border-slate-200 hover:border-slate-300'
-            }`}
+              }`}
           >
             <div className="flex justify-between items-start">
               <div>
@@ -237,9 +235,8 @@ export const IndexApixPage = () => {
                   {f.currentValue.toFixed(2)}
                 </p>
               </div>
-              <span className={`text-xs font-semibold px-2 py-0.5 rounded font-mono ${
-                activeFormula === key ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'
-              }`}>
+              <span className={`text-xs font-semibold px-2 py-0.5 rounded font-mono ${activeFormula === key ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'
+                }`}>
                 {f.symbol}
               </span>
             </div>
@@ -294,31 +291,31 @@ export const IndexApixPage = () => {
                 }}
               />
               <Legend verticalAlign="top" height={36} iconType="circle" />
-              <Line 
-                type="monotone" 
-                name="APIx Headline Index" 
-                dataKey="HeadlineIndex" 
-                stroke="#2563eb" 
-                strokeWidth={2.5} 
-                dot={false} 
+              <Line
+                type="monotone"
+                name="APIx Headline Index"
+                dataKey="HeadlineIndex"
+                stroke="#2563eb"
+                strokeWidth={2.5}
+                dot={false}
               />
-              <Line 
-                type="monotone" 
-                name="T+1 Surge Window Index" 
-                dataKey="T1SurgeIndex" 
-                stroke="#dc2626" 
-                strokeWidth={1.8} 
-                strokeDasharray="4 4" 
-                dot={false} 
+              <Line
+                type="monotone"
+                name="T+1 Surge Window Index"
+                dataKey="T1SurgeIndex"
+                stroke="#dc2626"
+                strokeWidth={1.8}
+                strokeDasharray="4 4"
+                dot={false}
               />
-              <Line 
-                type="monotone" 
-                name="T+45 Base Inventory Index" 
-                dataKey="T45BaseIndex" 
-                stroke="#10b981" 
-                strokeWidth={1.8} 
-                strokeDasharray="4 4" 
-                dot={false} 
+              <Line
+                type="monotone"
+                name="T+45 Base Inventory Index"
+                dataKey="T45BaseIndex"
+                stroke="#10b981"
+                strokeWidth={1.8}
+                strokeDasharray="4 4"
+                dot={false}
               />
             </LineChart>
           </ResponsiveContainer>
@@ -452,25 +449,22 @@ export const IndexApixPage = () => {
           <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg text-xs font-medium">
             <button
               onClick={() => setActiveApiTab('nso')}
-              className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
-                activeApiTab === 'nso' ? 'bg-white text-blue-700 shadow-2xs font-semibold' : 'text-[#4B5563] hover:text-[#111827]'
-              }`}
+              className={`px-3 py-1 rounded-md transition-all cursor-pointer ${activeApiTab === 'nso' ? 'bg-white text-blue-700 shadow-2xs font-semibold' : 'text-[#4B5563] hover:text-[#111827]'
+                }`}
             >
               MoSPI / NSO Feed
             </button>
             <button
               onClick={() => setActiveApiTab('rbi')}
-              className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
-                activeApiTab === 'rbi' ? 'bg-white text-blue-700 shadow-2xs font-semibold' : 'text-[#4B5563] hover:text-[#111827]'
-              }`}
+              className={`px-3 py-1 rounded-md transition-all cursor-pointer ${activeApiTab === 'rbi' ? 'bg-white text-blue-700 shadow-2xs font-semibold' : 'text-[#4B5563] hover:text-[#111827]'
+                }`}
             >
               RBI Bulletin Feed
             </button>
             <button
               onClick={() => setActiveApiTab('python')}
-              className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
-                activeApiTab === 'python' ? 'bg-white text-blue-700 shadow-2xs font-semibold' : 'text-[#4B5563] hover:text-[#111827]'
-              }`}
+              className={`px-3 py-1 rounded-md transition-all cursor-pointer ${activeApiTab === 'python' ? 'bg-white text-blue-700 shadow-2xs font-semibold' : 'text-[#4B5563] hover:text-[#111827]'
+                }`}
             >
               Python Client
             </button>
@@ -481,11 +475,11 @@ export const IndexApixPage = () => {
         <div className="bg-slate-900 rounded-lg p-4 font-mono text-xs text-slate-100 overflow-x-auto relative">
           <button
             onClick={() => {
-              const code = activeApiTab === 'nso' 
+              const code = activeApiTab === 'nso'
                 ? 'curl -X GET "http://localhost:8000/api/v1/institutional/nso-feed" -H "Accept: application/json"'
                 : activeApiTab === 'rbi'
-                ? 'curl -X GET "http://localhost:8000/api/v1/institutional/rbi-bulletin" -H "Accept: application/json"'
-                : 'import requests\n\n# MoSPI CPI Central Compilation Integration\nr = requests.get("http://localhost:8000/api/v1/institutional/nso-feed")\ndata = r.json()\nprint(f"National APIx: {data[\'headline_indices\'][\'laspeyres\']}")\nprint(f"Base Fare: ₹{data[\'component_fare_disaggregation_inr\'][\'average_base_fare\']}")';
+                  ? 'curl -X GET "http://localhost:8000/api/v1/institutional/rbi-bulletin" -H "Accept: application/json"'
+                  : 'import requests\n\n# MoSPI CPI Central Compilation Integration\nr = requests.get("http://localhost:8000/api/v1/institutional/nso-feed")\ndata = r.json()\nprint(f"National APIx: {data[\'headline_indices\'][\'laspeyres\']}")\nprint(f"Base Fare: ₹{data[\'component_fare_disaggregation_inr\'][\'average_base_fare\']}")';
               navigator.clipboard.writeText(code);
               setCopiedApi(true);
               setTimeout(() => setCopiedApi(false), 2000);

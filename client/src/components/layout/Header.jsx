@@ -2,11 +2,11 @@ import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useRole } from '../../context/RoleContext';
 import { useAuditModal } from '../../context/AuditModalContext';
-import { Calendar, Bell, ShieldCheck, Sparkles, Terminal } from 'lucide-react';
+import { Calendar, Bell, ShieldCheck, Terminal } from 'lucide-react';
 
 export const Header = () => {
   const { currentRole } = useRole();
-  const { openCopilot, openHeadless } = useAuditModal();
+  const { openHeadless } = useAuditModal();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -42,7 +42,7 @@ export const Header = () => {
           SIH26056
         </span>
         <div className="flex items-center gap-1.5 text-xs text-[#6B7280] font-medium">
-          <button 
+          <button
             onClick={() => navigate('/')}
             className="hover:text-blue-600 transition-colors cursor-pointer"
             title="Go to Landing Page"
@@ -66,17 +66,6 @@ export const Header = () => {
           <span>Scraper Studio</span>
         </button>
 
-        {/* AI Copilot Button */}
-        <button
-          onClick={() => openCopilot()}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-[12px] font-medium transition-all shadow-xs cursor-pointer group"
-          title="Open AeroIntel AI Econometric Copilot"
-        >
-          <Sparkles className="w-3.5 h-3.5 text-blue-200 group-hover:rotate-12 transition-transform" />
-          <span>AI Copilot</span>
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-        </button>
-
         <div className="h-6 w-px bg-slate-200 mx-0.5"></div>
 
         {/* Month / Date Selector */}
@@ -88,7 +77,7 @@ export const Header = () => {
         </div>
 
         {/* Notifications */}
-        <button 
+        <button
           title="Data Verification & Pipeline Alerts"
           className="w-8 h-8 rounded-lg border border-slate-200 hover:border-slate-300 flex items-center justify-center text-[#4B5563] hover:bg-slate-50 relative transition-colors"
         >

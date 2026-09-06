@@ -26,7 +26,7 @@ export const KeyInsights = ({ onNavigateAnalysis }) => {
           Key Insights
         </h2>
         <span className="text-xs text-[#6B7280] font-normal">
-          AI-Driven Briefing Unit – August 2026
+          National Econometric Briefing Unit · August 2026
         </span>
       </div>
 

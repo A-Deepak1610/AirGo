@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Terminal, 
-  Sparkles, 
-  ExternalLink, 
-  Camera, 
-  TrendingUp, 
-  TrendingDown, 
+import {
+  Terminal,
+  ExternalLink,
+  Camera,
+  TrendingUp,
+  TrendingDown,
   ShieldCheck
 } from 'lucide-react';
 
@@ -13,7 +12,7 @@ import { useAuditModal } from '../../context/AuditModalContext';
 import { liveScraperStream, auditedFlightsList } from '../../data/scrapedRunsData';
 
 export const LiveScraperTicker = () => {
-  const { openAuditModal, openHeadless, openCopilot } = useAuditModal();
+  const { openAuditModal, openHeadless } = useAuditModal();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
 
@@ -32,7 +31,7 @@ export const LiveScraperTicker = () => {
   const isPositive = deltaStr.startsWith('+');
 
   return (
-    <div 
+    <div
       className="bg-slate-900 border border-slate-800 text-slate-200 rounded-xl px-4 py-2.5 shadow-sm transition-all flex flex-col md:flex-row items-center justify-between gap-3 text-xs"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
@@ -70,9 +69,8 @@ export const LiveScraperTicker = () => {
           <span className="text-slate-500">·</span>
           <span className="text-emerald-400 font-bold">₹{totalFareDisplay}</span>
 
-          <span className={`text-[10px] flex items-center gap-0.5 px-1 rounded ${
-            isPositive ? 'text-amber-400 bg-amber-950/40' : 'text-emerald-400 bg-emerald-950/40'
-          }`}>
+          <span className={`text-[10px] flex items-center gap-0.5 px-1 rounded ${isPositive ? 'text-amber-400 bg-amber-950/40' : 'text-emerald-400 bg-emerald-950/40'
+            }`}>
             {isPositive ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
             {deltaStr}
           </span>
@@ -111,15 +109,6 @@ export const LiveScraperTicker = () => {
         >
           <Terminal className="w-3.5 h-3.5 text-emerald-400 group-hover:scale-110 transition-transform" />
           <span>Scraper Studio</span>
-        </button>
-
-        <button
-          onClick={() => openCopilot(`Analyze ${activeItem.route} price surge on ${activeItem.horizon}`)}
-          title="Open AirGo Econometric Copilot (AeroIntel AI)"
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-[11px] font-semibold transition-all cursor-pointer shadow-xs group"
-        >
-          <Sparkles className="w-3.5 h-3.5 text-blue-200 group-hover:rotate-12 transition-transform" />
-          <span>AI Copilot</span>
         </button>
       </div>
     </div>

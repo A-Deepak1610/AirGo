@@ -69,8 +69,8 @@ export const DashboardPage = () => {
             <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-[#4B5563] font-medium">
               <Calendar className="w-3.5 h-3.5 text-[#6B7280]" />
               <span className="text-[#6B7280]">Date:</span>
-              <select 
-                value={dateRange} 
+              <select
+                value={dateRange}
                 onChange={(e) => setDateRange(e.target.value)}
                 className="bg-transparent font-medium text-[#111827] focus:outline-none cursor-pointer"
               >
@@ -84,8 +84,8 @@ export const DashboardPage = () => {
             <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-[#4B5563] font-medium">
               <Plane className="w-3.5 h-3.5 text-[#6B7280]" />
               <span className="text-[#6B7280]">Corridor:</span>
-              <select 
-                value={selectedCorridor} 
+              <select
+                value={selectedCorridor}
                 onChange={(e) => setSelectedCorridor(e.target.value)}
                 className="bg-transparent font-medium text-[#111827] focus:outline-none cursor-pointer"
               >
@@ -102,8 +102,8 @@ export const DashboardPage = () => {
             <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-[#4B5563] font-medium">
               <Building2 className="w-3.5 h-3.5 text-[#6B7280]" />
               <span className="text-[#6B7280]">Carrier:</span>
-              <select 
-                value={selectedAirline} 
+              <select
+                value={selectedAirline}
                 onChange={(e) => setSelectedAirline(e.target.value)}
                 className="bg-transparent font-medium text-[#111827] focus:outline-none cursor-pointer"
               >
