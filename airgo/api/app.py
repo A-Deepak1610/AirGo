@@ -138,6 +138,30 @@ def get_sectors_summary(db: Session = Depends(get_db)):
         CanonicalFareDB.is_outlier == False
     ))
 
+    # Pre-fetch all active canonical records in batch
+    canon_records = db.scalars(
+        select(CanonicalFareDB).where(CanonicalFareDB.is_outlier == False).order_by(desc(CanonicalFareDB.id))
+    ).all()
+
+    # Group canonical fares by route for latest_date and base_date
+    latest_by_route = {}
+    base_by_route = {}
+    for rec in canon_records:
+        r = str(rec.route)
+        if latest_date is None or rec.observation_date == latest_date:
+            latest_by_route.setdefault(r, []).append(rec)
+        if base_date and rec.observation_date == base_date:
+            base_by_route.setdefault(r, []).append(rec)
+
+    # Pre-fetch fallback clean fares if needed
+    clean_records = db.scalars(
+        select(CleanFareDB).where(CleanFareDB.is_outlier == False).order_by(desc(CleanFareDB.created_at))
+    ).all()
+    clean_by_sector = {}
+    for rec in clean_records:
+        s = str(rec.sector)
+        clean_by_sector.setdefault(s, []).append(rec)
+
     for sec_code, meta in DGCA_ROUTES.items():
         pair_key = tuple(sorted([meta["origin"], meta["destination"]]))
         if pair_key in processed_pairs:
@@ -146,16 +170,8 @@ def get_sectors_summary(db: Session = Depends(get_db)):
 
         rev_code = f"{sec_code.split('-')[1]}-{sec_code.split('-')[0]}" if "-" in sec_code else sec_code
 
-        # 1. Query CanonicalFareDB for latest observation date
-        filters = [
-            CanonicalFareDB.route.in_([sec_code, rev_code]),
-            CanonicalFareDB.is_outlier == False
-        ]
-        if latest_date:
-            filters.append(CanonicalFareDB.observation_date == latest_date)
-
-        canon_stmt = select(CanonicalFareDB).where(*filters).order_by(desc(CanonicalFareDB.id))
-        sector_canon = db.scalars(canon_stmt).all()
+        # 1. Query CanonicalFareDB for latest observation date from memory
+        sector_canon = latest_by_route.get(sec_code, []) + latest_by_route.get(rev_code, [])
 
         if sector_canon:
             fares_list: List[float] = [float(getattr(x, "avg_total_fare", None) or getattr(x, "min_total_fare", 0.0) or 0.0) for x in sector_canon]
@@ -164,12 +180,8 @@ def get_sectors_summary(db: Session = Depends(get_db)):
             carriers = sorted(list(set(str(x.carrier) for x in sector_canon)))
             quote_cnt = len(sector_canon)
         else:
-            # 2. Fallback to legacy CleanFareDB
-            stmt = select(CleanFareDB).where(
-                CleanFareDB.sector.in_([sec_code, rev_code]),
-                CleanFareDB.is_outlier == False
-            ).order_by(desc(CleanFareDB.created_at))
-            sector_fares = db.scalars(stmt).all()
+            # 2. Fallback to legacy CleanFareDB from memory
+            sector_fares = clean_by_sector.get(sec_code, []) + clean_by_sector.get(rev_code, [])
 
             if sector_fares:
                 fares_list = [float(getattr(x, "total_fare", 0.0) or 0.0) for x in sector_fares]
@@ -184,12 +196,7 @@ def get_sectors_summary(db: Session = Depends(get_db)):
 
         # Dynamically compute baseline fare from the first scrape (base_date)
         if base_date and base_date != latest_date:
-            base_stmt = select(CanonicalFareDB).where(
-                CanonicalFareDB.route.in_([sec_code, rev_code]),
-                CanonicalFareDB.observation_date == base_date,
-                CanonicalFareDB.is_outlier == False
-            )
-            base_records = db.scalars(base_stmt).all()
+            base_records = base_by_route.get(sec_code, []) + base_by_route.get(rev_code, [])
             if base_records:
                 base_vals = [float(getattr(x, "avg_total_fare", None) or getattr(x, "min_total_fare", 0.0) or 0.0) for x in base_records]
                 valid_b = [b for b in base_vals if b > 0]
