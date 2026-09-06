@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Download, Calendar, Plane, Building2, RotateCcw, LayoutGrid } from 'lucide-react';
+import { Download, Calendar, Plane, Building2, RotateCcw } from 'lucide-react';
 import { PageHeader } from '../components/layout/PageHeader';
 import { LiveScraperTicker } from '../components/dashboard/LiveScraperTicker';
 import { MetricCards } from '../components/dashboard/MetricCards';
@@ -9,7 +9,6 @@ import { DomesticFareMovement } from '../components/dashboard/DomesticFareMoveme
 import { FarePressureGauge } from '../components/dashboard/FarePressureGauge';
 import { RoutesInflationTable } from '../components/dashboard/RoutesInflationTable';
 import { KeyInsights } from '../components/dashboard/KeyInsights';
-import { RouteHeatmapGrid } from '../components/analytics/RouteHeatmapGrid';
 
 export const DashboardPage = () => {
   const navigate = useNavigate();
@@ -147,31 +146,7 @@ export const DashboardPage = () => {
       {/* 4. Routes Driving Airfare Inflation Table */}
       <RoutesInflationTable onNavigateRoutes={() => navigate('/index-apix')} />
 
-      {/* 5. Operational Domestic Corridor Heatmap Grid */}
-      <div className="space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
-              <LayoutGrid className="w-4 h-4" />
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold text-[#111827] flex items-center gap-2">
-                <span>National Airspace Corridor Heatmap & Yield Pressure Grid</span>
-                <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-mono font-semibold">
-                  OPERATIONAL MATRIX
-                </span>
-              </h3>
-              <p className="text-xs text-[#4B5563] mt-0.5">
-                Real-time 2D sector yield pressure tracking across 20 primary domestic city-pairs.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <RouteHeatmapGrid />
-      </div>
-
-      {/* 7. Key Analytical Briefing Insights */}
+      {/* 5. Key Analytical Briefing Insights */}
       <KeyInsights onNavigateAnalysis={() => navigate('/analytics')} />
     </div>
   );

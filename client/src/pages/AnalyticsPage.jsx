@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import { 
   Compass,
   Download,
-  Plane,
-  LayoutGrid
+  Plane
 } from 'lucide-react';
 import { routeAnalyticsList } from '../data/analyticsData';
 import { LeadTimeCurveChart } from '../components/analytics/LeadTimeCurveChart';
@@ -120,27 +119,8 @@ export const AnalyticsPage = () => {
         </div>
       </div>
 
-      {/* Section 1: Sector Pricing Heatmap Grid */}
-      <div className="space-y-3">
-        <div className="flex items-center gap-2.5 bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs">
-          <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
-            <LayoutGrid className="w-4 h-4" />
-          </div>
-          <div>
-            <h2 className="text-sm font-semibold text-[#111827] flex items-center gap-2">
-              <span>National Airspace Corridor Heatmap & Matrix</span>
-              <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-mono font-semibold">
-                OPERATIONAL MATRIX
-              </span>
-            </h2>
-            <p className="text-xs text-[#4B5563] mt-0.5">
-              Sector-by-sector yield pressure and price movement across monitored Indian domestic city-pairs.
-            </p>
-          </div>
-        </div>
-
-        <RouteHeatmapGrid />
-      </div>
+      {/* Section 1: DGCA National Corridors Price Pressure Heatmap */}
+      <RouteHeatmapGrid />
 
       {/* Section 2: Lead-Time Elasticity Curve */}
       <LeadTimeCurveChart 

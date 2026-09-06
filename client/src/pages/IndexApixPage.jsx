@@ -31,7 +31,6 @@ import {
   routeAnalyticsList, 
   airlineAnalyticsList 
 } from '../data/analyticsData';
-import { RouteHeatmapGrid } from '../components/analytics/RouteHeatmapGrid';
 import { PageHeader } from '../components/layout/PageHeader';
 
 export const IndexApixPage = () => {
@@ -579,9 +578,6 @@ print(f"Volatility (σ): {rbi_data['headline_price_impulse']['volatility_dispers
           )}
         </div>
       </div>
-
-      {/* Section: Route Heatmap Grid */}
-      <RouteHeatmapGrid />
     </div>
   );
 };
