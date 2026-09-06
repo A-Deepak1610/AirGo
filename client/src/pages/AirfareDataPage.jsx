@@ -152,10 +152,10 @@ export const AirfareDataPage = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs">
           <p className="text-xs font-medium text-[#6B7280]">Valid Cleansed Quotes</p>
-          <p className="text-2xl sm:text-[26px] font-semibold text-[#111827] mt-1 font-mono tabular-nums leading-none">
+          <p className="text-2xl sm:text-[28px] font-semibold text-slate-900 mt-1 tabular-nums tracking-tight leading-none">
             {dataQualitySummary.validCount.toLocaleString()}
           </p>
-          <div className="flex items-center gap-1.5 text-xs text-emerald-600 font-medium mt-1">
+          <div className="flex items-center gap-1.5 text-xs text-emerald-600 font-medium mt-2">
             <CheckCircle2 className="w-3.5 h-3.5" />
             <span>97.3% Clean Yield</span>
           </div>
@@ -163,10 +163,10 @@ export const AirfareDataPage = () => {
 
         <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs">
           <p className="text-xs font-medium text-[#6B7280]">Canonical Deduplication</p>
-          <p className="text-2xl sm:text-[26px] font-semibold text-blue-600 mt-1 font-mono tabular-nums leading-none">
-            {dataQualitySummary.duplicateCount} Merged
+          <p className="text-2xl sm:text-[28px] font-semibold text-slate-900 mt-1 tabular-nums tracking-tight leading-none">
+            {dataQualitySummary.duplicateCount} <span className="text-sm font-medium text-slate-500">Merged</span>
           </p>
-          <div className="flex items-center gap-1.5 text-xs text-[#6B7280] font-normal mt-1">
+          <div className="flex items-center gap-1.5 text-xs text-[#6B7280] font-normal mt-2">
             <Layers className="w-3.5 h-3.5 text-blue-500" />
             <span>Cross-platform duplicate suppression</span>
           </div>
@@ -174,10 +174,10 @@ export const AirfareDataPage = () => {
 
         <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs">
           <p className="text-xs font-medium text-[#6B7280]">Outliers Excluded (1.5x IQR)</p>
-          <p className="text-2xl sm:text-[26px] font-semibold text-amber-600 mt-1 font-mono tabular-nums leading-none">
-            {dataQualitySummary.outliersRejected} Filtered
+          <p className="text-2xl sm:text-[28px] font-semibold text-slate-900 mt-1 tabular-nums tracking-tight leading-none">
+            {dataQualitySummary.outliersRejected} <span className="text-sm font-medium text-slate-500">Filtered</span>
           </p>
-          <div className="flex items-center gap-1.5 text-xs text-amber-600 font-medium mt-1">
+          <div className="flex items-center gap-1.5 text-xs text-amber-600 font-medium mt-2">
             <AlertTriangle className="w-3.5 h-3.5" />
             <span>Anomalous scraper artifacts discarded</span>
           </div>
@@ -185,8 +185,8 @@ export const AirfareDataPage = () => {
 
         <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs">
           <p className="text-xs font-medium text-[#6B7280]">Component Disaggregation</p>
-          <p className="text-2xl sm:text-[26px] font-semibold text-[#111827] mt-1 font-mono tabular-nums leading-none">100%</p>
-          <div className="flex items-center gap-1.5 text-xs text-emerald-600 font-medium mt-1">
+          <p className="text-2xl sm:text-[28px] font-semibold text-slate-900 mt-1 tabular-nums tracking-tight leading-none">100%</p>
+          <div className="flex items-center gap-1.5 text-xs text-emerald-600 font-medium mt-2">
             <ShieldCheck className="w-3.5 h-3.5" />
             <span>Base + UDF + GST + Conv Fee</span>
           </div>
@@ -205,14 +205,14 @@ export const AirfareDataPage = () => {
               DGCA & MoSPI compliant normalization separating pure airline yield from statutory government levies and intermediary fees.
             </p>
           </div>
-          <span className="text-xs font-mono text-[#6B7280]">Total Mandatory Fare = Base + Taxes + UDF + Convenience Fee</span>
+          <span className="text-xs text-[#6B7280]">Total Mandatory Fare = Base + Taxes + UDF + Convenience Fee</span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="p-4 rounded-xl border border-blue-200 bg-blue-50/30">
             <div className="flex justify-between items-center">
               <span className="text-sm font-semibold text-blue-900">1. Base Fare</span>
-              <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 font-mono">~81.5%</span>
+              <span className="text-xs font-semibold px-2 py-0.5 rounded bg-blue-100 text-blue-800 tabular-nums">~81.5%</span>
             </div>
             <p className="text-xs sm:text-[13px] text-[#4B5563] mt-1 leading-relaxed">
               Airline's core commercial tariff for seat transportation. Forms the primary weight in elementary Laspeyres index relative calculations.
@@ -222,7 +222,7 @@ export const AirfareDataPage = () => {
           <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/30">
             <div className="flex justify-between items-center">
               <span className="text-sm font-semibold text-emerald-900">2. Statutory Taxes</span>
-              <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-mono">~9.2%</span>
+              <span className="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 tabular-nums">~9.2%</span>
             </div>
             <p className="text-xs sm:text-[13px] text-[#4B5563] mt-1 leading-relaxed">
               GST (Goods & Services Tax) computed at 5% on domestic Economy class tickets, plus fuel surcharges where non-separable.
@@ -232,7 +232,7 @@ export const AirfareDataPage = () => {
           <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/30">
             <div className="flex justify-between items-center">
               <span className="text-sm font-semibold text-amber-900">3. UDF & Airport Charges</span>
-              <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-mono">~6.8%</span>
+              <span className="text-xs font-semibold px-2 py-0.5 rounded bg-amber-100 text-amber-800 tabular-nums">~6.8%</span>
             </div>
             <p className="text-xs sm:text-[13px] text-[#4B5563] mt-1 leading-relaxed">
               User Development Fee (UDF), Passenger Service Fee (PSF), and airport regulatory tariffs authorized by AERA.
@@ -242,7 +242,7 @@ export const AirfareDataPage = () => {
           <div className="p-4 rounded-xl border border-purple-200 bg-purple-50/30">
             <div className="flex justify-between items-center">
               <span className="text-sm font-semibold text-purple-900">4. Convenience Charges</span>
-              <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 font-mono">~2.5%</span>
+              <span className="text-xs font-semibold px-2 py-0.5 rounded bg-purple-100 text-purple-800 tabular-nums">~2.5%</span>
             </div>
             <p className="text-xs sm:text-[13px] text-[#4B5563] mt-1 leading-relaxed">
               Mandatory checkout booking fees charged by OTAs (₹50 to ₹310). Excluded from pure airline index; monitored for consumer burden.
@@ -273,15 +273,15 @@ export const AirfareDataPage = () => {
                 return (
                   <tr key={f.canonicalId} className="hover:bg-slate-50 transition-colors">
                     <td className="py-2.5 px-3 font-medium text-[#111827]">
-                      {f.flightNumber} ({f.airline})
+                      {f.flightNumber} <span className="text-[#6B7280] font-normal">({f.airline})</span>
                     </td>
-                    <td className="py-2.5 px-3 font-mono font-medium text-blue-700">{f.route}</td>
-                    <td className="py-2.5 px-3 font-mono font-medium text-[#111827]">{f.advanceWindow}</td>
-                    <td className="py-2.5 px-3 font-mono tabular-nums text-[#111827]">₹{f.baseFare.toLocaleString()}</td>
-                    <td className="py-2.5 px-3 font-mono tabular-nums text-amber-700">₹{udf}</td>
-                    <td className="py-2.5 px-3 font-mono tabular-nums text-emerald-700">₹{gst}</td>
-                    <td className="py-2.5 px-3 font-mono tabular-nums text-purple-700">₹{f.fees}</td>
-                    <td className="py-2.5 px-3 font-mono tabular-nums font-semibold text-[#111827]">₹{f.totalFare.toLocaleString()}</td>
+                    <td className="py-2.5 px-3 font-semibold text-blue-700">{f.route}</td>
+                    <td className="py-2.5 px-3 font-medium text-slate-700">{f.advanceWindow}</td>
+                    <td className="py-2.5 px-3 font-medium tabular-nums text-[#111827]">₹{f.baseFare.toLocaleString()}</td>
+                    <td className="py-2.5 px-3 tabular-nums text-[#4B5563]">₹{udf.toLocaleString()}</td>
+                    <td className="py-2.5 px-3 tabular-nums text-[#4B5563]">₹{gst.toLocaleString()}</td>
+                    <td className="py-2.5 px-3 tabular-nums text-[#4B5563]">₹{f.fees.toLocaleString()}</td>
+                    <td className="py-2.5 px-3 font-semibold tabular-nums text-[#111827]">₹{f.totalFare.toLocaleString()}</td>
                     <td className="py-2.5 px-3 text-right">
                       <div className="flex items-center justify-end gap-1.5">
                         <button
@@ -318,7 +318,7 @@ export const AirfareDataPage = () => {
               Showing {filteredObs.length} validated records matching active route and temporal filters.
             </p>
           </div>
-          <span className="text-xs font-mono text-[#6B7280] bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-md">
+          <span className="text-xs text-[#6B7280] bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-md">
             Canonical Dedup: Active
           </span>
         </div>
@@ -347,16 +347,16 @@ export const AirfareDataPage = () => {
                     key={o.id} 
                     className={`hover:bg-slate-50 transition-colors ${selectedObs?.id === o.id ? 'bg-blue-50/60' : ''}`}
                   >
-                    <td className="py-2.5 px-3 font-mono font-medium text-blue-600">{o.id}</td>
+                    <td className="py-2.5 px-3 font-medium text-blue-700">{o.id}</td>
                     <td className="py-2.5 px-3 text-[#4B5563]">{o.source}</td>
                     <td className="py-2.5 px-3 font-medium text-[#111827]">
-                      {o.route} · <span className="font-mono text-[#6B7280]">{o.flightNo}</span>
+                      {o.route} · <span className="text-[#6B7280] font-normal">{o.flightNo}</span>
                     </td>
-                    <td className="py-2.5 px-3 font-mono font-medium text-[#111827]">{o.window}</td>
-                    <td className="py-2.5 px-3 font-mono tabular-nums text-[#111827]">₹{o.baseFare}</td>
-                    <td className="py-2.5 px-3 font-mono tabular-nums text-[#6B7280]">₹{o.taxes}</td>
-                    <td className="py-2.5 px-3 font-mono tabular-nums text-purple-700">₹{o.fees}</td>
-                    <td className="py-2.5 px-3 font-mono tabular-nums font-semibold text-[#111827]">₹{o.totalFare}</td>
+                    <td className="py-2.5 px-3 font-medium text-slate-700">{o.window}</td>
+                    <td className="py-2.5 px-3 font-medium tabular-nums text-[#111827]">₹{Number(o.baseFare).toLocaleString()}</td>
+                    <td className="py-2.5 px-3 tabular-nums text-[#4B5563]">₹{Number(o.taxes).toLocaleString()}</td>
+                    <td className="py-2.5 px-3 tabular-nums text-[#4B5563]">₹{Number(o.fees).toLocaleString()}</td>
+                    <td className="py-2.5 px-3 font-semibold tabular-nums text-[#111827]">₹{Number(o.totalFare).toLocaleString()}</td>
                     <td className="py-2.5 px-3">
                       <span className={`text-[11px] px-2 py-0.5 rounded font-medium border ${
                         o.qualityStatus === 'VALID'

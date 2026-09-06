@@ -27,7 +27,7 @@ export const MetricCards = () => {
 
             {/* Middle: Big Value */}
             <div className="my-2.5">
-              <span className="text-2xl sm:text-[26px] font-semibold tracking-tight text-[#111827] font-mono tabular-nums leading-none">
+              <span className="text-2xl sm:text-[26px] font-semibold tracking-tight text-[#111827] tabular-nums leading-none">
                 {metric.value}
               </span>
             </div>

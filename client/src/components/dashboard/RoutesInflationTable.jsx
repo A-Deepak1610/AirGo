@@ -42,24 +42,24 @@ export const RoutesInflationTable = ({ onNavigateRoutes }) => {
             {ROUTES_INFLATION_DATA.map((row, idx) => (
               <tr key={idx} className="hover:bg-slate-50/70 transition-colors">
                 {/* Route */}
-                <td className="py-3 font-medium font-mono text-[13px] text-[#111827]">
+                <td className="py-3 font-medium text-[13px] text-[#111827]">
                   <span>{row.origin} ↔ {row.destination}</span>
                 </td>
 
                 {/* Passengers */}
-                <td className="py-3 text-[#4B5563] font-mono tabular-nums text-xs">
+                <td className="py-3 text-[#4B5563] tabular-nums text-xs">
                   {row.passengers}
                 </td>
 
                 {/* Avg Fare */}
-                <td className="py-3 font-medium font-mono tabular-nums text-[13px] text-[#111827]">
+                <td className="py-3 font-medium tabular-nums text-[13px] text-[#111827]">
                   {row.avgFare}
                 </td>
 
                 {/* MoM Change with mini progress bar */}
                 <td className="py-3">
                   <div className="flex items-center gap-2">
-                    <span className="font-medium font-mono tabular-nums text-xs text-emerald-600 w-12">{row.momChange}</span>
+                    <span className="font-medium tabular-nums text-xs text-emerald-600 w-12">{row.momChange}</span>
                     <div className="w-20 bg-slate-100 rounded-full h-1.5 overflow-hidden">
                       <div
                         style={{ width: `${row.momProgress}%` }}
@@ -72,7 +72,7 @@ export const RoutesInflationTable = ({ onNavigateRoutes }) => {
                 {/* Index Contribution with blue progress bar */}
                 <td className="py-3">
                   <div className="flex items-center gap-2">
-                    <span className="font-medium font-mono tabular-nums text-xs text-[#111827] w-16">{row.indexContribution}</span>
+                    <span className="font-medium tabular-nums text-xs text-[#111827] w-16">{row.indexContribution}</span>
                     <div className="w-24 bg-slate-100 rounded-full h-1.5 overflow-hidden">
                       <div
                         style={{ width: `${row.contributionProgress}%` }}
@@ -84,7 +84,7 @@ export const RoutesInflationTable = ({ onNavigateRoutes }) => {
 
                 {/* Demand Weight Badge */}
                 <td className="py-3 text-right">
-                  <span className="bg-blue-50 text-blue-700 border border-blue-200/60 text-xs font-medium font-mono px-2 py-0.5 rounded">
+                  <span className="bg-blue-50 text-blue-700 border border-blue-200/60 text-xs font-medium tabular-nums px-2 py-0.5 rounded">
                     {row.demandWeight}
                   </span>
                 </td>
