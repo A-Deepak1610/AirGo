@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plane, ArrowRight, ShieldCheck, BarChart3, Database, Layers, ExternalLink } from 'lucide-react';
+import { Plane, ArrowRight } from 'lucide-react';
 
 export const LandingNavbar = () => {
   const navigate = useNavigate();
@@ -21,20 +21,21 @@ export const LandingNavbar = () => {
         : 'bg-white border-b border-slate-200/60'
     }`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        
         {/* Brand Logo */}
         <div 
           onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
           className="flex items-center gap-3 cursor-pointer group"
         >
-          <div className="w-9 h-9 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold text-sm shadow-xs group-hover:bg-blue-600 transition-colors">
-            <Plane className="w-5 h-5 -rotate-45" />
+          <div className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold text-xs shadow-xs group-hover:bg-blue-600 transition-colors">
+            <Plane className="w-4 h-4 -rotate-45" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-semibold text-slate-900 text-[15px] tracking-tight whitespace-nowrap">
+              <span className="font-bold text-slate-900 text-[15px] tracking-tight whitespace-nowrap">
                 Airfare Intelligence Platform
               </span>
-              <span className="hidden xl:inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-blue-50 text-blue-700 border border-blue-200 whitespace-nowrap">
+              <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-blue-50 text-blue-700 border border-blue-200 whitespace-nowrap">
                 APIx INDIA
               </span>
             </div>
@@ -44,37 +45,28 @@ export const LandingNavbar = () => {
           </div>
         </div>
 
-        {/* Navigation Links */}
-        <nav className="hidden xl:flex items-center gap-5 text-[13px] font-medium text-slate-600">
-          <a href="#problem" className="hover:text-slate-900 transition-colors">Problem</a>
-          <a href="#dynamic-pricing" className="hover:text-slate-900 transition-colors">Dynamic Pricing</a>
-          <a href="#pipeline" className="hover:text-slate-900 transition-colors">Pipeline</a>
-          <a href="#sources" className="hover:text-slate-900 transition-colors">Data Sources</a>
-          <a href="#network" className="hover:text-slate-900 transition-colors">3D Network</a>
-          <a href="#index" className="hover:text-slate-900 transition-colors">Price Index</a>
-          <a href="#heatmap" className="hover:text-slate-900 transition-colors">Heatmap</a>
-          <a href="#architecture" className="hover:text-slate-900 transition-colors">Architecture</a>
-          <a href="#backtest" className="hover:text-slate-900 transition-colors">Backtesting</a>
+        {/* Narrative Links */}
+        <nav className="hidden lg:flex items-center gap-6 text-[13px] font-medium text-slate-600">
+          <a href="#story" className="hover:text-slate-900 transition-colors">Story</a>
+          <a href="#gap" className="hover:text-slate-900 transition-colors">The Gap</a>
+          <a href="#signal" className="hover:text-slate-900 transition-colors">Noise to Signal</a>
+          <a href="#philosophy" className="hover:text-slate-900 transition-colors">Philosophy</a>
+          <a href="#index-concept" className="hover:text-slate-900 transition-colors">Price Index</a>
+          <a href="#human" className="hover:text-slate-900 transition-colors">Human Factor</a>
+          <a href="#features" className="hover:text-slate-900 transition-colors">Directory</a>
         </nav>
 
-        {/* Action CTAs */}
+        {/* Action CTA */}
         <div className="flex items-center gap-3">
           <button
-            onClick={() => navigate('/index-apix')}
-            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-medium transition-colors cursor-pointer"
-          >
-            <BarChart3 className="w-3.5 h-3.5 text-slate-500" />
-            <span>Methodology</span>
-          </button>
-
-          <button
             onClick={() => navigate('/dashboard')}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs hover:shadow-sm transition-all cursor-pointer"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 hover:bg-blue-600 text-white text-xs font-semibold shadow-xs hover:shadow-sm transition-all cursor-pointer group"
           >
-            <span>Open Terminal</span>
-            <ArrowRight className="w-3.5 h-3.5" />
+            <span>Explore Platform</span>
+            <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
           </button>
         </div>
+
       </div>
     </header>
   );

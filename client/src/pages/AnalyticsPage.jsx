@@ -3,7 +3,6 @@ import {
   Compass,
   Download,
   Plane,
-  Radio,
   LayoutGrid
 } from 'lucide-react';
 import { routeAnalyticsList } from '../data/analyticsData';
@@ -11,12 +10,10 @@ import { LeadTimeCurveChart } from '../components/analytics/LeadTimeCurveChart';
 import { PriceDistributionChart } from '../components/analytics/PriceDistributionChart';
 import { PlatformComparisonTable } from '../components/analytics/PlatformComparisonTable';
 import { RouteHeatmapGrid } from '../components/analytics/RouteHeatmapGrid';
-import { IndiaAviation3DMap } from '../components/network/IndiaAviation3DMap';
 import { PageHeader } from '../components/layout/PageHeader';
 
 export const AnalyticsPage = () => {
   const [selectedRouteCode, setSelectedRouteCode] = useState('DEL-BOM');
-  const [activeViewMode, setActiveViewMode] = useState('3d'); // '3d' | 'grid'
 
   const activeRoute = routeAnalyticsList.find(r => r.route === selectedRouteCode) || routeAnalyticsList[0];
 
@@ -123,60 +120,26 @@ export const AnalyticsPage = () => {
         </div>
       </div>
 
-      {/* Section 1: 3D Interactive India Airspace Corridor Radar & Sector Heatmap */}
+      {/* Section 1: Sector Pricing Heatmap Grid */}
       <div className="space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
-              <Radio className="w-4 h-4 animate-pulse" />
-            </div>
-            <div>
-              <h2 className="text-sm font-semibold text-[#111827] flex items-center gap-2">
-                <span>Spatial Airspace & Route Network Intelligence</span>
-                <span className="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-mono font-semibold">
-                  Three.js + Framer Motion
-                </span>
-              </h2>
-              <p className="text-xs text-[#4B5563] mt-0.5">
-                Toggle between real-time 3D flight trajectory radar with live photon pulses or the 2D sector heatmap matrix.
-              </p>
-            </div>
+        <div className="flex items-center gap-2.5 bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs">
+          <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
+            <LayoutGrid className="w-4 h-4" />
           </div>
-
-          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg text-xs font-medium self-start sm:self-auto border border-slate-200">
-            <button
-              onClick={() => setActiveViewMode('3d')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all cursor-pointer ${
-                activeViewMode === '3d'
-                  ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                  : 'text-[#4B5563] hover:text-[#111827]'
-              }`}
-            >
-              <Radio className="w-3.5 h-3.5" />
-              <span>3D Flight Radar (Three.js)</span>
-            </button>
-            <button
-              onClick={() => setActiveViewMode('grid')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all cursor-pointer ${
-                activeViewMode === 'grid'
-                  ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                  : 'text-[#4B5563] hover:text-[#111827]'
-              }`}
-            >
-              <LayoutGrid className="w-3.5 h-3.5" />
-              <span>2D Sector Heatmap Grid</span>
-            </button>
+          <div>
+            <h2 className="text-sm font-semibold text-[#111827] flex items-center gap-2">
+              <span>National Airspace Corridor Heatmap & Matrix</span>
+              <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-mono font-semibold">
+                OPERATIONAL MATRIX
+              </span>
+            </h2>
+            <p className="text-xs text-[#4B5563] mt-0.5">
+              Sector-by-sector yield pressure and price movement across monitored Indian domestic city-pairs.
+            </p>
           </div>
         </div>
 
-        {activeViewMode === '3d' ? (
-          <IndiaAviation3DMap 
-            defaultRoute={selectedRouteCode} 
-            onSelectRoute={(routeId) => setSelectedRouteCode(routeId)} 
-          />
-        ) : (
-          <RouteHeatmapGrid />
-        )}
+        <RouteHeatmapGrid />
       </div>
 
       {/* Section 2: Lead-Time Elasticity Curve */}
