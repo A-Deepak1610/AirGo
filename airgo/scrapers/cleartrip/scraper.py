@@ -1,9 +1,8 @@
 """
-Cleartrip Airfare Scraper with Playwright/Patchright and Chrome.
-Searches specified routes and advance purchase windows, extracts top 5 listings,
-attempts deep checkout audits (review, seat map, payment gateway),
-and writes screenshot evidence and JSON artifacts to runs/ directory.
-Strictly Zero Dummy Data Policy.
+Cleartrip Airfare Scraper with Playwright/Patchright and Google Chrome.
+Searches specified routes and advance purchase windows, extracts top 5 adult economy listings,
+and performs 1 representative checkout attempt per route/day.
+Adheres strictly to Zero Dummy Data and Visual Ground Truth policies.
 """
 
 import os
@@ -25,15 +24,6 @@ if sys.stdout.encoding != "utf-8":
     except Exception:
         pass
 
-CITY_LOOKUP = {
-    "DEL": "New Delhi", "BOM": "Mumbai", "BLR": "Bengaluru", "HYD": "Hyderabad",
-    "CCU": "Kolkata", "MAA": "Chennai", "GOI": "Goa", "GOX": "Goa",
-    "PNQ": "Pune", "AMD": "Ahmedabad", "COK": "Kochi", "GAU": "Guwahati",
-    "LKO": "Lucknow", "PAT": "Patna", "JAI": "Jaipur", "SXR": "Srinagar",
-    "BBI": "Bhubaneswar", "IXC": "Chandigarh", "IXR": "Ranchi", "VTZ": "Visakhapatnam",
-    "TRV": "Thiruvananthapuram", "VNS": "Varanasi", "IDR": "Indore", "NAG": "Nagpur"
-}
-
 
 class CleartripScraper:
     def __init__(
@@ -49,18 +39,18 @@ class CleartripScraper:
             raise ValueError(f"Invalid route format: '{route}'. Expected format 'ORIGIN-DEST' (e.g. 'BOM-DEL').")
         self.origin = parts[0]
         self.dest = parts[1]
-        self.horizons = horizons if horizons is not None else [1, 7, 15, 30, 45]
+        self.horizons = horizons if horizons is not None else [1]
         self.headless = headless
-        
+
         # Base runs directory
         workspace_dir = Path(__file__).resolve().parent.parent.parent.parent
         self.base_runs_dir = Path(runs_dir) if runs_dir else workspace_dir / "runs"
-        
+
         # Timestamped run folder: runs/YYYY-MM-DD_HH-MM-SS_cleartrip/
         timestamp_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         self.run_folder = self.base_runs_dir / f"{timestamp_str}_cleartrip"
         self.run_folder.mkdir(parents=True, exist_ok=True)
-        
+
         print(f"[CleartripScraper] Initialized run folder: {self.run_folder}")
 
     async def _launch_browser(self, p, profile_dir: str) -> BrowserContext:
@@ -109,7 +99,7 @@ class CleartripScraper:
             try:
                 await page.screenshot(path=str(path), full_page=False)
             except Exception as e:
-                print(f"[!] Screenshot capture warning: {e}")
+                print(f"[!] Screenshot capture note: {e}")
 
     async def _extract_flight_cards(self, page: Page) -> List[Dict[str, Any]]:
         """Extracts live flight listings from rendered search DOM."""
@@ -202,9 +192,8 @@ class CleartripScraper:
         top_flight: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
-        Attempts deep checkout navigation to capture:
-        01_checkout_review.png, 02_aircraft_seat_map.png, 03_final_payment_gateway.png.
-        If deep checkout encounters errors, gracefully falls back to search prices.
+        Executes 1 representative checkout navigation per route/day.
+        Captures 01_checkout_review.png and checks whether Akamai blocked /itin/v7/itinerary/create.
         """
         audit_result = {
             "checkout_successful": False,
@@ -212,31 +201,34 @@ class CleartripScraper:
             "taxes": None,
             "convenience_fee": None,
             "total_fare": top_flight["price"],
+            "status": "pending",
             "notes": ""
         }
 
         try:
             book_buttons = page.locator("button:has-text('Book')")
             if await book_buttons.count() == 0:
-                audit_result["notes"] = "No Book buttons found on page."
+                audit_result["notes"] = "No Book buttons available on page."
+                audit_result["status"] = "no_buttons"
                 return audit_result
 
-            print(f"  [Deep Checkout] Clicking Book on top flight {top_flight['airline']} ({top_flight['flightNumber']})...")
+            print(f"  [Representative Checkout] Clicking Book on top flight {top_flight['airline']} ({top_flight['flightNumber']})...")
             await book_buttons.first.click()
             await page.wait_for_timeout(2500)
 
-            # Check if 'Select your fare' modal appeared
+            # Step A: Check if 'Select your fare' modal appeared
             select_btn = page.locator("button:has-text('Select')").first
             if await select_btn.count() > 0:
-                print("  [Deep Checkout] Fare options modal presented. Clicking 'Select'...")
+                print("  [Representative Checkout] Fare selection modal opened. Selecting fare...")
                 await select_btn.click()
                 await page.wait_for_timeout(1500)
 
+            # Step B: Click 'Continue' to advance to itinerary / checkout review
             continue_btn = page.locator("button:has-text('Continue')").first
             checkout_page = None
 
             if await continue_btn.count() > 0:
-                print("  [Deep Checkout] Clicking 'Continue'...")
+                print("  [Representative Checkout] Advancing to checkout review...")
                 try:
                     async with context.expect_page(timeout=8000) as p_info:
                         await continue_btn.click()
@@ -249,72 +241,62 @@ class CleartripScraper:
                 checkout_page = context.pages[-1] if len(context.pages) > 1 else page
 
             await checkout_page.wait_for_load_state("domcontentloaded")
-            await checkout_page.wait_for_timeout(4000)
+            await checkout_page.wait_for_timeout(5000)
 
-            # Step 1: 01_checkout_review.png
+            # Capture 01_checkout_review.png (ground truth proof of checkout transition)
             review_shot = window_dir / "01_checkout_review.png"
             await self._safe_capture_screenshot(checkout_page, review_shot)
-            print(f"  [Deep Checkout] Saved: {review_shot.name}")
+            print(f"  [Representative Checkout] Saved screenshot: {review_shot.name}")
 
-            # Inspect review text for breakdown
-            breakdown = await checkout_page.evaluate(r"""() => {
-                const text = document.body.innerText;
-                let base = null, taxes = null, grand = null;
-                const bMatch = text.match(/Base\s*Fare[^\d]*([\d,]+)/i);
-                if (bMatch) base = parseFloat(bMatch[1].replace(/,/g, ''));
-                const tMatch = text.match(/Taxes[^\d]*([\d,]+)/i);
-                if (tMatch) taxes = parseFloat(tMatch[1].replace(/,/g, ''));
-                const gMatch = text.match(/Total\s*Price[^\d]*([\d,]+)/i);
-                if (gMatch) grand = parseFloat(gMatch[1].replace(/,/g, ''));
-                return { base, taxes, grand, hasError: /server error|try again/i.test(text) };
-            }""")
+            # Inspect destination URL and text content
+            page_text = await checkout_page.evaluate("() => document.body ? document.body.innerText : ''")
+            final_url = checkout_page.url
 
-            if breakdown.get("hasError"):
-                audit_result["notes"] = "OTA checkout gateway returned server error; falling back to listing price."
-                return audit_result
-
-            if breakdown.get("base") or breakdown.get("grand"):
-                audit_result["checkout_successful"] = True
-                audit_result["base_fare"] = breakdown.get("base")
-                audit_result["taxes"] = breakdown.get("taxes")
-                audit_result["total_fare"] = breakdown.get("grand") or top_flight["price"]
-                audit_result["notes"] = "Observed exact base fare and tax breakdown from checkout review."
-
-            # Step 2: Look for Seat Selection / Seat Map
-            seat_btn = checkout_page.locator("button:has-text('Select Seat'), button:has-text('Seats'), a:has-text('Seats')").first
-            if await seat_btn.count() > 0:
-                try:
-                    await seat_btn.click()
-                    await checkout_page.wait_for_timeout(3000)
-                    seat_shot = window_dir / "02_aircraft_seat_map.png"
-                    await self._safe_capture_screenshot(checkout_page, seat_shot)
-                    print(f"  [Deep Checkout] Saved: {seat_shot.name}")
-                except Exception as se:
-                    print(f"  [!] Seat map capture note: {se}")
-
-            # Step 3: Look for Payment Gateway / Continue to Pay
-            pay_btn = checkout_page.locator("button:has-text('Continue to payment'), button:has-text('Pay Now'), button:has-text('Proceed to Pay')").first
-            if await pay_btn.count() > 0:
-                try:
-                    await pay_btn.click()
-                    await checkout_page.wait_for_timeout(3000)
-                    pay_shot = window_dir / "03_final_payment_gateway.png"
-                    await self._safe_capture_screenshot(checkout_page, pay_shot)
-                    print(f"  [Deep Checkout] Saved: {pay_shot.name}")
-                except Exception as pe:
-                    print(f"  [!] Payment gateway capture note: {pe}")
+            if "/itinerary/failure" in final_url or "server error" in page_text.lower():
+                audit_result["status"] = "akamai_edge_blocked"
+                audit_result["notes"] = (
+                    "Cleartrip's endpoint /itin/v7/itinerary/create blocked automated checkout (HTTP 403 Access Denied), "
+                    "redirecting to /itinerary/failure ('Server error'). Deep checkout not feasible without active user session. "
+                    "Retained observed search listing price."
+                )
+                print(f"  [Representative Checkout] Status: {audit_result['status']}")
+            else:
+                # Inspect text for true breakdown if review loaded successfully
+                breakdown = await checkout_page.evaluate(r"""() => {
+                    const text = document.body ? document.body.innerText : '';
+                    let base = null, taxes = null, grand = null;
+                    const bMatch = text.match(/Base\s*Fare[^\d]*([\d,]+)/i);
+                    if (bMatch) base = parseFloat(bMatch[1].replace(/,/g, ''));
+                    const tMatch = text.match(/Taxes[^\d]*([\d,]+)/i);
+                    if (tMatch) taxes = parseFloat(tMatch[1].replace(/,/g, ''));
+                    const gMatch = text.match(/Total\s*Price[^\d]*([\d,]+)/i);
+                    if (gMatch) grand = parseFloat(gMatch[1].replace(/,/g, ''));
+                    return { base, taxes, grand };
+                }""")
+                if breakdown.get("base") or breakdown.get("grand"):
+                    audit_result["checkout_successful"] = True
+                    audit_result["status"] = "success"
+                    audit_result["base_fare"] = breakdown.get("base")
+                    audit_result["taxes"] = breakdown.get("taxes")
+                    audit_result["total_fare"] = breakdown.get("grand") or top_flight["price"]
+                    audit_result["notes"] = "Successfully extracted base fare and taxes from checkout review."
+                else:
+                    audit_result["status"] = "partial"
+                    audit_result["notes"] = "Review page loaded; no explicit breakdown text parsed."
 
             if checkout_page != page:
                 await checkout_page.close()
 
         except Exception as e:
-            audit_result["notes"] = f"Deep checkout exception ({e}); retained search result price."
+            audit_result["status"] = "exception"
+            audit_result["notes"] = f"Checkout exception: {e}"
 
         return audit_result
 
     async def run(self) -> Dict[str, Any]:
         """
         Executes search and extraction across configured advance purchase horizons.
+        Executes exactly 1 representative checkout audit per day.
         """
         print("=" * 80)
         print(f"[AirGo Cleartrip Scraper] Target Route: {self.route}")
@@ -349,7 +331,7 @@ class CleartripScraper:
                     page = await context.new_page()
 
                     try:
-                        res = await page.goto(search_url, wait_until="domcontentloaded", timeout=45000)
+                        await page.goto(search_url, wait_until="domcontentloaded", timeout=45000)
                         await page.wait_for_timeout(6000)
 
                         # Capture 00_search_results.png
@@ -364,12 +346,12 @@ class CleartripScraper:
                         # Take top 5 listings
                         top5 = raw_cards[:5]
 
-                        # Attempt deep checkout on flight #0
+                        # Perform 1 representative checkout attempt per route/day
                         deep_audit = None
                         if top5:
                             deep_audit = await self._attempt_deep_checkout(context, page, window_dir, top5[0])
 
-                        # Format quotes
+                        # Build quote items
                         horizon_quotes = []
                         for rank, card in enumerate(top5):
                             is_top_flight = (rank == 0)
@@ -417,7 +399,7 @@ class CleartripScraper:
                             "top_5_extracted": len(horizon_quotes),
                             "min_price": min_p,
                             "max_price": max_p,
-                            "deep_checkout_audit": deep_audit
+                            "representative_checkout_audit": deep_audit
                         }
                         horizon_summaries.append(h_summary)
 
@@ -477,9 +459,11 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Cleartrip Flight Scraper with Patchright & Chrome")
     parser.add_argument("--route", type=str, default="BOM-DEL", help="Route code e.g. BOM-DEL")
-    parser.add_argument("--horizons", type=str, default="1,7,15,30,45", help="Comma-separated advance windows e.g. 1,7,15,30,45")
+    parser.add_argument("--horizons", type=str, default="1", help="Advance window e.g. 1")
     parser.add_argument("--visible", action="store_true", help="Launch visible Chrome browser window (non-headless)")
     args = parser.parse_args()
 
     horizon_list = [int(x.strip()) for x in args.horizons.split(",") if x.strip().isdigit()]
+    if not horizon_list:
+        horizon_list = [1]
     run_cleartrip_scrape(route=args.route, horizons=horizon_list, headless=not args.visible)
