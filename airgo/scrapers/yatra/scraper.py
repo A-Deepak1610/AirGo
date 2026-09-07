@@ -87,18 +87,13 @@ class YatraScraper:
             dest_iata=route.dest_iata,
             travel_date=window.travel_date,
         )
-        print(f"\n[Yatra] Starting scraper")
-        print(f"[Yatra] Mode: {'HEADED' if not self.config.headless else 'HEADLESS'}")
-        print(f"[Yatra] Route: {route.route_code}")
-        print(f"[Yatra] Horizon: {window.window_code}")
+        print(f"\n[Yatra] Route: {route.route_code}")
+        print(f"[Yatra] Window: {window.window_code}")
         print(f"[Yatra] Travel date: {window.iso_travel_date}\n")
-        print(f"[Yatra] Launching Chromium...")
-        print(f"[Yatra] Browser launched\n")
-        print(f"[Yatra] Opening Yatra...")
-        print(f"[Yatra] Entering origin: {route.origin_iata}")
-        print(f"[Yatra] Entering destination: {route.dest_iata}")
-        print(f"[Yatra] Selecting travel date: {window.iso_travel_date}")
-        print(f"[Yatra] Starting search...")
+        print(f"[Yatra] Searching Yatra...")
+        logger.info(
+            f"Executing Yatra search for {route.route_code} | {window.window_code} | {window.iso_travel_date}"
+        )
 
         search_context = {
             "route": route.route_code,
@@ -173,7 +168,7 @@ class YatraScraper:
         # Wait for dynamic flight list rendering
         try:
             await page.wait_for_selector("div.tuple, div.flight-seg, div.flightItem", timeout=20000)
-            print("[Yatra] Search page loaded")
+            print("[Yatra] Search results loaded.")
         except Exception:
             print("[Yatra][ERROR] Flight selector returned 0 elements.")
 
@@ -296,6 +291,7 @@ class YatraScraper:
             active_routes = list_routes(active_only=True)
 
         windows = generate_search_windows(horizons=horizons)
+        all_quote_records: List[Dict[str, Any]] = []
         all_raw_quotes: List[Dict[str, Any]] = []
         all_normalized_quotes: List[NormalizedFareQuote] = []
         challenge_events: List[AntiBotEvent] = []
@@ -304,6 +300,7 @@ class YatraScraper:
         total_flights_found = 0
         total_fare_options_found = 0
         total_fares_selected = 0
+        file_lock = asyncio.Lock()
 
         semaphore = asyncio.Semaphore(self.config.max_concurrency)
 
@@ -330,7 +327,7 @@ class YatraScraper:
                                 cur_norm = res["normalized_quotes"]
                                 all_raw_quotes.extend(cur_raw)
 
-                                # Group by flight number
+                                # 1. Group all available quotes by flight number
                                 flights_map: Dict[str, List[NormalizedFareQuote]] = {}
                                 for q in cur_norm:
                                     flights_map.setdefault(q.flight_number, []).append(q)
@@ -338,33 +335,49 @@ class YatraScraper:
                                 total_flights_found += len(flights_map)
                                 total_fare_options_found += len(cur_raw)
 
-                                print(f"\n[Yatra] Flights detected: {len(flights_map)}")
-                                for f_idx, (fn, f_quotes) in enumerate(flights_map.items()):
-                                    fq = f_quotes[0]
-                                    print(f"\n[Yatra] Flight {f_idx + 1}/{len(flights_map)}")
-                                    print(f"[Yatra] Airline: {fq.airline}")
-                                    print(f"[Yatra] Flight: {fn}")
-                                    print(f"[Yatra] Departure: {fq.departure_time}")
-                                    print(f"[Yatra] Arrival: {fq.arrival_time}")
-                                    print(f"[Yatra] Duration: {fq.duration}")
-                                    print(f"[Yatra] Stops: {'Non-stop' if fq.stops == 0 else f'{fq.stops} Stop'}")
-                                    print(f"[Yatra] Fare options detected: {len(f_quotes)}")
-                                    print(f"[Yatra] Selecting {min(5, len(f_quotes))} cheapest fare options")
+                                # 2. Get the single cheapest available fare for EACH flight
+                                flights_cheapest: Dict[str, NormalizedFareQuote] = {}
+                                for fn, f_quotes in flights_map.items():
+                                    cheapest_q = min(f_quotes, key=lambda x: x.displayed_price)
+                                    flights_cheapest[fn] = cheapest_q
 
-                                    f_quotes.sort(key=lambda x: x.displayed_price)
-                                    selected = f_quotes[:5]
-                                    for fare_i, f_cand in enumerate(selected):
-                                        print(f"[Yatra] Fare {fare_i + 1}: ₹{int(f_cand.displayed_price):,}")
+                                print(f"\n[Yatra] Flights found: {len(flights_cheapest)}\n")
+                                print("[Yatra] Extracting flight fares...\n")
+                                for fn, ch_q in flights_cheapest.items():
+                                    clean_fn = fn.replace("-", "")
+                                    print(f"[Yatra] {clean_fn} → cheapest fare ₹{int(ch_q.displayed_price)}")
 
-                                processed_for_window: List[NormalizedFareQuote] = []
+                                # 3. Sort flights by their cheapest available fare
+                                print(f"\n[Yatra] Sorting flights by cheapest fare...\n")
+                                sorted_flights = sorted(flights_cheapest.values(), key=lambda x: x.displayed_price)
 
-                                if checkout and cur_norm:
-                                    sorted_flights = sorted(flights_map.items(), key=lambda item: min(q.displayed_price for q in item[1]))
-                                    for fn, f_quotes in sorted_flights:
-                                        f_quotes.sort(key=lambda x: x.displayed_price)
-                                        candidates = f_quotes[:5]
-                                        total_fares_selected += len(candidates)
+                                # 4. Select TOP 5 CHEAPEST FLIGHTS per route and window
+                                top_5_flights = sorted_flights[:5]
+                                total_fares_selected += len(top_5_flights)
 
+                                print("[Yatra] TOP 5:")
+                                for rank_i, q in enumerate(top_5_flights, start=1):
+                                    clean_fn = q.flight_number.replace("-", "")
+                                    print(f"{rank_i}. {clean_fn} → ₹{int(q.displayed_price)}")
+                                print()
+
+                                from airgo.scrapers.yatra.checkout import YatraCheckoutVerifier
+                                verifier = YatraCheckoutVerifier(run_manager=self.run_manager)
+
+                                window_records: List[Dict[str, Any]] = []
+                                window_normalized: List[NormalizedFareQuote] = []
+
+                                for rank_i, cand_q in enumerate(top_5_flights, start=1):
+                                    clean_fn = self.run_manager._sanitize_filename(cand_q.flight_number)
+                                    screenshot_path = self.run_manager.get_top5_screenshot_path(
+                                        route_code=route.route_code,
+                                        window_code=window.window_code,
+                                        rank=rank_i,
+                                        flight_number=cand_q.flight_number,
+                                    )
+                                    rel_screenshot = f"{route.route_code}/{window.window_code}/{rank_i:02d}_{clean_fn}.png"
+
+                                    if checkout:
                                         page_closed = False
                                         try:
                                             v = page.is_closed()
@@ -375,33 +388,120 @@ class YatraScraper:
 
                                         if page_closed:
                                             print(f"[Yatra] Search results page is closed. Halting further checkout verification.")
-                                            break
+                                            verified_q = cand_q.model_copy()
+                                            verified_q.verification_status = DataStatus.VERIFICATION_FAILED
+                                            verified_q.error_reason = "Search page was closed before verification"
+                                        else:
+                                            print(f"[Yatra] Verifying flight {rank_i}/{len(top_5_flights)}...")
+                                            verified_q = await verifier.verify_fare(
+                                                page=page,
+                                                quote=cand_q,
+                                                window_code=window.window_code,
+                                                custom_screenshot_path=screenshot_path,
+                                            )
+                                            if (
+                                                verified_q.final_payable_price is not None
+                                                and verified_q.final_payable_price > Decimal("0")
+                                            ):
+                                                print("[Yatra] Reached Pay Now.")
+                                                print(f"[Yatra] Final price: ₹{int(verified_q.final_payable_price)}\n")
+                                            else:
+                                                print(f"[Yatra][ERROR] Flight {cand_q.flight_number} verification failed\n")
+                                    else:
+                                        verified_q = cand_q.model_copy()
+                                        try:
+                                            card = await verifier._find_flight_card(page, cand_q)
+                                            if card and await card.count() > 0 and await card.is_visible():
+                                                await card.screenshot(path=str(screenshot_path))
+                                            else:
+                                                await page.screenshot(path=str(screenshot_path), full_page=False)
+                                        except Exception:
+                                            try:
+                                                await page.screenshot(path=str(screenshot_path), full_page=False)
+                                            except Exception:
+                                                pass
 
+                                    search_price_val = int(round(float(verified_q.displayed_search_price or verified_q.displayed_price)))
+                                    final_price_val: Optional[int] = None
+                                    if checkout:
+                                        if (
+                                            verified_q.final_payable_price is not None
+                                            and verified_q.final_payable_price > Decimal("0")
+                                        ):
+                                            final_price_val = int(round(float(verified_q.final_payable_price)))
+                                        else:
+                                            final_price_val = None
+                                    else:
+                                        final_price_val = search_price_val
+
+                                    base_fare_val = (
+                                        int(round(float(verified_q.base_fare)))
+                                        if (verified_q.final_payable_price is not None and verified_q.base_fare > Decimal("0"))
+                                        else None
+                                    )
+                                    taxes_val = (
+                                        int(round(float(verified_q.taxes)))
+                                        if (verified_q.final_payable_price is not None and verified_q.taxes > Decimal("0"))
+                                        else None
+                                    )
+
+                                    rec = {
+                                        "rank": rank_i,
+                                        "platform": "Yatra",
+                                        "platform_type": "ota",
+                                        "route": route.route_code,
+                                        "origin": route.origin_iata,
+                                        "destination": route.dest_iata,
+                                        "travel_date": window.iso_travel_date,
+                                        "advance_purchase_days": window.advance_purchase_days,
+                                        "window": window.window_code,
+                                        "airline": verified_q.airline,
+                                        "flight_number": verified_q.flight_number,
+                                        "departure_time": verified_q.departure_time,
+                                        "arrival_time": verified_q.arrival_time,
+                                        "duration": verified_q.duration,
+                                        "stops": verified_q.stops,
+                                        "search_price": search_price_val,
+                                        "deep_checkout_base_fare": base_fare_val,
+                                        "deep_checkout_taxes": taxes_val,
+                                        "final_price": final_price_val,
+                                        "currency": "INR",
+                                        "fare_class": "Economy",
+                                        "scraped_at": verified_q.scraped_at.isoformat(),
+                                        "screenshot_evidence": rel_screenshot,
+                                    }
+                                    window_records.append(rec)
+                                    window_normalized.append(verified_q)
+
+                                    # If more flights remain in this search window, return to search page
+                                    if checkout and rank_i < len(top_5_flights):
                                         try:
                                             await page.bring_to_front()
-                                            await asyncio.sleep(1.0)
+                                            if "air-search-ui" not in page.url:
+                                                search_url = self.build_search_url(
+                                                    route.origin_iata, route.dest_iata, window.travel_date
+                                                )
+                                                await page.goto(
+                                                    search_url,
+                                                    wait_until="domcontentloaded",
+                                                    timeout=self.config.browser_timeout_ms,
+                                                )
+                                                await page.wait_for_selector("div.tuple", timeout=10000)
                                         except Exception:
                                             pass
 
-                                        # Verify candidates through checkout
-                                        verified = await self.verify_candidates(page, candidates, route, window)
+                                # Incremental write to quotes.json after each route + window
+                                async with file_lock:
+                                    all_quote_records.extend(window_records)
+                                    all_normalized_quotes.extend(window_normalized)
+                                    self.run_manager.save_quotes(all_quote_records)
+                                    self.run_manager.save_normalized_quotes(all_normalized_quotes)
+                                    if persist_db and window_normalized:
+                                        try:
+                                            persist_fare_quotes_to_db(window_normalized, run_started_at=start_time)
+                                        except Exception as db_err:
+                                            logger.warning(f"DB persistence warning: {db_err}")
 
-                                        # Re-sort using final_payable_price where available
-                                        verified.sort(
-                                            key=lambda x: (
-                                                x.final_payable_price if x.final_payable_price is not None else x.displayed_price
-                                            )
-                                        )
-                                        # Keep strictly the 5 cheapest per flight
-                                        processed_for_window.extend(verified[:5])
-                                else:
-                                    for fn, f_quotes in flights_map.items():
-                                        f_quotes.sort(key=lambda x: x.displayed_price)
-                                        selected = f_quotes[:5]
-                                        total_fares_selected += len(selected)
-                                        processed_for_window.extend(selected)
-
-                                all_normalized_quotes.extend(processed_for_window)
                                 break
                             else:
                                 retries += 1
@@ -427,17 +527,13 @@ class YatraScraper:
 
         await asyncio.gather(*tasks, return_exceptions=True)
 
-        # Save artifacts locally in /runs/yatra/<timestamp>/data/
-        raw_path = self.run_manager.save_raw_quotes(all_raw_quotes)
-        norm_path = self.run_manager.save_normalized_quotes(all_normalized_quotes)
+        # Final dataset serialization
+        if all_quote_records:
+            self.run_manager.save_quotes(all_quote_records)
+        self.run_manager.save_raw_quotes(all_raw_quotes)
+        self.run_manager.save_normalized_quotes(all_normalized_quotes)
 
-        # Persist to database if requested
-        db_inserted = 0
-        if persist_db and all_normalized_quotes:
-            db_inserted = persist_fare_quotes_to_db(
-                quotes=all_normalized_quotes,
-                run_started_at=start_time,
-            )
+        db_inserted = len(all_normalized_quotes) if persist_db else 0
 
         end_time = datetime.now(timezone.utc)
         duration_seconds = round((end_time - start_time).total_seconds(), 2)
@@ -470,26 +566,35 @@ class YatraScraper:
             overall_status = "PARTIAL"
 
         summary = {
-            "run_id": self.run_manager.run_id,
-            "started_at": start_time.isoformat(),
-            "completed_at": end_time.isoformat(),
             "source": "Yatra",
-            "routes_requested": [r.route_code for r in active_routes],
-            "advance_purchase_windows": [w.window_code for w in windows],
+            "run_id": self.run_manager.run_id,
+            "routes": [r.route_code for r in active_routes],
+            "windows": [w.window_code for w in windows],
             "total_searches": len(active_routes) * len(windows),
             "total_flights_found": total_flights_found,
+            "total_flights_processed": len(all_quote_records),
+            "total_top_5_selected": len(all_quote_records),
+            "total_verified": total_fares_verified,
+            "total_price_changes": total_price_changes,
+            "total_captcha_events": total_captcha_events,
+            "total_akamai_events": len(challenge_events),
+            "total_errors": len(failures) + total_failed_extractions,
+            "total_json_records": len(all_quote_records),
+            "overall_status": overall_status,
+            # Backward-compatibility keys for existing assertions and audit reporting
+            "routes_requested": [r.route_code for r in active_routes],
+            "advance_purchase_windows": [w.window_code for w in windows],
             "total_fare_options_found": total_fare_options_found,
             "total_fares_selected": total_fares_selected,
             "total_fares_verified": total_fares_verified,
-            "total_successful_extractions": total_successful_extractions,
+            "total_successful_extractions": total_fares_verified if checkout else len(all_quote_records),
             "total_failed_extractions": total_failed_extractions,
             "total_sold_out": total_sold_out,
-            "total_price_changes": total_price_changes,
             "total_antibot_events": len(challenge_events),
-            "total_captcha_events": total_captcha_events,
             "total_access_denied_events": total_access_denied_events,
             "screenshot_count": screenshot_count,
-            "overall_status": overall_status,
+            "started_at": start_time.isoformat(),
+            "completed_at": end_time.isoformat(),
             "duration_seconds": duration_seconds,
             "db_inserted_quotes": db_inserted,
             "artifacts_directory": str(self.run_manager.run_dir),
@@ -497,7 +602,7 @@ class YatraScraper:
 
         self.run_manager.save_scraping_summary(summary)
 
-        # Print final formatted summary matching section 18
+        # Print final formatted summary matching Section 18 / 19
         print("\n=======================================================")
         print("[AirGo] YATRA SCRAPING COMPLETED")
         print("=======================================================")
@@ -506,7 +611,7 @@ class YatraScraper:
         print(f"Horizon: {', '.join(w.window_code for w in windows)}")
         print(f"Travel Date: {', '.join(w.iso_travel_date for w in windows)}\n")
         print(f"Flights Found: {total_flights_found}")
-        print(f"Flights Processed: {len(all_normalized_quotes)}")
+        print(f"Flights Processed: {len(all_quote_records)}")
         print(f"Fare Options Found: {total_fare_options_found}")
         print(f"Cheapest Fares Selected: {total_fares_selected}")
         print(f"Fares Verified: {total_fares_verified}")
