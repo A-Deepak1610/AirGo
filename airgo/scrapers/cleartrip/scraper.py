@@ -31,7 +31,8 @@ class CleartripScraper:
         route: str = "BOM-DEL",
         horizons: List[int] = None,
         headless: bool = True,
-        runs_dir: Optional[str] = None
+        runs_dir: Optional[str] = None,
+        pause_at_end: int = 15
     ):
         self.route = route.upper()
         parts = self.route.split("-")
@@ -41,6 +42,7 @@ class CleartripScraper:
         self.dest = parts[1]
         self.horizons = horizons if horizons is not None else [1]
         self.headless = headless
+        self.pause_at_end = pause_at_end
 
         # Base runs directory
         workspace_dir = Path(__file__).resolve().parent.parent.parent.parent
@@ -60,21 +62,29 @@ class CleartripScraper:
             "--no-sandbox",
             "--disable-setuid-sandbox",
             "--disable-infobars",
-            "--window-position=0,0",
             "--ignore-certificate-errors",
             "--ignore-certificate-errors-spki-list",
             "--disable-web-security",
         ]
-        return await p.chromium.launch_persistent_context(
-            user_data_dir=profile_dir,
-            channel="chrome",
-            headless=self.headless,
-            args=args,
-            viewport={"width": 1440, "height": 900},
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
-            locale="en-IN",
-            timezone_id="Asia/Kolkata"
-        )
+        if not self.headless:
+            args.extend(["--start-maximized", "--no-first-run", "--no-default-browser-check"])
+
+        launch_kwargs = {
+            "user_data_dir": profile_dir,
+            "channel": "chrome",
+            "headless": self.headless,
+            "args": args,
+            "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            "locale": "en-IN",
+            "timezone_id": "Asia/Kolkata",
+        }
+        if self.headless:
+            launch_kwargs["viewport"] = {"width": 1440, "height": 900}
+        else:
+            launch_kwargs["no_viewport"] = True
+            launch_kwargs["slow_mo"] = 600
+
+        return await p.chromium.launch_persistent_context(**launch_kwargs)
 
     async def _safe_capture_screenshot(self, page: Page, path: Path):
         """Scrolls and captures high-resolution screenshot without exceeding Chromium limits."""
@@ -363,7 +373,9 @@ class CleartripScraper:
                     )
 
                     print(f"\n[Scraping] {self.route} | {horizon_label} (Travel Date: {dept_date_str})...")
-                    page = await context.new_page()
+                    page = context.pages[0] if context.pages else await context.new_page()
+                    if not self.headless:
+                        await page.bring_to_front()
 
                     search_payload: Dict[str, Any] = {}
 
@@ -379,7 +391,12 @@ class CleartripScraper:
 
                     try:
                         await page.goto(search_url, wait_until="domcontentloaded", timeout=45000)
-                        await page.wait_for_timeout(6000)
+                        print("  [Loading] Waiting for flight results to render on screen...")
+                        try:
+                            await page.wait_for_selector("button:has-text('Book')", timeout=25000)
+                        except Exception:
+                            pass
+                        await page.wait_for_timeout(3000)
 
                         # Capture 00_search_results.png
                         shot_00 = window_dir / "00_search_results.png"
@@ -494,7 +511,12 @@ class CleartripScraper:
                     except Exception as he:
                         print(f"  [!] Error scraping {self.route}_{horizon_label}: {he}")
                     finally:
-                        await page.close()
+                        if self.headless:
+                            await page.close()
+
+                if not self.headless:
+                    print(f"\n[Visual Observation Mode] Pausing for {self.pause_at_end} seconds so you can see the open browser window...")
+                    await asyncio.sleep(self.pause_at_end)
 
             finally:
                 await context.close()
@@ -535,9 +557,10 @@ class CleartripScraper:
 def run_cleartrip_scrape(
     route: str = "BOM-DEL",
     horizons: List[int] = None,
-    headless: bool = True
+    headless: bool = True,
+    pause_at_end: int = 15
 ) -> Dict[str, Any]:
-    scraper = CleartripScraper(route=route, horizons=horizons, headless=headless)
+    scraper = CleartripScraper(route=route, horizons=horizons, headless=headless, pause_at_end=pause_at_end)
     return asyncio.run(scraper.run())
 
 
@@ -547,9 +570,10 @@ if __name__ == "__main__":
     parser.add_argument("--route", type=str, default="BOM-DEL", help="Route code e.g. BOM-DEL")
     parser.add_argument("--horizons", type=str, default="1", help="Advance window e.g. 1")
     parser.add_argument("--visible", action="store_true", help="Launch visible Chrome browser window (non-headless)")
+    parser.add_argument("--pause", type=int, default=15, help="Seconds to pause browser on screen before closing (default: 15)")
     args = parser.parse_args()
 
     horizon_list = [int(x.strip()) for x in args.horizons.split(",") if x.strip().isdigit()]
     if not horizon_list:
         horizon_list = [1]
-    run_cleartrip_scrape(route=args.route, horizons=horizon_list, headless=not args.visible)
+    run_cleartrip_scrape(route=args.route, horizons=horizon_list, headless=not args.visible, pause_at_end=args.pause)
