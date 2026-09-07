@@ -157,7 +157,7 @@ class YatraSelectors:
     CHALLENGE_SIGNATURES: List[str] = [
         "Access Denied",
         "You don't have permission to access",
-        "Akamai",
+        "Akamai Bot Manager",
         "Cloudflare",
         "cf-turnstile",
         "recaptcha",

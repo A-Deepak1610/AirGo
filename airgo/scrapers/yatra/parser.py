@@ -42,7 +42,17 @@ class YatraParser:
         effective_date = travel_date or date.today()
         lower_html = html.lower() if html else ""
 
-        # First check specific challenge signatures in HTML
+        # Avoid false positives if page contains actual rendered content (flight tuples or checkout)
+        has_rendered_content = (
+            ("tuple" in lower_html and "book" in lower_html)
+            or "autom=\"booknow\"" in lower_html
+            or "paynowbtn" in lower_html
+            or "fare summary" in lower_html
+        )
+        if (status_code is None or status_code == 200) and has_rendered_content:
+            return None
+
+        # Check specific challenge signatures in HTML
         for sig in YatraSelectors.CHALLENGE_SIGNATURES:
             if sig.lower() in lower_html:
                 detected_type = AntiBotEventType.CAPTCHA if "captcha" in sig.lower() else (
