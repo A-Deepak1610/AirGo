@@ -49,13 +49,13 @@ class TestRouteConfiguration:
     """Tests configuration-driven routes and route validation."""
 
     def test_initial_routes_count_and_corridors(self):
-        """Verifies exactly 3 initial corridors exist: DEL-BOM, DEL-BLR, BOM-BLR."""
+        """Verifies exactly 3 initial corridors exist: BOM-DEL, BLR-DEL, BLR-BOM."""
         routes = list_routes()
         assert len(routes) == 3
         codes = [r.route_code for r in routes]
-        assert "DEL-BOM" in codes
-        assert "DEL-BLR" in codes
-        assert "BOM-BLR" in codes
+        assert "BOM-DEL" in codes
+        assert "BLR-DEL" in codes
+        assert "BLR-BOM" in codes
 
     def test_route_attributes_and_display_name(self):
         """Verifies route properties are structured with IATA codes and names."""

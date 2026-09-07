@@ -104,7 +104,7 @@ def main():
     parser.add_argument("--no-reload", action="store_true", help="Disable auto-reload in server mode")
 
     # Pipeline Configuration
-    parser.add_argument("--routes", type=str, default=None, help="Comma-separated corridors (e.g. DEL-BOM,DEL-BLR,BOM-BLR)")
+    parser.add_argument("--routes", type=str, default=None, help="Comma-separated corridors (e.g. BOM-DEL,BLR-DEL,BLR-BOM)")
     parser.add_argument("--top-n", type=int, default=3, help="Number of top DGCA routes to audit (default: 3)")
     parser.add_argument("--horizons", type=str, default="1,7,15,30,45", help="Advance-purchase windows in days (default: 1,7,15,30,45)")
     parser.add_argument("--checkout", action="store_true", help="Execute deep checkout fee and tax audit")

@@ -9,6 +9,7 @@ import asyncio
 from datetime import datetime, timezone
 from decimal import Decimal
 import logging
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 from playwright.async_api import Page, TimeoutError as PlaywrightTimeoutError
 
@@ -124,7 +125,8 @@ class YatraCheckoutVerifier:
             )
             if challenge:
                 print(f"[Yatra][SECURITY] {challenge.message}")
-                return await self._handle_challenge(page, quote, challenge, window_code)
+                custom_dir = custom_screenshot_path.parent if custom_screenshot_path else None
+                return await self._handle_challenge(page, quote, challenge, window_code, custom_dir=custom_dir)
 
             # Check if page is already at checkout / payment (e.g. direct test fixture or redirect)
             is_already_checkout = any(
@@ -215,7 +217,8 @@ class YatraCheckoutVerifier:
             )
             if challenge:
                 print(f"[Yatra][SECURITY] {challenge.message}")
-                return await self._handle_challenge(checkout_page, quote, challenge, window_code)
+                custom_dir = custom_screenshot_path.parent if custom_screenshot_path else None
+                return await self._handle_challenge(checkout_page, quote, challenge, window_code, custom_dir=custom_dir)
 
             # 8. Check for price change alert or sold out banner
             price_alert = YatraParser.detect_price_change_alert(checkout_html)
@@ -307,7 +310,6 @@ class YatraCheckoutVerifier:
                         if "total amount" in ln.lower() or "total payable" in ln.lower():
                             for nxt in lines[i+1:i+3]:
                                 try:
-                                    from airgo.scrapers.yatra.normalizer import normalize_price
                                     final_price = normalize_price(nxt)
                                     break
                                 except ValueError:
@@ -348,21 +350,41 @@ class YatraCheckoutVerifier:
                 else:
                     quote.verification_status = DataStatus.FARE_VERIFIED
             else:
-                # Page reached but could not parse price
                 quote.verification_status = DataStatus.VERIFICATION_FAILED
                 quote.error_reason = "Fare review page reached but total amount could not be parsed"
                 print(f"[Yatra][ERROR] Could not parse final payable price for {quote.flight_number}")
+                if custom_screenshot_path:
+                    fail_path = custom_screenshot_path.parent / "checkout_failed.png"
+                    try:
+                        active_p = checkout_page or page
+                        await active_p.screenshot(path=str(fail_path), full_page=False)
+                    except Exception:
+                        pass
 
         except PlaywrightTimeoutError as te:
             logger.warning(f"Timeout during checkout verification for {quote.flight_number}: {te}")
             quote.verification_status = DataStatus.VERIFICATION_FAILED
             quote.error_reason = f"Timeout during booking progression: {te}"
             print(f"[Yatra][ERROR] Flight {quote.flight_number} verification timed out")
+            if custom_screenshot_path:
+                fail_path = custom_screenshot_path.parent / "checkout_failed.png"
+                try:
+                    active_p = checkout_page or page
+                    await active_p.screenshot(path=str(fail_path), full_page=False)
+                except Exception:
+                    pass
         except Exception as e:
             logger.warning(f"Unexpected error during checkout verification for {quote.flight_number}: {e}")
             quote.verification_status = DataStatus.VERIFICATION_FAILED
             quote.error_reason = f"Unexpected checkout error: {e}"
             print(f"[Yatra][ERROR] Flight {quote.flight_number} verification failed: {e}")
+            if custom_screenshot_path:
+                fail_path = custom_screenshot_path.parent / "checkout_failed.png"
+                try:
+                    active_p = checkout_page or page
+                    await active_p.screenshot(path=str(fail_path), full_page=False)
+                except Exception:
+                    pass
         finally:
             if checkout_page and checkout_page is not page:
                 try:
@@ -418,11 +440,15 @@ class YatraCheckoutVerifier:
         quote: NormalizedFareQuote,
         challenge: AntiBotEvent,
         window_code: str,
+        custom_dir: Optional[Path] = None,
     ) -> NormalizedFareQuote:
         """Captures challenge screenshot and records challenge state without evasion."""
-        challenge_shot = self.run_manager.get_screenshot_path(
-            quote.route, window_code, "checkout_challenge"
-        )
+        if custom_dir is not None:
+            challenge_shot = custom_dir / "akamai_challenge.png"
+        else:
+            challenge_shot = self.run_manager.get_screenshot_path(
+                quote.route, window_code, "checkout_challenge"
+            )
         try:
             await page.screenshot(path=str(challenge_shot), full_page=False)
             challenge.screenshot_path = str(challenge_shot)

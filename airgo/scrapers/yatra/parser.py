@@ -255,67 +255,68 @@ class YatraParser:
                 raw_quotes.append(raw_record)
                 continue
 
-            # Sort fare options by price ascending and keep strictly the 5 cheapest per flight
-            fare_options.sort(key=lambda x: x[1])
-            selected_fares = fare_options[:5]
+            # Find the single cheapest available fare option for this flight
+            cheapest_opt = min(fare_options, key=lambda x: x[1])
+            opt_name, price_dec, raw_str = cheapest_opt
 
-            for opt_name, price_dec, raw_str in selected_fares:
-                raw_record = {
-                    "source": "Yatra",
-                    "route": route_code,
-                    "origin": origin_iata,
-                    "destination": dest_iata,
-                    "search_date": search_date.isoformat(),
-                    "travel_date": travel_date.isoformat(),
-                    "advance_purchase_days": advance_days,
-                    "airline": airline_name,
-                    "flight_number": flight_number,
-                    "departure_time": dep_time,
-                    "arrival_time": arr_time,
-                    "duration": duration,
-                    "stops": stops_count,
-                    "fare_class": "ECONOMY",
-                    "fare_option_name": opt_name,
-                    "displayed_price": float(price_dec),
-                    "raw_displayed_price": raw_str,
-                    "availability_status": avail_status.value,
-                    "scraped_at": datetime.now(timezone.utc).isoformat(),
-                    "source_url": source_url,
-                }
-                raw_quotes.append(raw_record)
+            clean_opt_name = opt_name.strip() if opt_name and opt_name.strip().lower() != "standard" else "Saver"
 
-                # Build normalized quote
-                norm_quote = NormalizedFareQuote(
-                    source="Yatra",
-                    route=route_code,
-                    origin=origin_iata,
-                    destination=dest_iata,
-                    search_date=search_date,
-                    travel_date=travel_date,
-                    advance_purchase_days=advance_days,
-                    airline=airline_name,
-                    flight_number=flight_number,
-                    departure_time=dep_time,
-                    arrival_time=arr_time,
-                    duration=duration,
-                    stops=stops_count,
-                    fare_class="ECONOMY",
-                    fare_option_name=opt_name,
-                    base_fare=price_dec,
-                    taxes=Decimal("0.00"),
-                    fees=Decimal("0.00"),
-                    convenience_fee=Decimal("0.00"),
-                    displayed_price=price_dec,
-                    displayed_search_price=price_dec,
-                    final_payable_price=None,
-                    currency="INR",
-                    availability_status=avail_status,
-                    verification_status=DataStatus.SEARCH_RESULT,
-                )
-                normalized_quotes.append(norm_quote)
+            raw_record = {
+                "source": "Yatra",
+                "route": route_code,
+                "origin": origin_iata,
+                "destination": dest_iata,
+                "search_date": search_date.isoformat(),
+                "travel_date": travel_date.isoformat(),
+                "advance_purchase_days": advance_days,
+                "airline": airline_name,
+                "flight_number": flight_number,
+                "departure_time": dep_time,
+                "arrival_time": arr_time,
+                "duration": duration,
+                "stops": stops_count,
+                "fare_class": "Economy",
+                "fare_option_name": clean_opt_name,
+                "displayed_price": float(price_dec),
+                "raw_displayed_price": raw_str,
+                "availability_status": avail_status.value,
+                "scraped_at": datetime.now(timezone.utc).isoformat(),
+                "source_url": source_url,
+            }
+            raw_quotes.append(raw_record)
+
+            # Build normalized quote for this flight's cheapest seat/fare
+            norm_quote = NormalizedFareQuote(
+                source="Yatra",
+                route=route_code,
+                origin=origin_iata,
+                destination=dest_iata,
+                search_date=search_date,
+                travel_date=travel_date,
+                advance_purchase_days=advance_days,
+                airline=airline_name,
+                flight_number=flight_number,
+                departure_time=dep_time,
+                arrival_time=arr_time,
+                duration=duration,
+                stops=stops_count,
+                fare_class="Economy",
+                fare_option_name=clean_opt_name,
+                base_fare=price_dec,
+                taxes=Decimal("0.00"),
+                fees=Decimal("0.00"),
+                convenience_fee=Decimal("0.00"),
+                displayed_price=price_dec,
+                displayed_search_price=price_dec,
+                final_payable_price=None,
+                currency="INR",
+                availability_status=avail_status,
+                verification_status=DataStatus.SEARCH_RESULT,
+            )
+            normalized_quotes.append(norm_quote)
 
         logger.info(
-            f"Parsed {len(cards)} flight cards for {route_code} (Generated {len(normalized_quotes)} quotes, selecting <= 5 fares/flight)"
+            f"Parsed {len(cards)} flight cards for {route_code} (Generated {len(normalized_quotes)} flight candidates with cheapest fare each)"
         )
         return raw_quotes, normalized_quotes
 

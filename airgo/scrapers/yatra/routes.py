@@ -42,8 +42,39 @@ class RouteDefinition(BaseModel):
         return f"{self.origin_name} ({self.origin_iata}) → {self.dest_name} ({self.dest_iata})"
 
 
-# Initial DGCA High-Density Corridors
+# Initial Target DGCA Corridors (BOM-DEL, BLR-DEL, BLR-BOM)
 INITIAL_ROUTES: List[RouteDefinition] = [
+    RouteDefinition(
+        route_code="BOM-DEL",
+        origin_iata="BOM",
+        dest_iata="DEL",
+        origin_name="Mumbai",
+        dest_name="New Delhi",
+        origin_airport="Chhatrapati Shivaji Maharaj International Airport",
+        dest_airport="Indira Gandhi International Airport",
+    ),
+    RouteDefinition(
+        route_code="BLR-DEL",
+        origin_iata="BLR",
+        dest_iata="DEL",
+        origin_name="Bengaluru",
+        dest_name="New Delhi",
+        origin_airport="Kempegowda International Airport",
+        dest_airport="Indira Gandhi International Airport",
+    ),
+    RouteDefinition(
+        route_code="BLR-BOM",
+        origin_iata="BLR",
+        dest_iata="BOM",
+        origin_name="Bengaluru",
+        dest_name="Mumbai",
+        origin_airport="Kempegowda International Airport",
+        dest_airport="Chhatrapati Shivaji Maharaj International Airport",
+    ),
+]
+
+# Additional bidirectional aliases for lookup compatibility
+_ADDITIONAL_ROUTES: List[RouteDefinition] = [
     RouteDefinition(
         route_code="DEL-BOM",
         origin_iata="DEL",
@@ -52,6 +83,7 @@ INITIAL_ROUTES: List[RouteDefinition] = [
         dest_name="Mumbai",
         origin_airport="Indira Gandhi International Airport",
         dest_airport="Chhatrapati Shivaji Maharaj International Airport",
+        is_active=False,
     ),
     RouteDefinition(
         route_code="DEL-BLR",
@@ -61,6 +93,7 @@ INITIAL_ROUTES: List[RouteDefinition] = [
         dest_name="Bengaluru",
         origin_airport="Indira Gandhi International Airport",
         dest_airport="Kempegowda International Airport",
+        is_active=False,
     ),
     RouteDefinition(
         route_code="BOM-BLR",
@@ -70,6 +103,7 @@ INITIAL_ROUTES: List[RouteDefinition] = [
         dest_name="Bengaluru",
         origin_airport="Chhatrapati Shivaji Maharaj International Airport",
         dest_airport="Kempegowda International Airport",
+        is_active=False,
     ),
 ]
 
@@ -81,6 +115,9 @@ class RouteRegistry:
         self._routes: Dict[str, RouteDefinition] = {}
         for r in (routes or INITIAL_ROUTES):
             self.register(r)
+        if routes is None:
+            for r in _ADDITIONAL_ROUTES:
+                self.register(r)
 
     def register(self, route: RouteDefinition) -> None:
         """Register a new or updated route corridor."""

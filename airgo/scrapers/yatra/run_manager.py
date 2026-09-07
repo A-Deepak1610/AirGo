@@ -19,7 +19,7 @@ logger = logging.getLogger("AirGo.Yatra.RunManager")
 
 
 class YatraRunManager:
-    """Manages creation, layout, and artifact saving for a single Yatra scraping execution."""
+    """Manages creation, layout, and artifact saving for Yatra scraping executions."""
 
     def __init__(
         self,
@@ -27,11 +27,12 @@ class YatraRunManager:
         run_timestamp: Optional[str] = None,
     ):
         base_dir = base_runs_dir or RUNS_DIR
-        ts = run_timestamp or datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
-        self.run_id = f"yatra_{ts}"
-        self.run_dir = base_dir / "yatra" / ts
+        raw_ts = run_timestamp or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        self.scrape_date = raw_ts.split("_")[0]
+        self.run_id = f"yatra_{raw_ts}"
+        self.run_dir = base_dir / "yatra" / raw_ts
 
-        # Subdirectories
+        # Subdirectories for backward-compatibility
         self.data_dir = self.run_dir / "data"
         self.screenshots_dir = self.run_dir / "screenshots"
         self.logs_dir = self.run_dir / "logs"
@@ -41,6 +42,7 @@ class YatraRunManager:
 
     def _initialize_directories(self) -> None:
         """Creates the run directory and required subdirectories."""
+        self.run_dir.mkdir(parents=True, exist_ok=True)
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.screenshots_dir.mkdir(parents=True, exist_ok=True)
         self.logs_dir.mkdir(parents=True, exist_ok=True)
@@ -51,6 +53,98 @@ class YatraRunManager:
         """Removes or replaces invalid characters for safe cross-platform filenames, preserving + in T+1."""
         cleaned = re.sub(r"[^\w\-_+.]", "_", name.strip())
         return cleaned
+
+    @staticmethod
+    def clean_flight_number(name: str) -> str:
+        """Strips non-alphanumeric characters (e.g. 'SG-164' -> 'SG164', '6E 1234' -> '6E1234')."""
+        if not name:
+            return "UNKNOWN"
+        clean = name.split("/")[0].strip()
+        clean = re.sub(r"[^\w]", "", clean).upper()
+        return clean or "UNKNOWN"
+
+    def get_route_dir(self, route_code: str) -> Path:
+        """Returns runs/yatra/<scrape-date>/<ROUTE>/."""
+        clean_route = self._sanitize_filename(route_code.strip().upper())
+        route_dir = self.run_dir / clean_route
+        route_dir.mkdir(parents=True, exist_ok=True)
+        return route_dir
+
+    def get_window_dir(self, route_code: str, window_code: str) -> Path:
+        """Returns runs/yatra/<scrape-date>/<ROUTE>/<WINDOW>/."""
+        clean_window = self._sanitize_filename(window_code.strip().upper())
+        window_dir = self.get_route_dir(route_code) / clean_window
+        window_dir.mkdir(parents=True, exist_ok=True)
+        return window_dir
+
+    def get_flight_dir(
+        self,
+        route_code: str,
+        window_code: str,
+        rank: int,
+        flight_number: str,
+    ) -> Path:
+        """Returns runs/yatra/<scrape-date>/<ROUTE>/<WINDOW>/<rank:02d>_<flight>/."""
+        window_dir = self.get_window_dir(route_code, window_code)
+        clean_fn = self.clean_flight_number(flight_number)
+        flight_dir = window_dir / f"{rank:02d}_{clean_fn}"
+        flight_dir.mkdir(parents=True, exist_ok=True)
+        return flight_dir
+
+    def get_flight_screenshot_path(
+        self,
+        route_code: str,
+        window_code: str,
+        rank: int,
+        flight_number: str,
+        filename: str,
+    ) -> Path:
+        """Returns path for a screenshot inside runs/yatra/<scrape-date>/<ROUTE>/<WINDOW>/<rank:02d>_<flight>/."""
+        flight_dir = self.get_flight_dir(route_code, window_code, rank, flight_number)
+        return flight_dir / filename
+
+    def save_window_quotes(
+        self,
+        route_code: str,
+        window_code: str,
+        quotes: List[Dict[str, Any]],
+    ) -> Path:
+        """
+        Saves quotes.json for a single route + window combination.
+        Must contain ONLY the selected flights (maximum 5).
+        Also prunes any excess flight directories in the window folder so maximum 5 flight directories exist.
+        """
+        window_dir = self.get_window_dir(route_code, window_code)
+        out_path = window_dir / "quotes.json"
+        limited_quotes = quotes[:5]
+
+        try:
+            temp_path = out_path.with_suffix(".tmp")
+            with open(temp_path, "w", encoding="utf-8") as f:
+                json.dump(limited_quotes, f, indent=2, default=str)
+                f.flush()
+                os.fsync(f.fileno())
+            temp_path.replace(out_path)
+
+            # Ensure at most 5 flight directories exist in window_dir
+            valid_dirs = {
+                f"{q.get('rank', i+1):02d}_{self.clean_flight_number(q.get('flight_number', ''))}"
+                for i, q in enumerate(limited_quotes)
+            }
+            for sub in window_dir.iterdir():
+                if sub.is_dir() and re.match(r"^\d{2}_", sub.name):
+                    if sub.name not in valid_dirs and len(valid_dirs) >= 5:
+                        import shutil
+                        shutil.rmtree(sub, ignore_errors=True)
+
+            print(f"[Yatra][JSON] Saved:\n{out_path}\n")
+            print(f"[Yatra] Records written: {len(limited_quotes)}\n")
+            logger.info(f"Saved window quotes to {out_path} ({len(limited_quotes)} records)")
+            return out_path
+        except Exception as e:
+            print(f"[Yatra][JSON][ERROR] Failed to write window quotes.json: {e}")
+            logger.error(f"Failed to write window quotes to {out_path}: {e}", exc_info=True)
+            raise
 
     def get_screenshot_path(
         self,
@@ -91,16 +185,14 @@ class YatraRunManager:
         flight_number: str,
     ) -> Path:
         """
-        Computes target path for a Top 5 flight screenshot matching section 12:
-        Example: runs/yatra/<ts>/screenshots/DEL-BOM/T+1/01_6E-6433.png
+        Computes target path for a Top 5 flight screenshot.
+        Supports both new flight directory structure and backward-compatible path.
         """
+        clean_fn = self._sanitize_filename(flight_number)
         route_dir = self.screenshots_dir / self._sanitize_filename(route_code)
         window_dir = route_dir / self._sanitize_filename(window_code)
         window_dir.mkdir(parents=True, exist_ok=True)
-
-        clean_fn = self._sanitize_filename(flight_number)
-        filename = f"{rank:02d}_{clean_fn}.png"
-        return window_dir / filename
+        return window_dir / f"{rank:02d}_{clean_fn}.png"
 
     def get_paynow_screenshot_path(
         self,
@@ -111,7 +203,6 @@ class YatraRunManager:
     ) -> Path:
         """
         Computes target path for a Pay Now / pre-payment verification screenshot.
-        Example: runs/yatra/<ts>/screenshots/DEL-BOM/T+1/DEL-BOM_T+1_6E-205_Saver_paynow.png
         """
         clean_flight = self._sanitize_filename(flight_number)
         clean_fare = self._sanitize_filename(fare_option_name or "fare_1")
@@ -120,9 +211,9 @@ class YatraRunManager:
 
     def count_screenshots(self) -> int:
         """Counts all screenshot images stored across the run directory."""
-        if not self.screenshots_dir.exists():
+        if not self.run_dir.exists():
             return 0
-        return len(list(self.screenshots_dir.glob("**/*.png")))
+        return len(list(self.run_dir.glob("**/*.png")))
 
     def save_quotes(self, quotes: List[Dict[str, Any]]) -> Path:
         """

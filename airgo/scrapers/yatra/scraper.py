@@ -88,10 +88,12 @@ class YatraScraper:
             dest_iata=route.dest_iata,
             travel_date=window.travel_date,
         )
-        print(f"\n[Yatra] Route: {route.route_code}")
+        print(f"\n[Yatra] ==========================================")
+        print(f"[Yatra] Route: {route.route_code}")
         print(f"[Yatra] Window: {window.window_code}")
-        print(f"[Yatra] Travel date: {window.iso_travel_date}\n")
-        print(f"[Yatra] Searching Yatra...")
+        print(f"[Yatra] Travel date: {window.iso_travel_date}")
+        print(f"[Yatra] ==========================================\n")
+        print("[Yatra] Searching Yatra...")
         logger.info(
             f"Executing Yatra search for {route.route_code} | {window.window_code} | {window.iso_travel_date}"
         )
@@ -169,7 +171,6 @@ class YatraScraper:
         # Wait for dynamic flight list rendering
         try:
             await page.wait_for_selector("div.tuple, div.flight-seg, div.flightItem", timeout=20000)
-            print("[Yatra] Search results loaded.")
         except Exception:
             print("[Yatra][ERROR] Flight selector returned 0 elements.")
 
@@ -177,8 +178,6 @@ class YatraScraper:
         prev_count = 0
         for _ in range(8):
             curr_count = await page.locator("div.tuple").count()
-            if curr_count > 0:
-                print(f"[Yatra] Flights currently loaded: {curr_count}")
             if curr_count > prev_count:
                 prev_count = curr_count
                 await page.evaluate("window.scrollBy(0, 1200)")
@@ -187,6 +186,11 @@ class YatraScraper:
                 break
         await page.evaluate("window.scrollTo(0, 0)")
         await asyncio.sleep(0.8)
+
+        total_loaded = await page.locator("div.tuple").count()
+        if total_loaded == 0:
+            total_loaded = await page.locator("div.flight-seg, div.flightItem").count()
+        print(f"[Yatra] All flights loaded: {total_loaded}\n")
 
         # Capture search results screenshot proof
         results_shot = self.run_manager.get_screenshot_path(
@@ -206,8 +210,6 @@ class YatraScraper:
 
         if not raw_quotes:
             print(f"[Yatra][ERROR] Search results loaded but no flight cards matched for {route.route_code}.")
-        else:
-            print(f"[Yatra] Search results loaded")
 
         if not self.config.headless and self.config.observation_delay > 0:
             await asyncio.sleep(self.config.observation_delay)
@@ -328,38 +330,31 @@ class YatraScraper:
                                 cur_norm = res["normalized_quotes"]
                                 all_raw_quotes.extend(cur_raw)
 
-                                # 1. Group all available quotes by flight number
-                                flights_map: Dict[str, List[NormalizedFareQuote]] = {}
+                                # 1. Process candidate flights: cur_norm has 1 quote per flight (its cheapest fare)
+                                # Deduplicate by flight_number just in case
+                                flights_map: Dict[str, NormalizedFareQuote] = {}
                                 for q in cur_norm:
-                                    flights_map.setdefault(q.flight_number, []).append(q)
+                                    if q.flight_number not in flights_map or q.displayed_price < flights_map[q.flight_number].displayed_price:
+                                        flights_map[q.flight_number] = q
 
                                 total_flights_found += len(flights_map)
                                 total_fare_options_found += len(cur_raw)
 
-                                # 2. Get the single cheapest available fare for EACH flight
-                                flights_cheapest: Dict[str, NormalizedFareQuote] = {}
-                                for fn, f_quotes in flights_map.items():
-                                    cheapest_q = min(f_quotes, key=lambda x: x.displayed_price)
-                                    flights_cheapest[fn] = cheapest_q
+                                print("[Yatra] Finding cheapest fare for every flight...\n")
+                                for fn, ch_q in flights_map.items():
+                                    print(f"[Yatra] {fn} → cheapest seat ₹{int(ch_q.displayed_price):,}")
 
-                                print(f"\n[Yatra] Flights found: {len(flights_cheapest)}\n")
-                                print("[Yatra] Extracting flight fares...\n")
-                                for fn, ch_q in flights_cheapest.items():
-                                    clean_fn = fn.replace("-", "")
-                                    print(f"[Yatra] {clean_fn} → cheapest fare ₹{int(ch_q.displayed_price)}")
+                                # 2. Sort all flights by their cheapest available fare across the entire window
+                                print(f"\n[Yatra] Ranking all flights by cheapest seat...\n")
+                                sorted_flights = sorted(flights_map.values(), key=lambda x: x.displayed_price)
 
-                                # 3. Sort flights by their cheapest available fare
-                                print(f"\n[Yatra] Sorting flights by cheapest fare...\n")
-                                sorted_flights = sorted(flights_cheapest.values(), key=lambda x: x.displayed_price)
-
-                                # 4. Select TOP 5 CHEAPEST FLIGHTS per route and window
+                                # 3. Select strictly the TOP 5 CHEAPEST FLIGHTS per route and window
                                 top_5_flights = sorted_flights[:5]
                                 total_fares_selected += len(top_5_flights)
 
-                                print("[Yatra] TOP 5:")
+                                print("[Yatra] TOP 5 FLIGHTS:\n")
                                 for rank_i, q in enumerate(top_5_flights, start=1):
-                                    clean_fn = q.flight_number.replace("-", "")
-                                    print(f"{rank_i}. {clean_fn} → ₹{int(q.displayed_price)}")
+                                    print(f"{rank_i}. {q.flight_number} → ₹{int(q.displayed_price):,}")
                                 print()
 
                                 from airgo.scrapers.yatra.checkout import YatraCheckoutVerifier
@@ -369,14 +364,41 @@ class YatraScraper:
                                 window_normalized: List[NormalizedFareQuote] = []
 
                                 for rank_i, cand_q in enumerate(top_5_flights, start=1):
-                                    clean_fn = self.run_manager._sanitize_filename(cand_q.flight_number)
-                                    screenshot_path = self.run_manager.get_top5_screenshot_path(
+                                    flight_dir = self.run_manager.get_flight_dir(
                                         route_code=route.route_code,
                                         window_code=window.window_code,
                                         rank=rank_i,
                                         flight_number=cand_q.flight_number,
                                     )
-                                    rel_screenshot = f"{route.route_code}/{window.window_code}/{rank_i:02d}_{clean_fn}.png"
+                                    flight_dir_name = flight_dir.name
+                                    search_results_path = flight_dir / "search_results.png"
+                                    paynow_path = flight_dir / "paynow.png"
+                                    checkout_failed_path = flight_dir / "checkout_failed.png"
+                                    akamai_challenge_path = flight_dir / "akamai_challenge.png"
+
+                                    # Capture search_results.png of the actual flight card
+                                    try:
+                                        card = await verifier._find_flight_card(page, cand_q)
+                                        if card and await card.count() > 0 and await card.is_visible():
+                                            await card.scroll_into_view_if_needed()
+                                            await asyncio.sleep(0.3)
+                                            await card.screenshot(path=str(search_results_path))
+                                        else:
+                                            await page.screenshot(path=str(search_results_path), full_page=False)
+                                    except Exception:
+                                        try:
+                                            await page.screenshot(path=str(search_results_path), full_page=False)
+                                        except Exception:
+                                            pass
+
+                                    screenshot_evidence: Dict[str, str] = {}
+                                    if search_results_path.exists():
+                                        screenshot_evidence["search_results"] = f"{flight_dir_name}/search_results.png"
+
+                                    search_price_val = int(round(float(cand_q.displayed_search_price or cand_q.displayed_price)))
+                                    final_price_val: Optional[int] = None
+                                    base_fare_val: Optional[int] = None
+                                    taxes_val: Optional[int] = None
 
                                     if checkout:
                                         page_closed = False
@@ -392,72 +414,56 @@ class YatraScraper:
                                             verified_q = cand_q.model_copy()
                                             verified_q.verification_status = DataStatus.VERIFICATION_FAILED
                                             verified_q.error_reason = "Search page was closed before verification"
+                                            final_price_val = None
+                                            if not checkout_failed_path.exists():
+                                                try:
+                                                    await page.screenshot(path=str(checkout_failed_path), full_page=False)
+                                                except Exception:
+                                                    pass
+                                            if checkout_failed_path.exists():
+                                                screenshot_evidence["checkout_failed"] = f"{flight_dir_name}/checkout_failed.png"
                                         else:
-                                            print(f"[Yatra] Verifying flight {rank_i}/{len(top_5_flights)}...")
+                                            print(f"[Yatra] Starting checkout verification {rank_i}/{len(top_5_flights)}...")
                                             verified_q = await verifier.verify_fare(
                                                 page=page,
                                                 quote=cand_q,
                                                 window_code=window.window_code,
-                                                custom_screenshot_path=screenshot_path,
+                                                custom_screenshot_path=paynow_path,
                                             )
                                             if (
                                                 verified_q.final_payable_price is not None
                                                 and verified_q.final_payable_price > Decimal("0")
                                             ):
-                                                print("[Yatra] Reached Pay Now.")
-                                                print(f"[Yatra] Final price: ₹{int(verified_q.final_payable_price)}\n")
+                                                print(f"[Yatra] {cand_q.flight_number} → Pay Now reached")
+                                                print(f"[Yatra] Final price: ₹{int(verified_q.final_payable_price):,}\n")
+                                                final_price_val = int(round(float(verified_q.final_payable_price)))
+                                                base_fare_val = (
+                                                    int(round(float(verified_q.base_fare)))
+                                                    if verified_q.base_fare > Decimal("0")
+                                                    else None
+                                                )
+                                                taxes_val = (
+                                                    int(round(float(verified_q.taxes)))
+                                                    if verified_q.taxes > Decimal("0")
+                                                    else None
+                                                )
+                                                if paynow_path.exists():
+                                                    screenshot_evidence["paynow"] = f"{flight_dir_name}/paynow.png"
+                                            elif verified_q.verification_status in (DataStatus.CAPTCHA_BLOCKED, DataStatus.ACCESS_DENIED):
+                                                print(f"[Yatra][SECURITY] Challenge during checkout for {cand_q.flight_number}\n")
+                                                final_price_val = None
+                                                if akamai_challenge_path.exists():
+                                                    screenshot_evidence["akamai_challenge"] = f"{flight_dir_name}/akamai_challenge.png"
                                             else:
-                                                print(f"[Yatra][ERROR] Flight {cand_q.flight_number} verification failed\n")
-                                                # Capture card screenshot as fallback proof so an actual file exists
-                                                if not screenshot_path.exists():
-                                                    try:
-                                                        card = await verifier._find_flight_card(page, cand_q)
-                                                        if card and await card.count() > 0 and await card.is_visible():
-                                                            await card.screenshot(path=str(screenshot_path))
-                                                        else:
-                                                            await page.screenshot(path=str(screenshot_path), full_page=False)
-                                                    except Exception:
-                                                        pass
+                                                print(f"[Yatra][ERROR] Flight {cand_q.flight_number} checkout failed\n")
+                                                final_price_val = None
+                                                if checkout_failed_path.exists():
+                                                    screenshot_evidence["checkout_failed"] = f"{flight_dir_name}/checkout_failed.png"
                                     else:
                                         verified_q = cand_q.model_copy()
-                                        try:
-                                            card = await verifier._find_flight_card(page, cand_q)
-                                            if card and await card.count() > 0 and await card.is_visible():
-                                                await card.screenshot(path=str(screenshot_path))
-                                            else:
-                                                await page.screenshot(path=str(screenshot_path), full_page=False)
-                                        except Exception:
-                                            try:
-                                                await page.screenshot(path=str(screenshot_path), full_page=False)
-                                            except Exception:
-                                                pass
-
-                                    if not screenshot_path.exists():
-                                        rel_screenshot = None
-
-                                    search_price_val = int(round(float(verified_q.displayed_search_price or verified_q.displayed_price)))
-                                    final_price_val: Optional[int] = None
-                                    if checkout:
-                                        if (
-                                            verified_q.final_payable_price is not None
-                                            and verified_q.final_payable_price > Decimal("0")
-                                        ):
-                                            final_price_val = int(round(float(verified_q.final_payable_price)))
-                                        else:
-                                            final_price_val = None
-                                    else:
                                         final_price_val = search_price_val
-
-                                    base_fare_val = (
-                                        int(round(float(verified_q.base_fare)))
-                                        if (verified_q.final_payable_price is not None and verified_q.base_fare > Decimal("0"))
-                                        else None
-                                    )
-                                    taxes_val = (
-                                        int(round(float(verified_q.taxes)))
-                                        if (verified_q.final_payable_price is not None and verified_q.taxes > Decimal("0"))
-                                        else None
-                                    )
+                                        base_fare_val = None
+                                        taxes_val = None
 
                                     rec = {
                                         "rank": rank_i,
@@ -475,14 +481,15 @@ class YatraScraper:
                                         "arrival_time": verified_q.arrival_time,
                                         "duration": verified_q.duration,
                                         "stops": verified_q.stops,
+                                        "fare_class": "Economy",
+                                        "fare_option_name": verified_q.fare_option_name or "Saver",
                                         "search_price": search_price_val,
                                         "deep_checkout_base_fare": base_fare_val,
                                         "deep_checkout_taxes": taxes_val,
                                         "final_price": final_price_val,
                                         "currency": "INR",
-                                        "fare_class": "Economy",
                                         "scraped_at": verified_q.scraped_at.isoformat(),
-                                        "screenshot_evidence": rel_screenshot,
+                                        "screenshot_evidence": screenshot_evidence,
                                     }
                                     window_records.append(rec)
                                     window_normalized.append(verified_q)
@@ -504,7 +511,10 @@ class YatraScraper:
                                         except Exception:
                                             pass
 
-                                # Incremental write to quotes.json after each route + window
+                                # Save quotes.json for this route + window (max 5 records)
+                                self.run_manager.save_window_quotes(route.route_code, window.window_code, window_records)
+
+                                # Incremental write to summary datasets
                                 async with file_lock:
                                     all_quote_records.extend(window_records)
                                     all_normalized_quotes.extend(window_normalized)

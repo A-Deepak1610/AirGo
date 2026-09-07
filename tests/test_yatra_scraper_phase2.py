@@ -142,45 +142,36 @@ class TestYatraParsingAndFareFiltering:
         }
 
     def test_parse_flight_cards_extracts_all_flights(self, search_context):
-        """Verifies that all 5 flight cards are extracted from the HTML."""
+        """Verifies that all available flight cards produce 1 candidate quote each with its cheapest fare."""
         raw_quotes, normalized_quotes = YatraParser.parse_flight_cards(
             MOCK_YATRA_SEARCH_PAGE_HTML, search_context
         )
-        # Total quotes: 5 (6E) + 3 (AI) + 1 (QP) = 9 normalized quotes (sold-out and missing-price recorded in raw)
-        assert len(normalized_quotes) == 9
-        assert len(raw_quotes) == 11  # 5 + 3 + 1 (soldout) + 1 (single) + 1 (missing price)
+        # 3 available flights (6E, AI, QP) produce 1 cheapest quote each; SG is sold out, UK is missing price
+        assert len(normalized_quotes) == 3
+        assert len(raw_quotes) == 5
 
-    def test_selects_strictly_5_cheapest_fares_per_flight(self, search_context):
+    def test_selects_strictly_cheapest_fare_per_flight(self, search_context):
         """
         Flight 1 (6E-205) has 6 options: ₹4500, ₹4800, ₹5000, ₹5300, ₹5700, ₹6000.
-        Must strictly select only the 5 cheapest (4500, 4800, 5000, 5300, 5700) and drop 6000.
+        Must strictly select only the single cheapest fare (₹4500, Saver).
         """
         _, normalized_quotes = YatraParser.parse_flight_cards(
             MOCK_YATRA_SEARCH_PAGE_HTML, search_context
         )
         indigo_quotes = [q for q in normalized_quotes if q.flight_number == "6E-205"]
-        assert len(indigo_quotes) == 5
+        assert len(indigo_quotes) == 1
+        assert indigo_quotes[0].displayed_price == Decimal("4500.00")
+        assert indigo_quotes[0].fare_option_name == "Saver"
 
-        prices = [q.displayed_price for q in indigo_quotes]
-        assert prices == [
-            Decimal("4500.00"),
-            Decimal("4800.00"),
-            Decimal("5000.00"),
-            Decimal("5300.00"),
-            Decimal("5700.00"),
-        ]
-        # Excludes 6000.00
-        assert Decimal("6000.00") not in prices
-
-    def test_preserves_all_fares_if_less_than_5(self, search_context):
-        """Flight 2 (AI-805) has 3 options (< 5). All 3 must be preserved."""
+    def test_cheapest_fare_for_multi_fare_flight(self, search_context):
+        """Flight 2 (AI-805) has 3 options (6200, 7100, 8500). Cheapest (6200, Comfort) must be selected."""
         _, normalized_quotes = YatraParser.parse_flight_cards(
             MOCK_YATRA_SEARCH_PAGE_HTML, search_context
         )
         ai_quotes = [q for q in normalized_quotes if q.flight_number == "AI-805"]
-        assert len(ai_quotes) == 3
-        prices = [q.displayed_price for q in ai_quotes]
-        assert prices == [Decimal("6200.00"), Decimal("7100.00"), Decimal("8500.00")]
+        assert len(ai_quotes) == 1
+        assert ai_quotes[0].displayed_price == Decimal("6200.00")
+        assert ai_quotes[0].fare_option_name == "Comfort"
 
     def test_sold_out_flight_handling(self, search_context):
         """Flight 3 (SG-123) is sold out; verifies it is recorded with SOLD_OUT status in raw quotes."""
