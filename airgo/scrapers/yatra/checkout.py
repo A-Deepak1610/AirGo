@@ -66,7 +66,8 @@ class YatraCheckoutVerifier:
         self,
         page: Page,
         quote: NormalizedFareQuote,
-        window_code: str,
+        window_code: str = "T+1",
+        custom_screenshot_path: Optional[Path] = None,
     ) -> NormalizedFareQuote:
         """
         Executes booking navigation for a candidate fare quote:
@@ -100,12 +101,15 @@ class YatraCheckoutVerifier:
             f"{quote.fare_option_name or 'Standard'} (Displayed: ₹{quote.displayed_price})"
         )
 
-        paynow_shot_path = self.run_manager.get_paynow_screenshot_path(
-            route_code=quote.route,
-            window_code=window_code,
-            flight_number=quote.flight_number,
-            fare_option_name=quote.fare_option_name or "standard",
-        )
+        if custom_screenshot_path is not None:
+            paynow_shot_path = custom_screenshot_path
+        else:
+            paynow_shot_path = self.run_manager.get_paynow_screenshot_path(
+                route_code=quote.route,
+                window_code=window_code,
+                flight_number=quote.flight_number,
+                fare_option_name=quote.fare_option_name or "standard",
+            )
 
         checkout_page: Optional[Page] = None
         try:
