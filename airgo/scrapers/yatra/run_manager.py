@@ -48,8 +48,8 @@ class YatraRunManager:
 
     @staticmethod
     def _sanitize_filename(name: str) -> str:
-        """Removes or replaces invalid characters for safe cross-platform filenames."""
-        cleaned = re.sub(r"[^\w\-_.]", "_", name.strip())
+        """Removes or replaces invalid characters for safe cross-platform filenames, preserving + in T+1."""
+        cleaned = re.sub(r"[^\w\-_+.]", "_", name.strip())
         return cleaned
 
     def get_screenshot_path(
@@ -83,6 +83,25 @@ class YatraRunManager:
 
         return window_dir / filename
 
+    def get_top5_screenshot_path(
+        self,
+        route_code: str,
+        window_code: str,
+        rank: int,
+        flight_number: str,
+    ) -> Path:
+        """
+        Computes target path for a Top 5 flight screenshot matching section 12:
+        Example: runs/yatra/<ts>/screenshots/DEL-BOM/T+1/01_6E-6433.png
+        """
+        route_dir = self.screenshots_dir / self._sanitize_filename(route_code)
+        window_dir = route_dir / self._sanitize_filename(window_code)
+        window_dir.mkdir(parents=True, exist_ok=True)
+
+        clean_fn = self._sanitize_filename(flight_number)
+        filename = f"{rank:02d}_{clean_fn}.png"
+        return window_dir / filename
+
     def get_paynow_screenshot_path(
         self,
         route_code: str,
@@ -104,6 +123,48 @@ class YatraRunManager:
         if not self.screenshots_dir.exists():
             return 0
         return len(list(self.screenshots_dir.glob("**/*.png")))
+
+    def save_quotes(self, quotes: List[Dict[str, Any]]) -> Path:
+        """
+        Persists the primary airfare quotes array to runs/yatra/<run_id>/data/quotes.json.
+        Ensures reliable serialization, disk flushing, existence validation, and re-read verification.
+        Logs status explicitly matching Section 9.
+        """
+        out_path = self.data_dir / "quotes.json"
+        print(f"[Yatra][JSON] Writing quotes...")
+        print(f"[Yatra][JSON] Records: {len(quotes)}")
+        print(f"[Yatra][JSON] Path:\n{out_path}")
+
+        try:
+            temp_path = out_path.with_suffix(".tmp")
+            with open(temp_path, "w", encoding="utf-8") as f:
+                json.dump(quotes, f, indent=2, default=str)
+                f.flush()
+                os.fsync(f.fileno())
+
+            # Atomic rename to prevent partial writes
+            temp_path.replace(out_path)
+
+            # Verify file exists on disk
+            if not out_path.exists():
+                raise FileNotFoundError(f"quotes.json was not created at {out_path}")
+
+            # Verify readability and record count
+            with open(out_path, "r", encoding="utf-8") as rf:
+                verified_data = json.load(rf)
+
+            if len(verified_data) != len(quotes):
+                raise ValueError(
+                    f"Integrity check failed: wrote {len(quotes)} quotes, verified {len(verified_data)}"
+                )
+
+            print(f"[Yatra][JSON] Successfully persisted {len(quotes)} records.\n")
+            logger.info(f"Successfully saved and verified {len(quotes)} quotes in {out_path}")
+            return out_path
+        except Exception as e:
+            print(f"[Yatra][JSON][ERROR] Failed to write quotes.json: {e}")
+            logger.error(f"Failed to write quotes.json to {out_path}: {e}", exc_info=True)
+            raise
 
     def save_raw_quotes(self, raw_quotes: List[Dict[str, Any]]) -> Path:
         """Saves raw scraped airfare observations to data/raw_quotes.json."""
