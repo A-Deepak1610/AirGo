@@ -10,6 +10,7 @@ Usage:
 import os
 import sys
 import argparse
+from typing import Optional
 import uvicorn
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -29,9 +30,35 @@ def start_server(host: str = "127.0.0.1", port: int = 8000, reload: bool = True)
     uvicorn.run("airgo.api.app:app", host=host, port=port, reload=reload)
 
 
-def run_pipeline(top_n: int = 5, horizons: str = "1,7,15,30,45", checkout: bool = False):
-    """Executes the automated end-to-end harvest, clean, and indexing pipeline."""
-    print("[AirGo] Pipeline execution trigger.")
+def run_pipeline(routes: Optional[str] = None, top_n: int = 3, horizons: str = "1,7,15,30,45", headless: Optional[bool] = None):
+    """Executes the automated end-to-end harvest across Yatra corridors."""
+    import asyncio
+    from airgo.scrapers.yatra import run_yatra_harvest, list_routes
+
+    print("\n=======================================================")
+    print("[AirGo] Launching Yatra Airfare Scraper Pipeline...")
+    print("=======================================================\n")
+
+    horizons_list = [int(h.strip()) for h in horizons.split(",") if h.strip().isdigit()]
+    route_codes = None
+    if routes:
+        route_codes = [r.strip().upper() for r in routes.split(",") if r.strip()]
+    else:
+        all_routes = list_routes(active_only=True)
+        route_codes = [r.route_code for r in all_routes[:top_n]]
+
+    summary = asyncio.run(
+        run_yatra_harvest(
+            routes=route_codes,
+            horizons=horizons_list,
+            headless=headless,
+        )
+    )
+    print("\n=======================================================")
+    print(f"[AirGo] Yatra Harvest Completed: {summary['total_normalized_quotes']} quotes captured.")
+    print(f"        Artifacts saved to: {summary['artifacts_directory']}")
+    print(f"        Database records persisted: {summary['db_inserted_quotes']}")
+    print("=======================================================\n")
 
 
 def main():
@@ -52,15 +79,22 @@ def main():
     parser.add_argument("--no-reload", action="store_true", help="Disable auto-reload in server mode")
 
     # Pipeline Configuration
-    parser.add_argument("--top-n", type=int, default=5, help="Number of top DGCA routes to audit (default: 5)")
+    parser.add_argument("--routes", type=str, default=None, help="Comma-separated corridors (e.g. DEL-BOM,DEL-BLR,BOM-BLR)")
+    parser.add_argument("--top-n", type=int, default=3, help="Number of top DGCA routes to audit (default: 3)")
     parser.add_argument("--horizons", type=str, default="1,7,15,30,45", help="Advance-purchase windows in days (default: 1,7,15,30,45)")
     parser.add_argument("--checkout", action="store_true", help="Execute deep checkout fee and tax audit")
     parser.add_argument("--headless", action="store_true", help="Run browser scrapers in headless mode (no GUI windows)")
+    parser.add_argument("--headful", "--visible", dest="headful", action="store_true", help="Run browser in visible GUI window for debugging")
 
     args = parser.parse_args()
 
+    headless_mode = None
     if args.headless:
         os.environ["HEADLESS"] = "true"
+        headless_mode = True
+    elif args.headful:
+        os.environ["HEADLESS"] = "false"
+        headless_mode = False
 
     # If no flags provided, show help
     if not (args.serve or args.scrape or args.clean or args.compute_index):
@@ -72,7 +106,12 @@ def main():
 
     # Trigger Scraping / Pipeline
     if args.scrape or args.clean or args.compute_index:
-        run_pipeline(top_n=args.top_n, horizons=args.horizons, checkout=args.checkout)
+        run_pipeline(
+            routes=args.routes,
+            top_n=args.top_n,
+            horizons=args.horizons,
+            headless=headless_mode,
+        )
 
     # Start Server
     if args.serve:

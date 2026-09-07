@@ -1,0 +1,276 @@
+"""
+HTML and DOM parsing engine for Yatra search results.
+Extracts flight items, processes multiple fare options, selects the 5 cheapest
+options per flight, detects sold-out flights, and checks for anti-bot barriers.
+"""
+
+from datetime import date, datetime, timezone
+from decimal import Decimal
+import logging
+import re
+from typing import Any, Dict, List, Optional, Tuple
+from bs4 import BeautifulSoup, Tag
+
+from airgo.scrapers.yatra.models import (
+    AntiBotEvent,
+    AntiBotEventType,
+    AvailabilityStatus,
+    DataStatus,
+    NormalizedFareQuote,
+)
+from airgo.scrapers.yatra.normalizer import normalize_price
+from airgo.scrapers.yatra.selectors import YatraSelectors
+
+logger = logging.getLogger("AirGo.Yatra.Parser")
+
+
+class YatraParser:
+    """Parses raw HTML from Yatra flight searches into structured quotes."""
+
+    @staticmethod
+    def detect_anti_bot(
+        html: str,
+        status_code: Optional[int] = None,
+        url: str = "",
+        route: str = "",
+        travel_date: Optional[date] = None,
+    ) -> Optional[AntiBotEvent]:
+        """
+        Inspects status codes and HTML content for anti-bot or security challenge markers.
+        Never attempts to bypass; records the event for backoff.
+        """
+        effective_date = travel_date or date.today()
+        lower_html = html.lower() if html else ""
+
+        # First check specific challenge signatures in HTML
+        for sig in YatraSelectors.CHALLENGE_SIGNATURES:
+            if sig.lower() in lower_html:
+                detected_type = AntiBotEventType.CAPTCHA if "captcha" in sig.lower() else (
+                    AntiBotEventType.AKAMAI_CHALLENGE if ("akamai" in sig.lower() or "access denied" in sig.lower()) else AntiBotEventType.OTHER
+                )
+                code_str = f" (HTTP {status_code})" if status_code else ""
+                return AntiBotEvent(
+                    route=route,
+                    travel_date=effective_date,
+                    url=url,
+                    event_type=detected_type,
+                    status_code=status_code or 200,
+                    message=f"Access Denied / Security challenge detected: '{sig}'{code_str}",
+                )
+
+        # Check HTTP status codes
+        if status_code in (403, 429):
+            event_type = AntiBotEventType.RATE_LIMITED if status_code == 429 else AntiBotEventType.ACCESS_DENIED
+            return AntiBotEvent(
+                route=route,
+                travel_date=effective_date,
+                url=url,
+                event_type=event_type,
+                status_code=status_code,
+                message=f"Access Denied: HTTP {status_code} received from server",
+            )
+
+        if not html:
+            return None
+
+        return None
+
+    @staticmethod
+    def _find_element_text(tag: Tag, selectors: List[str]) -> Optional[str]:
+        """Helper to find the text of the first matching selector."""
+        for sel in selectors:
+            found = tag.select_one(sel)
+            if found and found.get_text(strip=True):
+                return found.get_text(strip=True)
+        return None
+
+    @staticmethod
+    def _parse_stops(raw_stops: Optional[str]) -> int:
+        """Parses stop string (e.g. 'Non Stop', '1 Stop', '2 Stops') into integer."""
+        if not raw_stops:
+            return 0
+        cleaned = raw_stops.lower()
+        if "non" in cleaned or "0" in cleaned:
+            return 0
+        digits = re.findall(r"\d+", cleaned)
+        if digits:
+            return int(digits[0])
+        return 1
+
+    @classmethod
+    def parse_flight_cards(
+        cls,
+        html: str,
+        search_context: Dict[str, Any],
+    ) -> Tuple[List[Dict[str, Any]], List[NormalizedFareQuote]]:
+        """
+        Parses all available flight cards from the page HTML.
+        For each flight:
+          1. Extracts all available fare options.
+          2. Normalizes prices.
+          3. Sorts ascending.
+          4. Selects strictly the 5 cheapest fare options for that flight.
+        Returns a tuple of (raw_quotes_list, normalized_quotes_list).
+        """
+        soup = BeautifulSoup(html, "html.parser")
+        route_code = search_context.get("route", "DEL-BOM")
+        origin_iata = search_context.get("origin", "DEL")
+        dest_iata = search_context.get("destination", "BOM")
+        search_date = search_context.get("search_date", date.today())
+        travel_date = search_context.get("travel_date", date.today())
+        advance_days = search_context.get("advance_purchase_days", 1)
+        source_url = search_context.get("url", "")
+
+        # Find flight card containers
+        cards: List[Tag] = []
+        for selector in YatraSelectors.FLIGHT_CARDS:
+            matched = soup.select(selector)
+            if matched:
+                cards = matched
+                break
+
+        if not cards:
+            logger.info(f"No flight cards found on page for {route_code}")
+            return [], []
+
+        raw_quotes: List[Dict[str, Any]] = []
+        normalized_quotes: List[NormalizedFareQuote] = []
+
+        for card in cards:
+            # Check for sold-out indicator
+            is_sold_out = bool(card.select_one(", ".join(YatraSelectors.SOLD_OUT))) or ("sold out" in card.get_text().lower())
+            avail_status = AvailabilityStatus.SOLD_OUT if is_sold_out else AvailabilityStatus.AVAILABLE
+
+            # Extract basic flight info
+            airline_name = cls._find_element_text(card, YatraSelectors.AIRLINE_NAME)
+            if not airline_name:
+                img = card.select_one("img[alt]")
+                alt_val = img.get("alt") if img else ""
+                airline_name = str(alt_val).strip() if alt_val else "Unknown Airline"
+
+            flight_number = cls._find_element_text(card, YatraSelectors.FLIGHT_NUMBER) or "FLIGHT-UNKNOWN"
+            dep_time = cls._find_element_text(card, YatraSelectors.DEPARTURE_TIME) or "00:00"
+            arr_time = cls._find_element_text(card, YatraSelectors.ARRIVAL_TIME) or "00:00"
+            duration = cls._find_element_text(card, YatraSelectors.DURATION) or "00h 00m"
+            raw_stops = cls._find_element_text(card, YatraSelectors.STOPS)
+            stops_count = cls._parse_stops(raw_stops)
+
+            # Extract fare options
+            fare_options: List[Tuple[str, Decimal, str]] = []  # (name, normalized_price, raw_string)
+            matched_containers = card.select(", ".join(YatraSelectors.FARE_OPTIONS_CONTAINER))
+            container_set = set(matched_containers)
+            # Filter out parent containers that wrap other matched containers
+            fare_containers = [
+                c for c in matched_containers
+                if not any(d in container_set for d in c.descendants)
+            ]
+
+            if fare_containers:
+                for f_tag in fare_containers:
+                    opt_name = cls._find_element_text(f_tag, YatraSelectors.FARE_OPTION_NAME) or "Standard"
+                    raw_price_str = cls._find_element_text(f_tag, YatraSelectors.FARE_OPTION_PRICE)
+                    if raw_price_str:
+                        try:
+                            norm_price = normalize_price(raw_price_str)
+                            fare_options.append((opt_name, norm_price, raw_price_str))
+                        except ValueError:
+                            continue
+
+            # Fallback to main displayed price if no fare option containers found
+            if not fare_options:
+                main_price_str = cls._find_element_text(card, YatraSelectors.DISPLAYED_PRICE)
+                if main_price_str:
+                    try:
+                        norm_price = normalize_price(main_price_str)
+                        fare_options.append(("Standard", norm_price, main_price_str))
+                    except ValueError:
+                        pass
+
+            # If sold out or missing price
+            if not fare_options:
+                raw_record = {
+                    "source": "Yatra",
+                    "route": route_code,
+                    "origin": origin_iata,
+                    "destination": dest_iata,
+                    "search_date": search_date.isoformat(),
+                    "travel_date": travel_date.isoformat(),
+                    "advance_purchase_days": advance_days,
+                    "airline": airline_name,
+                    "flight_number": flight_number,
+                    "departure_time": dep_time,
+                    "arrival_time": arr_time,
+                    "duration": duration,
+                    "stops": stops_count,
+                    "fare_class": "ECONOMY",
+                    "fare_option_name": "Standard",
+                    "displayed_price": None,
+                    "availability_status": AvailabilityStatus.SOLD_OUT.value if is_sold_out else AvailabilityStatus.NOT_FOUND.value,
+                    "scraped_at": datetime.now(timezone.utc).isoformat(),
+                    "source_url": source_url,
+                }
+                raw_quotes.append(raw_record)
+                continue
+
+            # Sort fare options by price ascending and keep strictly the 5 cheapest per flight
+            fare_options.sort(key=lambda x: x[1])
+            selected_fares = fare_options[:5]
+
+            for opt_name, price_dec, raw_str in selected_fares:
+                raw_record = {
+                    "source": "Yatra",
+                    "route": route_code,
+                    "origin": origin_iata,
+                    "destination": dest_iata,
+                    "search_date": search_date.isoformat(),
+                    "travel_date": travel_date.isoformat(),
+                    "advance_purchase_days": advance_days,
+                    "airline": airline_name,
+                    "flight_number": flight_number,
+                    "departure_time": dep_time,
+                    "arrival_time": arr_time,
+                    "duration": duration,
+                    "stops": stops_count,
+                    "fare_class": "ECONOMY",
+                    "fare_option_name": opt_name,
+                    "displayed_price": float(price_dec),
+                    "raw_displayed_price": raw_str,
+                    "availability_status": avail_status.value,
+                    "scraped_at": datetime.now(timezone.utc).isoformat(),
+                    "source_url": source_url,
+                }
+                raw_quotes.append(raw_record)
+
+                # Build normalized quote
+                norm_quote = NormalizedFareQuote(
+                    source="Yatra",
+                    route=route_code,
+                    origin=origin_iata,
+                    destination=dest_iata,
+                    search_date=search_date,
+                    travel_date=travel_date,
+                    advance_purchase_days=advance_days,
+                    airline=airline_name,
+                    flight_number=flight_number,
+                    departure_time=dep_time,
+                    arrival_time=arr_time,
+                    duration=duration,
+                    stops=stops_count,
+                    fare_class="ECONOMY",
+                    fare_option_name=opt_name,
+                    base_fare=price_dec,
+                    taxes=Decimal("0.00"),
+                    fees=Decimal("0.00"),
+                    convenience_fee=Decimal("0.00"),
+                    displayed_price=price_dec,
+                    final_payable_price=price_dec,
+                    currency="INR",
+                    availability_status=avail_status,
+                    verification_status=DataStatus.SEARCH_RESULT,
+                )
+                normalized_quotes.append(norm_quote)
+
+        logger.info(
+            f"Parsed {len(cards)} flight cards for {route_code} (Generated {len(normalized_quotes)} quotes, selecting <= 5 fares/flight)"
+        )
+        return raw_quotes, normalized_quotes
