@@ -1,3 +1,0 @@
-"""
-AirGo Harvester Module.
-"""

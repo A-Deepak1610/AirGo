@@ -56,8 +56,12 @@ def main():
     parser.add_argument("--top-n", type=int, default=5, help="Number of top DGCA routes to audit (default: 5)")
     parser.add_argument("--horizons", type=str, default="1,7,15,30,45", help="Advance-purchase windows in days (default: 1,7,15,30,45)")
     parser.add_argument("--checkout", action="store_true", help="Execute deep checkout fee and tax audit")
+    parser.add_argument("--headless", action="store_true", help="Run browser scrapers in headless mode (no GUI windows)")
 
     args = parser.parse_args()
+
+    if args.headless:
+        os.environ["HEADLESS"] = "true"
 
     # If no flags provided, show help
     if not (args.serve or args.scrape or args.clean or args.compute_index):

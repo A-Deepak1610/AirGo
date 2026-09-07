@@ -1,3 +1,0 @@
-"""
-AirGo Utilities Module.
-"""

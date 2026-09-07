@@ -1,5 +1,0 @@
-# AirGo Crontab Entry for Linux/macOS
-# Edit with: crontab -e
-# Runs every day at 03:00 AM local time
-
-0 3 * * * cd /path/to/AirGo && /path/to/venv/bin/python scripts/run_daily_harvest.py --top-n 5 --horizons 1,7,15,30,45 >> runs/cron_harvest.log 2>&1

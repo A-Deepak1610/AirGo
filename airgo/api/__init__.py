@@ -1,3 +1,0 @@
-"""
-AirGo API Module.
-"""

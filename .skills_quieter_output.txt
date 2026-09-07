@@ -1,3 +1,0 @@
-No matching skill found for: quieter
-Available skills:
-  - impeccable
