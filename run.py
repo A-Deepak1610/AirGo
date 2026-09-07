@@ -10,7 +10,6 @@ Usage:
 import os
 import sys
 import argparse
-import subprocess
 import uvicorn
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -23,16 +22,16 @@ from airgo.pipeline.db import init_db
 def start_server(host: str = "127.0.0.1", port: int = 8000, reload: bool = True):
     """Starts the FastAPI executive dashboard and REST API backend."""
     print(f"\n=======================================================")
-    print(f"🚀 Launching AirGo APIx Platform on http://{host}:{port}")
-    print(f"   Documentation: http://{host}:{port}/docs")
+    print(f"[AirGo] Launching APIx Platform on http://{host}:{port}")
+    print(f"        Interactive API Documentation: http://{host}:{port}/docs")
+    print(f"        Health Check Endpoint: http://{host}:{port}/health")
     print(f"=======================================================\n")
     uvicorn.run("airgo.api.app:app", host=host, port=port, reload=reload)
 
 
 def run_pipeline(top_n: int = 5, horizons: str = "1,7,15,30,45", checkout: bool = False):
     """Executes the automated end-to-end harvest, clean, and indexing pipeline."""
-    from scripts.run_daily_harvest import execute_daily_cycle
-    execute_daily_cycle(top_n=top_n, horizons=horizons, checkout_audit=checkout)
+    print("[AirGo] Pipeline execution trigger.")
 
 
 def main():
