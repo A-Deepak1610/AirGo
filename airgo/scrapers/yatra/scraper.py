@@ -359,10 +359,17 @@ class YatraScraper:
                                 processed_for_window: List[NormalizedFareQuote] = []
 
                                 if checkout and cur_norm:
-                                    for fn, f_quotes in flights_map.items():
+                                    sorted_flights = sorted(flights_map.items(), key=lambda item: min(q.displayed_price for q in item[1]))
+                                    for fn, f_quotes in sorted_flights:
                                         f_quotes.sort(key=lambda x: x.displayed_price)
                                         candidates = f_quotes[:5]
                                         total_fares_selected += len(candidates)
+
+                                        try:
+                                            await page.bring_to_front()
+                                            await asyncio.sleep(1.0)
+                                        except Exception:
+                                            pass
 
                                         # Verify candidates through checkout
                                         verified = await self.verify_candidates(page, candidates, route, window)

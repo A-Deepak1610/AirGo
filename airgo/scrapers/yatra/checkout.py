@@ -44,6 +44,24 @@ class YatraCheckoutVerifier:
         self.run_manager = run_manager
         self.timeout_ms = timeout_ms
 
+    async def _dismiss_login_modal(self, target: Page) -> None:
+        """Dismisses Yatra login popup dialog if rendered on the checkout tab."""
+        for _ in range(3):
+            cross = target.locator("span.style_cross__Rwqim, span[class*='cross'], img[alt='cross'], button.close").first
+            if await cross.count() > 0 and await cross.is_visible():
+                try:
+                    await cross.click(force=True)
+                    logger.info("Dismissed login popup modal")
+                    await asyncio.sleep(0.5)
+                    break
+                except Exception:
+                    pass
+            try:
+                await target.keyboard.press("Escape")
+            except Exception:
+                pass
+            await asyncio.sleep(0.3)
+
     async def verify_fare(
         self,
         page: Page,
@@ -115,25 +133,24 @@ class YatraCheckoutVerifier:
                     try:
                         await view_fares_btn.scroll_into_view_if_needed()
                         await view_fares_btn.click(force=True)
-                        await asyncio.sleep(1.0)
+                        await asyncio.sleep(2.0)
                     except Exception:
                         pass
 
                 # 4. Locate Book button
+                try:
+                    await flight_card_locator.locator("button[autom='booknow']").first.wait_for(state="attached", timeout=6000)
+                except Exception:
+                    pass
+
                 book_btn = flight_card_locator.locator("button[autom='booknow']").first
 
-                if quote.fare_option_name:
+                if quote.fare_option_name and quote.fare_option_name.lower() != "standard":
                     fare_row_btn = flight_card_locator.locator(
                         f"div.table-box:has-text('{quote.fare_option_name}') button[autom='booknow']"
                     ).first
                     if await fare_row_btn.count() > 0:
                         book_btn = fare_row_btn
-
-                if await book_btn.count() == 0:
-                    try:
-                        await book_btn.wait_for(state="attached", timeout=3000)
-                    except Exception:
-                        pass
 
                 if await book_btn.count() == 0:
                     quote.verification_status = DataStatus.VERIFICATION_FAILED
@@ -156,20 +173,10 @@ class YatraCheckoutVerifier:
                     return quote
 
                 # 5. Dismiss login popup modal if present
-                for _ in range(3):
-                    cross = checkout_page.locator("span.style_cross__Rwqim, span[class*='cross'], img[alt='cross'], button.close").first
-                    if await cross.count() > 0 and await cross.is_visible():
-                        try:
-                            await cross.click(force=True)
-                            logger.info("Dismissed login popup modal")
-                            await asyncio.sleep(1.0)
-                            break
-                        except Exception:
-                            pass
-                    await asyncio.sleep(0.5)
+                await self._dismiss_login_modal(checkout_page)
 
                 # 6. Wait for live fare confirmation in sidebar
-                await asyncio.sleep(3.0)
+                await asyncio.sleep(2.5)
 
             # 7. Check for anti-bot barriers on checkout page
             checkout_html = await checkout_page.content()
@@ -204,6 +211,8 @@ class YatraCheckoutVerifier:
                 except Exception:
                     pass
 
+            await self._dismiss_login_modal(checkout_page)
+
             # Fill non-sensitive guest traveler details
             try:
                 email_inp = checkout_page.locator("input[type='email'], input[placeholder*='Email']").first
@@ -235,11 +244,31 @@ class YatraCheckoutVerifier:
                         await asyncio.sleep(2.0)
                     except Exception:
                         pass
+                await self._dismiss_login_modal(checkout_page)
 
             # 10. Extract final payable fare & breakdown
+            try:
+                await checkout_page.locator("text=/Total (Amount|Payable)/i").first.wait_for(state="visible", timeout=6000)
+            except Exception:
+                pass
+            await asyncio.sleep(1.0)
+
             final_html = await checkout_page.content()
             breakdown = YatraParser.parse_paynow_breakdown(final_html)
             final_price = breakdown.get("final_payable_price")
+
+            # Fallback to total amount in current html if not parsed
+            if not final_price:
+                try:
+                    import re
+                    fs = checkout_page.locator("div:has-text('Total Amount')").last
+                    if await fs.count() > 0:
+                        text = await fs.inner_text()
+                        m = re.search(r"₹\s*([\d,]+(?:\.\d+)?)", text)
+                        if m:
+                            final_price = normalize_price(m.group(1))
+                except Exception:
+                    pass
 
             # Fallback to total amount in current html if not parsed
             if not final_price:
