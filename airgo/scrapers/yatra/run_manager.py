@@ -43,9 +43,10 @@ class YatraRunManager:
     def _initialize_directories(self) -> None:
         """Creates the run directory and required subdirectories."""
         self.run_dir.mkdir(parents=True, exist_ok=True)
-        self.data_dir.mkdir(parents=True, exist_ok=True)
-        self.screenshots_dir.mkdir(parents=True, exist_ok=True)
-        self.logs_dir.mkdir(parents=True, exist_ok=True)
+        if "_" in self.run_id:
+            self.data_dir.mkdir(parents=True, exist_ok=True)
+            self.screenshots_dir.mkdir(parents=True, exist_ok=True)
+            self.logs_dir.mkdir(parents=True, exist_ok=True)
         logger.info(f"Initialized Yatra run directory: {self.run_dir}")
 
     @staticmethod
@@ -60,7 +61,7 @@ class YatraRunManager:
         if not name:
             return "UNKNOWN"
         clean = name.split("/")[0].strip()
-        clean = re.sub(r"[^\w]", "", clean).upper()
+        clean = re.sub(r"[^A-Za-z0-9]", "", clean).upper()
         return clean or "UNKNOWN"
 
     def get_route_dir(self, route_code: str) -> Path:
@@ -221,6 +222,7 @@ class YatraRunManager:
         Ensures reliable serialization, disk flushing, existence validation, and re-read verification.
         Logs status explicitly matching Section 9.
         """
+        self.data_dir.mkdir(parents=True, exist_ok=True)
         out_path = self.data_dir / "quotes.json"
         print(f"[Yatra][JSON] Writing quotes...")
         print(f"[Yatra][JSON] Records: {len(quotes)}")
@@ -259,6 +261,7 @@ class YatraRunManager:
 
     def save_raw_quotes(self, raw_quotes: List[Dict[str, Any]]) -> Path:
         """Saves raw scraped airfare observations to data/raw_quotes.json."""
+        self.data_dir.mkdir(parents=True, exist_ok=True)
         out_path = self.data_dir / "raw_quotes.json"
         with open(out_path, "w", encoding="utf-8") as f:
             json.dump(raw_quotes, f, indent=2, default=str)
@@ -267,6 +270,7 @@ class YatraRunManager:
 
     def save_normalized_quotes(self, normalized_quotes: List[NormalizedFareQuote]) -> Path:
         """Saves validated normalized quotes to data/normalized_quotes.json."""
+        self.data_dir.mkdir(parents=True, exist_ok=True)
         out_path = self.data_dir / "normalized_quotes.json"
         serialized = [q.model_dump(mode="json") for q in normalized_quotes]
         with open(out_path, "w", encoding="utf-8") as f:
@@ -279,6 +283,7 @@ class YatraRunManager:
         Saves overall execution statistics and metrics to data/scraping_summary.json
         and dual-writes data/run_summary.json for backward compatibility.
         """
+        self.data_dir.mkdir(parents=True, exist_ok=True)
         out_path = self.data_dir / "scraping_summary.json"
         with open(out_path, "w", encoding="utf-8") as f:
             json.dump(summary, f, indent=2, default=str)
@@ -292,6 +297,7 @@ class YatraRunManager:
 
     def record_anti_bot_event(self, event: AntiBotEvent) -> Path:
         """Appends an anti-bot challenge event to data/antibot_events.json."""
+        self.data_dir.mkdir(parents=True, exist_ok=True)
         out_path = self.data_dir / "antibot_events.json"
         existing = []
         if out_path.exists():

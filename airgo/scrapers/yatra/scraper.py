@@ -192,15 +192,6 @@ class YatraScraper:
             total_loaded = await page.locator("div.flight-seg, div.flightItem").count()
         print(f"[Yatra] All flights loaded: {total_loaded}\n")
 
-        # Capture search results screenshot proof
-        results_shot = self.run_manager.get_screenshot_path(
-            route.route_code, window.window_code, "search_results"
-        )
-        try:
-            await page.screenshot(path=str(results_shot), full_page=False)
-            logger.info(f"Saved search results screenshot: {results_shot}")
-        except Exception as e:
-            logger.warning(f"Failed to capture screenshot: {e}")
 
         # Parse rendered flight cards
         rendered_html = await page.content()
@@ -518,8 +509,7 @@ class YatraScraper:
                                 async with file_lock:
                                     all_quote_records.extend(window_records)
                                     all_normalized_quotes.extend(window_normalized)
-                                    self.run_manager.save_quotes(all_quote_records)
-                                    self.run_manager.save_normalized_quotes(all_normalized_quotes)
+
                                     if persist_db and window_normalized:
                                         try:
                                             persist_fare_quotes_to_db(window_normalized, run_started_at=start_time)
@@ -551,11 +541,7 @@ class YatraScraper:
 
         await asyncio.gather(*tasks, return_exceptions=True)
 
-        # Final dataset serialization
-        if all_quote_records:
-            self.run_manager.save_quotes(all_quote_records)
-        self.run_manager.save_raw_quotes(all_raw_quotes)
-        self.run_manager.save_normalized_quotes(all_normalized_quotes)
+        # Window quotes are saved directly to each route/window/quotes.json
 
         db_inserted = len(all_normalized_quotes) if persist_db else 0
 
@@ -624,7 +610,6 @@ class YatraScraper:
             "artifacts_directory": str(self.run_manager.run_dir),
         }
 
-        self.run_manager.save_scraping_summary(summary)
 
         # Print final formatted summary matching Section 18 / 19
         print("\n=======================================================")
@@ -643,12 +628,20 @@ class YatraScraper:
         print(f"Verification Failures: {total_failed_extractions}")
         print(f"Akamai Events: {len(challenge_events)}")
         print(f"CAPTCHA Events: {total_captcha_events}\n")
-        print("JSON:")
-        print(f"{self.run_manager.run_dir}/data/\n")
-        print("Screenshots:")
-        print(f"{self.run_manager.run_dir}/screenshots/\n")
-        print("Logs:")
-        print(f"{self.run_manager.run_dir}/logs/\n")
+        # Clean up empty legacy directories if unpopulated
+        for d in (self.run_manager.data_dir, self.run_manager.screenshots_dir, self.run_manager.logs_dir):
+            if d.exists() and not any(d.iterdir()):
+                try:
+                    d.rmdir()
+                except Exception:
+                    pass
+
+        print("Runs Output Directory:")
+        print(f"{self.run_manager.run_dir}/\n")
+        print("Artifacts saved under:")
+        print(f"{self.run_manager.run_dir}/<ROUTE>/<WINDOW>/quotes.json")
+        print(f"{self.run_manager.run_dir}/<ROUTE>/<WINDOW>/<rank>_<flight>/search_results.png")
+        print(f"{self.run_manager.run_dir}/<ROUTE>/<WINDOW>/<rank>_<flight>/paynow.png\n")
         print(f"Database Records: {db_inserted}")
         print("=======================================================\n")
         return summary

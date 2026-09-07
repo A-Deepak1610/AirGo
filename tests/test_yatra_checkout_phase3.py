@@ -373,6 +373,27 @@ class TestPayNowScreenshotPaths:
         assert q["final_price"] == 6222
         assert q["screenshot_evidence"] == "DEL-BOM/T+1/01_6E-6433.png"
 
+    def test_route_window_flight_artifact_hierarchy(self, tmp_path):
+        """Verifies exact hierarchy: runs/yatra/<YYYY-MM-DD>/<ROUTE>/<WINDOW>/01_<flight>/{search_results,paynow}.png and quotes.json."""
+        rm = YatraRunManager(base_runs_dir=tmp_path, run_timestamp="2026-09-07")
+        flight_dir = rm.get_flight_dir("BOM-DEL", "T+7", rank=1, flight_number="SG-164")
+        assert flight_dir.name == "01_SG164"
+        assert flight_dir.parent.name == "T+7"
+        assert flight_dir.parent.parent.name == "BOM-DEL"
+        assert flight_dir.parent.parent.parent.name == "2026-09-07"
+        assert flight_dir.parent.parent.parent.parent.name == "yatra"
+
+        # Verify search_results.png and paynow.png paths
+        sr_path = flight_dir / "search_results.png"
+        pn_path = flight_dir / "paynow.png"
+        assert sr_path.name == "search_results.png"
+        assert pn_path.name == "paynow.png"
+
+        # Verify window quotes.json
+        window_quotes_path = rm.save_window_quotes("BOM-DEL", "T+7", [{"rank": 1, "flight_number": "SG-164", "final_price": 5000}])
+        assert window_quotes_path.name == "quotes.json"
+        assert window_quotes_path.parent == flight_dir.parent
+
 
 # --- 5. FIVE-CHEAPEST RULE PER FLIGHT WITH VERIFIED FARES ---
 
