@@ -7,31 +7,38 @@ from typing import List
 
 
 class YatraSelectors:
-    """Central repository of DOM selectors for Yatra flight search interface."""
+    """Central repository of DOM selectors for Yatra flight search and checkout interface."""
 
     # Containers for flight cards
     FLIGHT_CARDS: List[str] = [
-        "div.flight-list div.flight-seg",
+        "div.tuple",
+        "div.flightItem",
+        "div.flight-seg",
         "div.flight-tuple",
         "div[class*='flightItem']",
         "div[class*='flight-item']",
-        "div.tuple",
         "div[class*='flight-card']",
         "div.flight-list > div.tuple",
     ]
 
     # Airline name selectors within a flight card
     AIRLINE_NAME: List[str] = [
-        "div.fs-15",
+        ".airline-name span.text",
+        "span.text.ellipsis",
+        ".airline-holder span.text",
+        "div.fs-13.airline-name span.text",
         "span.airline-name",
         "div[class*='airline-name']",
         "span.i-b.text-blue",
-        "span.i-b.ellipsis",
+        "div.fs-15",
         "img[alt]",
     ]
 
     # Flight code / number
     FLIGHT_NUMBER: List[str] = [
+        ".fl-no span",
+        "p.fl-no span",
+        "p.fl-no",
         "span.fl-code",
         "span.flight-number",
         "p.font-lightgray",
@@ -41,12 +48,16 @@ class YatraSelectors:
 
     # Departure and Arrival times
     DEPARTURE_TIME: List[str] = [
+        "[autom='departureTimeLabel']",
+        ".dtime .time",
         "div[class*='depart'] .fs-18",
         "div.depart-time",
         "span.depart-time",
         "div.fs-18:first-of-type",
     ]
     ARRIVAL_TIME: List[str] = [
+        "[autom='arrivalTimeLabel']",
+        ".atime p.time",
         "div[class*='arrival'] .fs-18",
         "div.arrival-time",
         "span.arrival-time",
@@ -55,6 +66,8 @@ class YatraSelectors:
 
     # Duration & Stops
     DURATION: List[str] = [
+        "[autom='durationLabel']",
+        "p.du",
         "p.duration",
         "p.fs-12",
         "span.duration",
@@ -62,6 +75,7 @@ class YatraSelectors:
         "div[class*='duration']",
     ]
     STOPS: List[str] = [
+        ".dotted-borderbtm",
         "span.cursor-default",
         "span.stops",
         "span[class*='stops']",
@@ -82,6 +96,11 @@ class YatraSelectors:
 
     # Primary displayed fare price
     DISPLAYED_PRICE: List[str] = [
+        "[autom='priceLabel'] .fare-summary-tooltip",
+        ".fare-summary-tooltip",
+        "div.tipsy.fare-summary-tooltip",
+        "div.tipsy.fs-18",
+        "div[autom='priceLabel']",
         "span.tipsy",
         "p.fs-18.font-bold",
         "span[class*='fare']",
@@ -90,8 +109,17 @@ class YatraSelectors:
         "span.total-fare",
     ]
 
+    # Button to expand multiple fares
+    MORE_FARES_BUTTON: List[str] = [
+        "button[autom='morefares']",
+        "button.secondary-button",
+        "button.button",
+    ]
+
     # Multiple fare options / family bundles within a flight card
     FARE_OPTIONS_CONTAINER: List[str] = [
+        "div.table-box",
+        "div.branded-fare",
         "div[class*='fare-family']",
         "div[class*='fare-dropdown']",
         "div[class*='fare-options']",
@@ -100,12 +128,15 @@ class YatraSelectors:
         "div[class*='fare-card']",
     ]
     FARE_OPTION_NAME: List[str] = [
+        "td.col.bold",
         "span.fare-name",
         "p.fare-type",
         "span.fare-title",
         "span.font-bold",
     ]
     FARE_OPTION_PRICE: List[str] = [
+        "div.v-aligm-m.i-b",
+        "div.tipsy",
         "span.fare-price",
         "span.price",
         "p.price",
@@ -141,47 +172,49 @@ class YatraSelectors:
 
     # Flight card booking / selection buttons
     BOOK_BUTTON: List[str] = [
+        "button[autom='booknow']",
+        "div.booknow-btn button",
+        "button.secondary-button",
         "button.booking-btn",
         "button[class*='book']",
         "button[class*='choose']",
         "input[value*='Book']",
-        "button:has-text('Book Now')",
-        "button:has-text('Book')",
-        "button:has-text('View Fares')",
     ]
 
     # Fare option selection buttons inside fare bundles
     SELECT_FARE_BUTTON: List[str] = [
+        "button[autom='booknow']",
         "button.select-fare-btn",
         "button[class*='select-fare']",
         "div.fare-option button",
-        "button:has-text('Book Fare')",
-        "button:has-text('Select')",
+    ]
+
+    # Modal dismissal on checkout page
+    CHECKOUT_MODAL_CLOSE: List[str] = [
+        "span.style_cross__Rwqim",
+        "span[class*='cross']",
+        "img[alt='cross']",
+        "button.close",
+        "span.close-popup",
     ]
 
     # Review / Itinerary progression buttons
     CONTINUE_BOOKING_BUTTON: List[str] = [
-        "button:has-text('Continue Booking')",
-        "button:has-text('Continue to Passenger Details')",
-        "button:has-text('Proceed to Payment')",
-        "button:has-text('Proceed to Pay')",
-        "button:has-text('Continue')",
-        "button:has-text('Proceed')",
+        "button.bg-\\[\\#D60F0F\\]",
+        "button.style_btnRed__EltTU",
         "button[id*='continue']",
         "input[value*='Continue']",
     ]
 
     # Popups, add-ons (insurance, seats, meals) skip/dismiss buttons
     ADDON_SKIP_BUTTON: List[str] = [
-        "button:has-text('No, I will take the risk')",
-        "button:has-text('Skip to Payment')",
-        "button:has-text('Skip')",
-        "button:has-text('Maybe Later')",
-        "button:has-text('No Thanks')",
+        "button.bg-\\[\\#D60F0F\\]",
+        "span.style_cross__Rwqim",
+        "span[class*='cross']",
+        "img[alt='cross']",
         "span.close-popup",
         "button.close",
         "button[class*='close']",
-        "a:has-text('Skip')",
     ]
 
     # Pre-payment / Pay Now page container indicators
@@ -191,9 +224,6 @@ class YatraSelectors:
         "div[class*='payment-wrapper']",
         "div#payment-modes",
         "div[class*='pay-now']",
-        "button:has-text('Pay Now')",
-        "button:has-text('Make Payment')",
-        "button[id*='payNow']",
     ]
 
     # Pre-Payment / Pay Now total payable amount

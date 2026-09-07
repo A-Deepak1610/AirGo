@@ -11,11 +11,18 @@ import os
 import sys
 import argparse
 from typing import Optional
+import logging
 import uvicorn
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)],
+)
 
 from airgo.pipeline.db import init_db
 

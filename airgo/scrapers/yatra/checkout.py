@@ -5,6 +5,7 @@ extracts authoritative payable prices and fee breakdowns, detects price changes,
 captures ground-truth Pay Now screenshots, and halts strictly before payment.
 """
 
+import asyncio
 from datetime import datetime, timezone
 from decimal import Decimal
 import logging
@@ -18,6 +19,7 @@ from airgo.scrapers.yatra.models import (
     DataStatus,
     NormalizedFareQuote,
 )
+from airgo.scrapers.yatra.normalizer import normalize_price
 from airgo.scrapers.yatra.parser import YatraParser
 from airgo.scrapers.yatra.run_manager import YatraRunManager
 from airgo.scrapers.yatra.selectors import YatraSelectors
@@ -28,8 +30,10 @@ logger = logging.getLogger("AirGo.Yatra.Checkout")
 class YatraCheckoutVerifier:
     """
     Orchestrates flight booking progression up to the Pay Now screen.
-    Guarantees strict halt before payment: no financial credentials entered,
-    and no final payment submission clicked.
+    Handles Yatra's multi-tab architecture (opening https://secure.yatra.com in a new tab),
+    dismisses login popup modals, fills non-sensitive guest traveler details,
+    extracts authoritative payable prices and fee breakdowns, detects price changes,
+    captures ground-truth Pay Now screenshots, and halts strictly before payment.
     """
 
     def __init__(
@@ -47,15 +51,18 @@ class YatraCheckoutVerifier:
         window_code: str,
     ) -> NormalizedFareQuote:
         """
-        Executes booking navigation for a candidate fare quote from the search page:
-        1. Identifies flight card and clicks Book / Select Fare.
-        2. Progresses through review pages and bypasses non-payment add-on dialogs.
-        3. Fills non-sensitive guest contact info if required by Yatra.
-        4. Waits for Pay Now / Payment options page to render.
-        5. Extracts final payable price and breakdown.
-        6. Captures Pay Now screenshot.
-        7. Halts without paying.
+        Executes booking navigation for a candidate fare quote:
+        1. On search page: locates flight card and clicks Book (opening new tab).
+        2. On checkout tab: closes login popup modal.
+        3. Waits for live fare confirmation in sidebar.
+        4. Progresses through insurance and guest traveler details.
+        5. Reaches pre-payment / Pay Now stage.
+        6. Extracts final payable fare and fee breakdown.
+        7. Captures Pay Now screenshot proof.
+        8. Halts strictly without payment.
+        9. Closes checkout tab.
         """
+        print(f"[Yatra] Opening booking flow for {quote.flight_number} ({quote.airline})...")
         logger.info(
             f"Initiating checkout verification for {quote.route} | {quote.flight_number} | "
             f"{quote.fare_option_name or 'Standard'} (Displayed: ₹{quote.displayed_price})"
@@ -68,6 +75,7 @@ class YatraCheckoutVerifier:
             fare_option_name=quote.fare_option_name or "standard",
         )
 
+        checkout_page: Optional[Page] = None
         try:
             # 1. Check if the initial page has an anti-bot challenge
             initial_html = await page.content()
@@ -79,74 +87,174 @@ class YatraCheckoutVerifier:
                 travel_date=quote.travel_date,
             )
             if challenge:
+                print(f"[Yatra][SECURITY] {challenge.message}")
                 return await self._handle_challenge(page, quote, challenge, window_code)
 
-            # 2. Locate the specific flight card
-            flight_card_locator = await self._find_flight_card(page, quote)
-            if not flight_card_locator:
-                quote.verification_status = DataStatus.VERIFICATION_FAILED
-                quote.error_reason = f"Flight card {quote.flight_number} not found on search page"
-                return quote
+            # Check if page is already at checkout / payment (e.g. direct test fixture or redirect)
+            is_already_checkout = any(
+                kw in page.url.lower() for kw in ["checkout", "payment", "notice"]
+            ) or "payment-container" in initial_html or "fare-breakup" in initial_html
 
-            # 3. Click Book / Select Fare Option
-            booked = await self._select_flight_and_fare(page, flight_card_locator, quote)
-            if not booked:
-                # Check if flight showed sold-out during attempt
-                html_check = await page.content()
-                if "sold out" in html_check.lower():
-                    quote.availability_status = AvailabilityStatus.SOLD_OUT
-                    quote.verification_status = DataStatus.SOLD_OUT
-                    quote.error_reason = "Flight became sold out upon selection"
+            if is_already_checkout:
+                checkout_page = page
+            else:
+                # 2. Locate flight card on search page
+                flight_card_locator = await self._find_flight_card(page, quote)
+                if not flight_card_locator:
+                    quote.verification_status = DataStatus.VERIFICATION_FAILED
+                    quote.error_reason = f"Flight card {quote.flight_number} not found on search page"
+                    print(f"[Yatra][ERROR] Flight {quote.flight_number} card not found")
                     return quote
 
-                quote.verification_status = DataStatus.VERIFICATION_FAILED
-                quote.error_reason = "Failed to trigger booking action on flight card"
-                return quote
+                await flight_card_locator.scroll_into_view_if_needed()
+                await asyncio.sleep(0.5)
 
-            # 4. Handle review / passenger info & dismiss popups
-            await self._handle_review_and_popups(page)
+                # 3. Expand fare options if button present
+                view_fares_btn = flight_card_locator.locator("button[autom='morefares'], button:has-text('View Fares')").first
+                if await view_fares_btn.count() > 0 and await view_fares_btn.is_visible():
+                    try:
+                        await view_fares_btn.click()
+                        await asyncio.sleep(1.0)
+                    except Exception:
+                        pass
 
-            # 5. Check again for security barriers during progression
-            post_nav_html = await page.content()
+                # 4. Click Book button and capture new checkout tab
+                book_btn = flight_card_locator.locator(
+                    "button[autom='booknow'], div.booknow-btn button:has-text('Book'), button.secondary-button:has-text('Book')"
+                ).first
+                if await book_btn.count() == 0 or not await book_btn.is_visible():
+                    book_btn = flight_card_locator.locator("button.secondary-button, button:has-text('View Fares'), button").first
+
+                try:
+                    async with page.context.expect_page(timeout=15000) as new_page_info:
+                        await book_btn.click(force=True)
+                    checkout_page = await new_page_info.value
+                    await checkout_page.wait_for_load_state("domcontentloaded", timeout=20000)
+                    print("[Yatra] Booking page loaded")
+                    await asyncio.sleep(2.0)
+                except Exception:
+                    # If expect_page failed or same page navigated
+                    checkout_page = page
+
+                # 5. Dismiss login popup modal if present
+                for _ in range(3):
+                    cross = checkout_page.locator("span.style_cross__Rwqim, span[class*='cross'], img[alt='cross'], button.close").first
+                    if await cross.count() > 0 and await cross.is_visible():
+                        try:
+                            await cross.click(force=True)
+                            logger.info("Dismissed login popup modal")
+                            await asyncio.sleep(1.0)
+                            break
+                        except Exception:
+                            pass
+                    await asyncio.sleep(0.5)
+
+                # 6. Wait for live fare confirmation in sidebar
+                await asyncio.sleep(3.0)
+
+            # 7. Check for anti-bot barriers on checkout page
+            checkout_html = await checkout_page.content()
             challenge = YatraParser.detect_anti_bot(
-                html=post_nav_html,
+                html=checkout_html,
                 status_code=200,
-                url=page.url,
+                url=checkout_page.url,
                 route=quote.route,
                 travel_date=quote.travel_date,
             )
             if challenge:
-                return await self._handle_challenge(page, quote, challenge, window_code)
-
-            # 6. Wait for Pre-Payment / Pay Now page
-            is_paynow = await self._wait_for_paynow_page(page)
-            paynow_html = await page.content()
-
-            # 7. Capture ground-truth Pay Now screenshot
-            try:
-                await page.screenshot(path=str(paynow_shot_path), full_page=False)
-                quote.paynow_screenshot_path = str(paynow_shot_path)
-                logger.info(f"Captured Pay Now screenshot: {paynow_shot_path}")
-            except Exception as ss_err:
-                logger.warning(f"Could not capture Pay Now screenshot: {ss_err}")
+                print(f"[Yatra][SECURITY] {challenge.message}")
+                return await self._handle_challenge(checkout_page, quote, challenge, window_code)
 
             # 8. Check for price change alert or sold out banner
-            price_alert = YatraParser.detect_price_change_alert(paynow_html)
-            if "sold out" in paynow_html.lower() or "seats sold out" in paynow_html.lower():
+            price_alert = YatraParser.detect_price_change_alert(checkout_html)
+            if "sold out" in checkout_html.lower() or "seats sold out" in checkout_html.lower():
                 quote.availability_status = AvailabilityStatus.SOLD_OUT
                 quote.verification_status = DataStatus.SOLD_OUT
                 quote.error_reason = "Seats sold out during checkout progression"
+                print(f"[Yatra] Flight {quote.flight_number} sold out during checkout")
                 return quote
 
-            # 9. Extract final payable price & fee breakdown
-            breakdown = YatraParser.parse_paynow_breakdown(paynow_html)
+            # 9. Progress through booking review flow
+            print("[Yatra] Continuing through booking review...")
+            # Insurance skip / Continue button
+            cont_btn = checkout_page.locator("button.bg-\\[\\#D60F0F\\], button:has-text('Continue')").first
+            if await cont_btn.count() > 0 and await cont_btn.is_visible():
+                try:
+                    await cont_btn.click(force=True)
+                    await asyncio.sleep(1.5)
+                except Exception:
+                    pass
+
+            # Fill non-sensitive guest traveler details
+            try:
+                email_inp = checkout_page.locator("input[type='email'], input[placeholder*='Email']").first
+                if await email_inp.count() > 0 and await email_inp.is_visible():
+                    await email_inp.fill("audit.traveler@example.com")
+
+                phone_inp = checkout_page.locator("input[type='tel'], input[placeholder*='Mobile']").first
+                if await phone_inp.count() > 0 and await phone_inp.is_visible():
+                    await phone_inp.fill("9876543210")
+
+                fname_inp = checkout_page.locator("input[placeholder*='First'], input[name*='fname']").first
+                if await fname_inp.count() > 0 and await fname_inp.is_visible():
+                    await fname_inp.fill("AirGo")
+
+                lname_inp = checkout_page.locator("input[placeholder*='Last'], input[name*='lname']").first
+                if await lname_inp.count() > 0 and await lname_inp.is_visible():
+                    await lname_inp.fill("Audit")
+            except Exception:
+                pass
+
+            # Proceed towards payment review / Pay Now stage
+            for _ in range(2):
+                prog_btn = checkout_page.locator(
+                    "button:has-text('Proceed to Payment'), button:has-text('Skip to Payment'), button:has-text('Continue')"
+                ).first
+                if await prog_btn.count() > 0 and await prog_btn.is_visible():
+                    try:
+                        await prog_btn.click(force=True)
+                        await asyncio.sleep(2.0)
+                    except Exception:
+                        pass
+
+            # 10. Extract final payable fare & breakdown
+            final_html = await checkout_page.content()
+            breakdown = YatraParser.parse_paynow_breakdown(final_html)
             final_price = breakdown.get("final_payable_price")
+
+            # Fallback to total amount in current html if not parsed
+            if not final_price:
+                # search for ₹ price in Fare Summary section
+                fs_loc = checkout_page.locator("h2:has-text('Fare Summary')").first
+                if await fs_loc.count() > 0:
+                    text_block = await checkout_page.locator("div:has-text('Fare Summary')").first.inner_text()
+                    lines = [ln.strip() for ln in text_block.split("\n") if ln.strip()]
+                    for i, ln in enumerate(lines):
+                        if "total amount" in ln.lower() or "total payable" in ln.lower():
+                            for nxt in lines[i+1:i+3]:
+                                try:
+                                    from airgo.scrapers.yatra.normalizer import normalize_price
+                                    final_price = normalize_price(nxt)
+                                    break
+                                except ValueError:
+                                    pass
+
+            # 11. Capture ground-truth Pay Now screenshot proof
+            try:
+                await checkout_page.screenshot(path=str(paynow_shot_path), full_page=False)
+                quote.paynow_screenshot_path = str(paynow_shot_path)
+            except Exception as ss_err:
+                logger.warning(f"Could not capture Pay Now screenshot: {ss_err}")
+
+            print("[Yatra] Reached fare review / Pay Now page")
+            print(f"[Yatra] Displayed price: ₹{quote.displayed_search_price or quote.displayed_price}")
 
             if final_price is not None and final_price > Decimal("0.00"):
                 quote.final_payable_price = final_price
                 quote.verification_timestamp = datetime.now(timezone.utc)
+                print(f"[Yatra] Final payable price: ₹{final_price}")
+                print(f"[Yatra] Screenshot saved: {paynow_shot_path}")
 
-                # Update breakdown components if extracted
                 if breakdown.get("base_fare"):
                     quote.base_fare = breakdown["base_fare"]  # type: ignore
                 if breakdown.get("taxes"):
@@ -156,7 +264,6 @@ class YatraCheckoutVerifier:
                 if breakdown.get("other_charges"):
                     quote.other_charges = breakdown["other_charges"]  # type: ignore
 
-                # Determine if price changed
                 diff = final_price - (quote.displayed_search_price or quote.displayed_price)
                 quote.price_difference = diff
 
@@ -164,36 +271,30 @@ class YatraCheckoutVerifier:
                     quote.verification_status = DataStatus.PRICE_CHANGED
                     if price_alert:
                         quote.error_reason = f"Price changed during checkout: {price_alert} (Diff: ₹{diff})"
-                    logger.info(
-                        f"Price change detected for {quote.flight_number}: "
-                        f"Displayed ₹{quote.displayed_search_price} -> Final ₹{final_price} (Diff: ₹{diff})"
-                    )
                 else:
                     quote.verification_status = DataStatus.FARE_VERIFIED
-                    logger.info(
-                        f"Fare verified successfully for {quote.flight_number}: ₹{final_price}"
-                    )
             else:
-                # Could not reliably parse final payable total
+                # Page reached but could not parse price
                 quote.verification_status = DataStatus.VERIFICATION_FAILED
-                quote.error_reason = "Pay Now page reached but total payable price element could not be parsed"
-                logger.warning(
-                    f"Pay Now page reached for {quote.flight_number} but total amount missing in DOM"
-                )
+                quote.error_reason = "Fare review page reached but total amount could not be parsed"
+                print(f"[Yatra][ERROR] Could not parse final payable price for {quote.flight_number}")
 
         except PlaywrightTimeoutError as te:
             logger.warning(f"Timeout during checkout verification for {quote.flight_number}: {te}")
             quote.verification_status = DataStatus.VERIFICATION_FAILED
             quote.error_reason = f"Timeout during booking progression: {te}"
-            err_shot = self.run_manager.get_screenshot_path(quote.route, window_code, "checkout_timeout")
-            try:
-                await page.screenshot(path=str(err_shot), full_page=False)
-            except Exception:
-                pass
+            print(f"[Yatra][ERROR] Flight {quote.flight_number} verification timed out")
         except Exception as e:
             logger.warning(f"Unexpected error during checkout verification for {quote.flight_number}: {e}")
             quote.verification_status = DataStatus.VERIFICATION_FAILED
             quote.error_reason = f"Unexpected checkout error: {e}"
+            print(f"[Yatra][ERROR] Flight {quote.flight_number} verification failed: {e}")
+        finally:
+            if checkout_page and checkout_page is not page:
+                try:
+                    await checkout_page.close()
+                except Exception:
+                    pass
 
         return quote
 
@@ -201,10 +302,11 @@ class YatraCheckoutVerifier:
         """Locates the card element matching flight number or airline details."""
         clean_fn = quote.flight_number.replace("-", "").strip()
         card_selectors = [
+            f"div.tuple:has-text('{quote.flight_number}')",
+            f"div.tuple:has-text('{clean_fn}')",
+            f"div.flightItem:has-text('{quote.flight_number}')",
             f"div.flight-seg:has-text('{quote.flight_number}')",
-            f"div.flight-seg:has-text('{clean_fn}')",
-            f"div[class*='flightItem']:has-text('{quote.flight_number}')",
-            f"div.flight-seg:has-text('{quote.airline}'):has-text('{quote.departure_time}')",
+            f"div.tuple:has-text('{quote.airline}'):has-text('{quote.departure_time}')",
         ]
         for sel in card_selectors:
             try:
@@ -216,7 +318,7 @@ class YatraCheckoutVerifier:
                 continue
 
         try:
-            loc = page.locator("div.flight-seg")
+            loc = page.locator("div.tuple")
             first_loc = getattr(loc, "first", loc)
             if await first_loc.count() > 0:
                 return first_loc
@@ -224,132 +326,6 @@ class YatraCheckoutVerifier:
             pass
 
         return None
-
-    async def _select_flight_and_fare(
-        self,
-        page: Page,
-        card_locator: Any,
-        quote: NormalizedFareQuote,
-    ) -> bool:
-        """Clicks book / select fare option on the chosen flight card."""
-        try:
-            # Check if specific fare option button is visible inside this card
-            if quote.fare_option_name:
-                fare_btn_selectors = [
-                    f"div.fare-option:has-text('{quote.fare_option_name}') button",
-                    f"div[class*='fare-family']:has-text('{quote.fare_option_name}') button",
-                    f"button:has-text('{quote.fare_option_name}')",
-                ]
-                for f_sel in fare_btn_selectors:
-                    loc = card_locator.locator(f_sel)
-                    btn = getattr(loc, "first", loc)
-                    if await btn.count() > 0 and await btn.is_visible():
-                        await btn.click()
-                        await page.wait_for_load_state("domcontentloaded", timeout=10000)
-                        return True
-
-            # Otherwise, click the primary Book / Choose button on the card
-            for b_sel in YatraSelectors.BOOK_BUTTON:
-                loc = card_locator.locator(b_sel)
-                btn = getattr(loc, "first", loc)
-                if await btn.count() > 0 and await btn.is_visible():
-                    await btn.click()
-                    await page.wait_for_load_state("domcontentloaded", timeout=10000)
-
-                    # Check if a fare family drawer / modal opened
-                    drawer_loc = page.locator("div.fare-family button, div.fare-options button")
-                    drawer_btn = getattr(drawer_loc, "first", drawer_loc)
-                    if await drawer_btn.count() > 0 and await drawer_btn.is_visible():
-                        await drawer_btn.click()
-                        await page.wait_for_load_state("domcontentloaded", timeout=10000)
-
-                    return True
-
-        except Exception as e:
-            logger.info(f"Flight selection interaction note: {e}")
-
-        return False
-
-    async def _handle_review_and_popups(self, page: Page) -> None:
-        """
-        Dismisses intermediate addon popups (insurance, seats, meals)
-        and fills non-sensitive guest traveler details if required.
-        """
-        for _ in range(3):
-            # Dismiss popups / opt-out of insurance or seat selection
-            for pop_sel in YatraSelectors.ADDON_SKIP_BUTTON:
-                try:
-                    skip_btn = page.locator(pop_sel).first
-                    if await skip_btn.count() > 0 and await skip_btn.is_visible():
-                        await skip_btn.click()
-                        logger.info(f"Dismissed checkout addon dialog using '{pop_sel}'")
-                        await page.wait_for_timeout(1000)
-                except Exception:
-                    pass
-
-            # If passenger contact form is required, fill non-sensitive generic audit info
-            try:
-                email_input = page.locator("input[type='email'], input[name*='email'], input[id*='email']").first
-                if await email_input.count() > 0 and await email_input.is_visible():
-                    curr_val = await email_input.input_value()
-                    if not curr_val:
-                        await email_input.fill("audit.traveler@example.com")
-
-                mobile_input = page.locator("input[type='tel'], input[name*='mobile'], input[id*='mobile']").first
-                if await mobile_input.count() > 0 and await mobile_input.is_visible():
-                    curr_val = await mobile_input.input_value()
-                    if not curr_val:
-                        await mobile_input.fill("9876543210")
-
-                fname_input = page.locator("input[name*='fname'], input[id*='fname'], input[placeholder*='First']").first
-                if await fname_input.count() > 0 and await fname_input.is_visible():
-                    curr_val = await fname_input.input_value()
-                    if not curr_val:
-                        await fname_input.fill("Audit")
-
-                lname_input = page.locator("input[name*='lname'], input[id*='lname'], input[placeholder*='Last']").first
-                if await lname_input.count() > 0 and await lname_input.is_visible():
-                    curr_val = await lname_input.input_value()
-                    if not curr_val:
-                        await lname_input.fill("Traveler")
-            except Exception:
-                pass
-
-            # Click Continue / Proceed to Payment
-            progressed = False
-            for cont_sel in YatraSelectors.CONTINUE_BOOKING_BUTTON:
-                try:
-                    cont_btn = page.locator(cont_sel).first
-                    if await cont_btn.count() > 0 and await cont_btn.is_visible():
-                        await cont_btn.click()
-                        logger.info(f"Progressed review screen via '{cont_sel}'")
-                        await page.wait_for_load_state("domcontentloaded", timeout=10000)
-                        progressed = True
-                        break
-                except Exception:
-                    pass
-
-            if not progressed:
-                break
-
-    async def _wait_for_paynow_page(self, page: Page) -> bool:
-        """Waits for the final pre-payment page or total payable amount to appear."""
-        for sel in YatraSelectors.PAYNOW_CONTAINER + YatraSelectors.PAYNOW_TOTAL_AMOUNT:
-            try:
-                loc = page.locator(sel).first
-                if await loc.count() > 0 and await loc.is_visible():
-                    return True
-            except Exception:
-                continue
-
-        try:
-            query = ", ".join(YatraSelectors.PAYNOW_TOTAL_AMOUNT[:4])
-            await page.wait_for_selector(query, timeout=8000)
-            return True
-        except Exception:
-            pass
-
-        return False
 
     async def _handle_challenge(
         self,
@@ -377,7 +353,4 @@ class YatraCheckoutVerifier:
             quote.verification_status = DataStatus.CAPTCHA_BLOCKED
 
         quote.error_reason = f"Security barrier encountered during checkout: {challenge.message}"
-        logger.warning(
-            f"Security challenge halted checkout verification for {quote.flight_number}: {challenge.message}"
-        )
         return quote

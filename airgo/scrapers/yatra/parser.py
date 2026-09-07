@@ -106,7 +106,7 @@ class YatraParser:
         """
         Parses all available flight cards from the page HTML.
         For each flight:
-          1. Extracts all available fare options.
+          1. Extracts all available fare options (including expanded fare families).
           2. Normalizes prices.
           3. Sorts ascending.
           4. Selects strictly the 5 cheapest fare options for that flight.
@@ -141,42 +141,75 @@ class YatraParser:
             is_sold_out = bool(card.select_one(", ".join(YatraSelectors.SOLD_OUT))) or ("sold out" in card.get_text().lower())
             avail_status = AvailabilityStatus.SOLD_OUT if is_sold_out else AvailabilityStatus.AVAILABLE
 
-            # Extract basic flight info
+            # Extract airline name cleanly
             airline_name = cls._find_element_text(card, YatraSelectors.AIRLINE_NAME)
             if not airline_name:
                 img = card.select_one("img[alt]")
                 alt_val = img.get("alt") if img else ""
                 airline_name = str(alt_val).strip() if alt_val else "Unknown Airline"
+            if "\n" in airline_name:
+                airline_name = airline_name.split("\n")[0].strip()
 
+            # Extract flight code / number
             flight_number = cls._find_element_text(card, YatraSelectors.FLIGHT_NUMBER) or "FLIGHT-UNKNOWN"
-            dep_time = cls._find_element_text(card, YatraSelectors.DEPARTURE_TIME) or "00:00"
-            arr_time = cls._find_element_text(card, YatraSelectors.ARRIVAL_TIME) or "00:00"
-            duration = cls._find_element_text(card, YatraSelectors.DURATION) or "00h 00m"
+            if "\n" in flight_number:
+                flight_number = flight_number.split("\n")[-1].strip()
+
+            # Departure & Arrival times (clean regex match for HH:MM)
+            raw_dep = cls._find_element_text(card, YatraSelectors.DEPARTURE_TIME) or ""
+            dep_match = re.search(r"\b\d{1,2}:\d{2}\b", raw_dep)
+            dep_time = dep_match.group(0) if dep_match else "00:00"
+
+            raw_arr = cls._find_element_text(card, YatraSelectors.ARRIVAL_TIME) or ""
+            arr_match = re.search(r"\b\d{1,2}:\d{2}\b", raw_arr)
+            arr_time = arr_match.group(0) if arr_match else "00:00"
+
+            # Duration and Stops
+            raw_dur = cls._find_element_text(card, YatraSelectors.DURATION) or "00h 00m"
+            dur_match = re.search(r"\d+h\s*\d+m|\d+h|\d+m", raw_dur)
+            duration = dur_match.group(0) if dur_match else raw_dur
+
             raw_stops = cls._find_element_text(card, YatraSelectors.STOPS)
             stops_count = cls._parse_stops(raw_stops)
 
             # Extract fare options
             fare_options: List[Tuple[str, Decimal, str]] = []  # (name, normalized_price, raw_string)
-            matched_containers = card.select(", ".join(YatraSelectors.FARE_OPTIONS_CONTAINER))
-            container_set = set(matched_containers)
-            # Filter out parent containers that wrap other matched containers
-            fare_containers = [
-                c for c in matched_containers
-                if not any(d in container_set for d in c.descendants)
-            ]
 
-            if fare_containers:
-                for f_tag in fare_containers:
-                    opt_name = cls._find_element_text(f_tag, YatraSelectors.FARE_OPTION_NAME) or "Standard"
-                    raw_price_str = cls._find_element_text(f_tag, YatraSelectors.FARE_OPTION_PRICE)
-                    if raw_price_str:
-                        try:
-                            norm_price = normalize_price(raw_price_str)
-                            fare_options.append((opt_name, norm_price, raw_price_str))
-                        except ValueError:
-                            continue
+            # 1. Check for expanded fare options table (e.g. div.table-box)
+            table_box = card.select_one("div.table-box")
+            if table_box:
+                services_rows = table_box.select("div.services tr")[1:]  # skip header
+                book_rows = table_box.select("div.booknow-btn tr")[1:]   # skip header
+                for s_tr, b_tr in zip(services_rows, book_rows):
+                    opt_name = s_tr.get_text(strip=True) or "Standard"
+                    price_div = b_tr.select_one("div.v-aligm-m, div.tipsy, [class*='rupee'], .bold")
+                    raw_price = price_div.get_text(strip=True) if price_div else b_tr.get_text(strip=True)
+                    try:
+                        p_dec = normalize_price(raw_price)
+                        fare_options.append((opt_name, p_dec, raw_price))
+                    except ValueError:
+                        pass
 
-            # Fallback to main displayed price if no fare option containers found
+            # 2. Check general fare options containers if table_box didn't yield
+            if not fare_options:
+                matched_containers = card.select(", ".join(YatraSelectors.FARE_OPTIONS_CONTAINER))
+                container_set = set(matched_containers)
+                fare_containers = [
+                    c for c in matched_containers
+                    if not any(d in container_set for d in c.descendants)
+                ]
+                if fare_containers:
+                    for f_tag in fare_containers:
+                        opt_name = cls._find_element_text(f_tag, YatraSelectors.FARE_OPTION_NAME) or "Standard"
+                        raw_price_str = cls._find_element_text(f_tag, YatraSelectors.FARE_OPTION_PRICE)
+                        if raw_price_str:
+                            try:
+                                norm_price = normalize_price(raw_price_str)
+                                fare_options.append((opt_name, norm_price, raw_price_str))
+                            except ValueError:
+                                continue
+
+            # 3. Fallback to main displayed price on the card
             if not fare_options:
                 main_price_str = cls._find_element_text(card, YatraSelectors.DISPLAYED_PRICE)
                 if main_price_str:
@@ -279,7 +312,8 @@ class YatraParser:
     @classmethod
     def parse_paynow_breakdown(cls, html: str) -> Dict[str, Optional[Decimal]]:
         """
-        Extracts final payable total and component fee breakdown from the pre-payment / Pay Now page.
+        Extracts final payable total and component fee breakdown from the pre-payment / Pay Now page
+        or the checkout fare summary sidebar.
         Returns a dictionary with Decimal values or None.
         """
         soup = BeautifulSoup(html, "html.parser")
@@ -301,7 +335,43 @@ class YatraParser:
         convenience_fee = _extract_decimal(YatraSelectors.PAYNOW_CONVENIENCE_FEE)
         other_charges = _extract_decimal(YatraSelectors.PAYNOW_OTHER_CHARGES)
 
-        # Fallback: check table rows for labeled fee components
+        # Fallback 1: check labeled line items across text blocks (Tailwind / React checkout sidebar)
+        fare_section = soup.find(lambda tag: tag.name in ("div", "section") and "Fare Summary" in tag.get_text() and len(tag.get_text()) < 1000)
+        search_target = fare_section if fare_section else soup
+
+        lines = [line.strip() for line in search_target.get_text(separator="\n").split("\n") if line.strip()]
+        for idx, line in enumerate(lines):
+            line_lower = line.lower()
+            if not final_payable and any(kw in line_lower for kw in ("total amount", "total payable", "final payable", "amount to pay")):
+                for next_line in lines[idx+1:idx+4]:
+                    try:
+                        final_payable = normalize_price(next_line)
+                        break
+                    except ValueError:
+                        pass
+            elif not base_fare and "base fare" in line_lower:
+                for next_line in lines[idx+1:idx+4]:
+                    try:
+                        base_fare = normalize_price(next_line)
+                        break
+                    except ValueError:
+                        pass
+            elif not taxes and any(kw in line_lower for kw in ("fee & surcharges", "fees & surcharges", "taxes & fees", "taxes and fees", "tax")):
+                for next_line in lines[idx+1:idx+4]:
+                    try:
+                        taxes = normalize_price(next_line)
+                        break
+                    except ValueError:
+                        pass
+            elif not convenience_fee and re.search(r"^(?:convenience\s*fee|convenience\s*charges?)\b", line_lower) and "zero" not in line_lower:
+                for next_line in lines[idx+1:idx+4]:
+                    try:
+                        convenience_fee = normalize_price(next_line)
+                        break
+                    except ValueError:
+                        pass
+
+        # Fallback 2: check table rows for labeled fee components
         for tr in soup.find_all("tr"):
             cells = tr.find_all(["td", "th"])
             if len(cells) >= 2:

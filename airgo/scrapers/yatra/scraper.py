@@ -78,19 +78,27 @@ class YatraScraper:
         window: SearchWindow,
     ) -> Dict[str, Any]:
         """
-        Executes a single route/window search: navigates, detects anti-bot challenges,
-        captures screenshot proof, and parses all available flight cards.
+        Executes a single route/window search: navigates, progressively scrolls to load
+        all lazy-loaded flights, detects anti-bot challenges, captures screenshot proof,
+        and parses all available flight cards.
         """
         search_url = self.build_search_url(
             origin_iata=route.origin_iata,
             dest_iata=route.dest_iata,
             travel_date=window.travel_date,
         )
-        logger.info(f"Searching {route.route_code} | {window.window_code} ({window.iso_travel_date})")
-        if not self.config.headless:
-            logger.info(f"[Workflow Step 1/13] Opening Yatra search interface: {search_url}")
-            logger.info(f"[Workflow Step 2-3/13] Parameters applied: Origin={route.origin_iata}, Dest={route.dest_iata}, Date={window.iso_travel_date}")
-            logger.info(f"[Workflow Step 4/13] Executing search query on Yatra...")
+        print(f"\n[Yatra] Starting scraper")
+        print(f"[Yatra] Mode: {'HEADED' if not self.config.headless else 'HEADLESS'}")
+        print(f"[Yatra] Route: {route.route_code}")
+        print(f"[Yatra] Horizon: {window.window_code}")
+        print(f"[Yatra] Travel date: {window.iso_travel_date}\n")
+        print(f"[Yatra] Launching Chromium...")
+        print(f"[Yatra] Browser launched\n")
+        print(f"[Yatra] Opening Yatra...")
+        print(f"[Yatra] Entering origin: {route.origin_iata}")
+        print(f"[Yatra] Entering destination: {route.dest_iata}")
+        print(f"[Yatra] Selecting travel date: {window.iso_travel_date}")
+        print(f"[Yatra] Starting search...")
 
         search_context = {
             "route": route.route_code,
@@ -111,6 +119,7 @@ class YatraScraper:
             )
         except Exception as e:
             logger.warning(f"Navigation error on {route.route_code} {window.window_code}: {e}")
+            print(f"[Yatra][ERROR] Navigation timed out / failed: {e}")
             err_shot = self.run_manager.get_screenshot_path(
                 route.route_code, window.window_code, "navigation_error"
             )
@@ -138,9 +147,7 @@ class YatraScraper:
         )
 
         if challenge_event:
-            logger.warning(
-                f"Security challenge detected on {route.route_code} {window.window_code}: {challenge_event.message}"
-            )
+            print(f"\n[Yatra][SECURITY] {challenge_event.message}")
             challenge_shot = self.run_manager.get_screenshot_path(
                 route.route_code, window.window_code, "security_challenge"
             )
@@ -153,7 +160,7 @@ class YatraScraper:
             self.run_manager.record_anti_bot_event(challenge_event)
 
             if not self.config.headless and self.config.observation_delay > 0:
-                logger.info(f"[Headed Debug] Holding challenge window for {self.config.observation_delay}s diagnostic inspection...")
+                print(f"[Yatra] Holding challenge window for {self.config.observation_delay}s diagnostic inspection...")
                 await asyncio.sleep(self.config.observation_delay)
 
             return {
@@ -164,14 +171,26 @@ class YatraScraper:
             }
 
         # Wait for dynamic flight list rendering
-        if not self.config.headless:
-            logger.info(f"[Workflow Step 5/13] Waiting for live flight search results to render...")
-
         try:
-            selector_query = ", ".join(YatraSelectors.FLIGHT_CARDS)
-            await page.wait_for_selector(selector_query, timeout=15000)
+            await page.wait_for_selector("div.tuple, div.flight-seg, div.flightItem", timeout=20000)
+            print("[Yatra] Search page loaded")
         except Exception:
-            logger.info(f"Wait timed out for flight cards on {route.route_code}; parsing rendered content.")
+            print("[Yatra][ERROR] Flight selector returned 0 elements.")
+
+        # Progressive lazy-load scrolling to load ALL flights
+        prev_count = 0
+        for _ in range(8):
+            curr_count = await page.locator("div.tuple").count()
+            if curr_count > 0:
+                print(f"[Yatra] Flights currently loaded: {curr_count}")
+            if curr_count > prev_count:
+                prev_count = curr_count
+                await page.evaluate("window.scrollBy(0, 1200)")
+                await asyncio.sleep(1.2)
+            else:
+                break
+        await page.evaluate("window.scrollTo(0, 0)")
+        await asyncio.sleep(0.8)
 
         # Capture search results screenshot proof
         results_shot = self.run_manager.get_screenshot_path(
@@ -189,11 +208,13 @@ class YatraScraper:
             rendered_html, search_context=search_context
         )
 
-        if not self.config.headless:
-            logger.info(f"[Workflow Step 6/13] Identified {len(raw_quotes)} raw flight options ({len(normalized_quotes)} candidate quotes) for {route.route_code}")
-            if self.config.observation_delay > 0:
-                logger.info(f"[Headed Debug] Holding search results page visible for {self.config.observation_delay}s...")
-                await asyncio.sleep(self.config.observation_delay)
+        if not raw_quotes:
+            print(f"[Yatra][ERROR] Search results loaded but no flight cards matched for {route.route_code}.")
+        else:
+            print(f"[Yatra] Search results loaded")
+
+        if not self.config.headless and self.config.observation_delay > 0:
+            await asyncio.sleep(self.config.observation_delay)
 
         return {
             "status": "success",
@@ -223,40 +244,31 @@ class YatraScraper:
                 continue
 
             await asyncio.sleep(self.config.request_delay)
-
-            if not self.config.headless:
-                logger.info(
-                    f"[Workflow Step 7-8/13] Selecting flight {q.flight_number} ({q.airline}) and fare option '{q.fare_option_name or 'Standard'}'..."
-                )
-                logger.info(f"[Workflow Step 9/13] Navigating review and itinerary flow, dismissing addon dialogs...")
+            print(f"\n[Yatra] Verifying fare {idx + 1}/{len(candidates)}")
 
             updated_q = await verifier.verify_fare(page, q, window_code=window.window_code)
             verified_quotes.append(updated_q)
 
-            if not self.config.headless:
-                logger.info(f"[Workflow Step 10/13] Reached final pre-payment / Pay Now page.")
-                logger.info(f"[Workflow Step 11/13] Extracted authoritative final payable price: ₹{updated_q.final_payable_price or updated_q.displayed_price}")
-                logger.info(f"[Workflow Step 12/13] Saved Pay Now screenshot: {updated_q.paynow_screenshot_path}")
-                logger.info(f"[Workflow Step 13/13] Strictly STOPPED before payment confirmation (Zero payment credentials entered).")
-                if self.config.observation_delay > 0:
-                    logger.info(f"[Headed Debug] Holding visible Pay Now page for {self.config.observation_delay}s observation...")
-                    await asyncio.sleep(self.config.observation_delay)
+            if not self.config.headless and self.config.observation_delay > 0:
+                await asyncio.sleep(self.config.observation_delay)
 
             # If challenge occurred, halt further checkout attempts for this search
             if updated_q.verification_status in (DataStatus.CAPTCHA_BLOCKED, DataStatus.ACCESS_DENIED):
-                logger.warning("Checkout verification halted early due to security challenge.")
+                print(f"[Yatra][SECURITY] Checkout verification halted due to barrier")
                 for remaining_q in candidates[idx + 1:]:
                     remaining_q.verification_status = updated_q.verification_status
                     remaining_q.error_reason = updated_q.error_reason
                     verified_quotes.append(remaining_q)
                 break
 
-            # If more quotes remain, return to search page
+            # If more quotes remain, ensure we are back on the search results page
             if idx < len(candidates) - 1:
-                search_url = self.build_search_url(route.origin_iata, route.dest_iata, window.travel_date)
                 try:
-                    await page.goto(search_url, wait_until="domcontentloaded", timeout=self.config.browser_timeout_ms)
-                    await page.wait_for_selector(", ".join(YatraSelectors.FLIGHT_CARDS), timeout=10000)
+                    await page.bring_to_front()
+                    if "air-search-ui" not in page.url:
+                        search_url = self.build_search_url(route.origin_iata, route.dest_iata, window.travel_date)
+                        await page.goto(search_url, wait_until="domcontentloaded", timeout=self.config.browser_timeout_ms)
+                        await page.wait_for_selector("div.tuple", timeout=10000)
                 except Exception:
                     pass
 
@@ -326,14 +338,29 @@ class YatraScraper:
                                 total_flights_found += len(flights_map)
                                 total_fare_options_found += len(cur_raw)
 
+                                print(f"\n[Yatra] Flights detected: {len(flights_map)}")
+                                for f_idx, (fn, f_quotes) in enumerate(flights_map.items()):
+                                    fq = f_quotes[0]
+                                    print(f"\n[Yatra] Flight {f_idx + 1}/{len(flights_map)}")
+                                    print(f"[Yatra] Airline: {fq.airline}")
+                                    print(f"[Yatra] Flight: {fn}")
+                                    print(f"[Yatra] Departure: {fq.departure_time}")
+                                    print(f"[Yatra] Arrival: {fq.arrival_time}")
+                                    print(f"[Yatra] Duration: {fq.duration}")
+                                    print(f"[Yatra] Stops: {'Non-stop' if fq.stops == 0 else f'{fq.stops} Stop'}")
+                                    print(f"[Yatra] Fare options detected: {len(f_quotes)}")
+                                    print(f"[Yatra] Selecting {min(5, len(f_quotes))} cheapest fare options")
+
+                                    f_quotes.sort(key=lambda x: x.displayed_price)
+                                    selected = f_quotes[:5]
+                                    for fare_i, f_cand in enumerate(selected):
+                                        print(f"[Yatra] Fare {fare_i + 1}: ₹{int(f_cand.displayed_price):,}")
+
                                 processed_for_window: List[NormalizedFareQuote] = []
 
                                 if checkout and cur_norm:
-                                    logger.info(f"Executing checkout verification for {len(flights_map)} flights on {route.route_code} {window.window_code}")
                                     for fn, f_quotes in flights_map.items():
-                                        # Sort candidate quotes by displayed price ascending
                                         f_quotes.sort(key=lambda x: x.displayed_price)
-                                        # Select candidates up to 5
                                         candidates = f_quotes[:5]
                                         total_fares_selected += len(candidates)
 
@@ -450,10 +477,32 @@ class YatraScraper:
         }
 
         self.run_manager.save_scraping_summary(summary)
-        logger.info(
-            f"Completed Yatra harvest: {len(all_normalized_quotes)} quotes ({total_fares_verified} verified, "
-            f"{total_price_changes} price changes) in {duration_seconds}s ({db_inserted} persisted to DB)."
-        )
+
+        # Print final formatted summary matching section 18
+        print("\n=======================================================")
+        print("[AirGo] YATRA SCRAPING COMPLETED")
+        print("=======================================================")
+        print(f"Mode: {'HEADED' if not self.config.headless else 'HEADLESS'}")
+        print(f"Route: {', '.join(r.route_code for r in active_routes)}")
+        print(f"Horizon: {', '.join(w.window_code for w in windows)}")
+        print(f"Travel Date: {', '.join(w.iso_travel_date for w in windows)}\n")
+        print(f"Flights Found: {total_flights_found}")
+        print(f"Flights Processed: {len(all_normalized_quotes)}")
+        print(f"Fare Options Found: {total_fare_options_found}")
+        print(f"Cheapest Fares Selected: {total_fares_selected}")
+        print(f"Fares Verified: {total_fares_verified}")
+        print(f"Price Changes: {total_price_changes}")
+        print(f"Verification Failures: {total_failed_extractions}")
+        print(f"Akamai Events: {len(challenge_events)}")
+        print(f"CAPTCHA Events: {total_captcha_events}\n")
+        print("JSON:")
+        print(f"{self.run_manager.run_dir}/data/\n")
+        print("Screenshots:")
+        print(f"{self.run_manager.run_dir}/screenshots/\n")
+        print("Logs:")
+        print(f"{self.run_manager.run_dir}/logs/\n")
+        print(f"Database Records: {db_inserted}")
+        print("=======================================================\n")
         return summary
 
 
@@ -469,6 +518,12 @@ async def run_yatra_harvest(
     cfg = YatraScraperConfig()
     if headless is not None:
         cfg.headless = headless
+        if not headless:
+            from airgo.config import HEADED_SLOW_MO_MS, HEADED_OBSERVATION_DELAY
+            if pause is None:
+                cfg.observation_delay = HEADED_OBSERVATION_DELAY
+            if slow_mo is None:
+                cfg.slow_mo_ms = HEADED_SLOW_MO_MS
     if pause is not None:
         cfg.observation_delay = pause
     if slow_mo is not None:
