@@ -167,12 +167,12 @@ class YatraParser:
 
             # Departure & Arrival times (clean regex match for HH:MM)
             raw_dep = cls._find_element_text(card, YatraSelectors.DEPARTURE_TIME) or ""
-            dep_match = re.search(r"\b\d{1,2}:\d{2}\b", raw_dep)
-            dep_time = dep_match.group(0) if dep_match else "00:00"
+            dep_match = re.search(r"(\d{1,2}:\d{2})", raw_dep)
+            dep_time = dep_match.group(1) if dep_match else "00:00"
 
             raw_arr = cls._find_element_text(card, YatraSelectors.ARRIVAL_TIME) or ""
-            arr_match = re.search(r"\b\d{1,2}:\d{2}\b", raw_arr)
-            arr_time = arr_match.group(0) if arr_match else "00:00"
+            arr_match = re.search(r"(\d{1,2}:\d{2})", raw_arr)
+            arr_time = arr_match.group(1) if arr_match else "00:00"
 
             # Duration and Stops
             raw_dur = cls._find_element_text(card, YatraSelectors.DURATION) or "00h 00m"
