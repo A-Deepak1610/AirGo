@@ -408,6 +408,16 @@ class YatraScraper:
                                                 print(f"[Yatra] Final price: ₹{int(verified_q.final_payable_price)}\n")
                                             else:
                                                 print(f"[Yatra][ERROR] Flight {cand_q.flight_number} verification failed\n")
+                                                # Capture card screenshot as fallback proof so an actual file exists
+                                                if not screenshot_path.exists():
+                                                    try:
+                                                        card = await verifier._find_flight_card(page, cand_q)
+                                                        if card and await card.count() > 0 and await card.is_visible():
+                                                            await card.screenshot(path=str(screenshot_path))
+                                                        else:
+                                                            await page.screenshot(path=str(screenshot_path), full_page=False)
+                                                    except Exception:
+                                                        pass
                                     else:
                                         verified_q = cand_q.model_copy()
                                         try:
@@ -421,6 +431,9 @@ class YatraScraper:
                                                 await page.screenshot(path=str(screenshot_path), full_page=False)
                                             except Exception:
                                                 pass
+
+                                    if not screenshot_path.exists():
+                                        rel_screenshot = None
 
                                     search_price_val = int(round(float(verified_q.displayed_search_price or verified_q.displayed_price)))
                                     final_price_val: Optional[int] = None

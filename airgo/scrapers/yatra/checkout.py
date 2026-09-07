@@ -145,15 +145,19 @@ class YatraCheckoutVerifier:
                 await flight_card_locator.scroll_into_view_if_needed()
                 await asyncio.sleep(0.5)
 
-                # 3. Expand fare options if button present
-                view_fares_btn = flight_card_locator.locator("button[autom='morefares'], button:has-text('View Fares')").first
-                if await view_fares_btn.count() > 0:
-                    try:
-                        await view_fares_btn.scroll_into_view_if_needed()
-                        await view_fares_btn.click(force=True)
-                        await asyncio.sleep(2.0)
-                    except Exception:
-                        pass
+                # 3. Expand fare options if button present and not already expanded
+                book_btn = flight_card_locator.locator("button[autom='booknow']").first
+                if await book_btn.count() == 0 or not await book_btn.is_visible():
+                    view_fares_btn = flight_card_locator.locator(
+                        "button[autom='morefares']:has-text('View Fares'), button:has-text('View Fares')"
+                    ).first
+                    if await view_fares_btn.count() > 0 and await view_fares_btn.is_visible():
+                        try:
+                            await view_fares_btn.scroll_into_view_if_needed()
+                            await view_fares_btn.click(force=True)
+                            await asyncio.sleep(2.0)
+                        except Exception:
+                            pass
 
                 # 4. Locate Book button
                 try:
@@ -171,10 +175,14 @@ class YatraCheckoutVerifier:
                         book_btn = fare_row_btn
 
                 if await book_btn.count() == 0:
-                    quote.verification_status = DataStatus.VERIFICATION_FAILED
-                    quote.error_reason = f"Book button not found for flight {quote.flight_number}"
-                    print(f"[Yatra][ERROR] Book button not found for {quote.flight_number}")
-                    return quote
+                    table_book = page.locator("div.table-box button[autom='booknow'], div.table-box button:has-text('Book')").first
+                    if await table_book.count() > 0 and await table_book.is_visible():
+                        book_btn = table_book
+                    else:
+                        quote.verification_status = DataStatus.VERIFICATION_FAILED
+                        quote.error_reason = f"Book button not found for flight {quote.flight_number}"
+                        print(f"[Yatra][ERROR] Book button not found for {quote.flight_number}")
+                        return quote
 
                 try:
                     await book_btn.scroll_into_view_if_needed()
@@ -371,13 +379,20 @@ class YatraCheckoutVerifier:
     async def _find_flight_card(self, page: Page, quote: NormalizedFareQuote) -> Optional[Any]:
         """Locates the card element matching flight number or airline details."""
         clean_fn = quote.flight_number.replace("-", "").strip()
+        first_segment = quote.flight_number.split("/")[0].strip()
+        first_clean = first_segment.replace("-", "").strip()
+
         card_selectors = [
             f"div.tuple:has-text('{quote.flight_number}')",
             f"div.tuple:has-text('{clean_fn}')",
+            f"div.tuple:has-text('{first_segment}')",
+            f"div.tuple:has-text('{first_clean}')",
             f"div.flightItem:has-text('{quote.flight_number}')",
             f"div.flight-seg:has-text('{quote.flight_number}')",
-            f"div.tuple:has-text('{quote.airline}'):has-text('{quote.departure_time}')",
         ]
+        if quote.departure_time and quote.departure_time != "00:00":
+            card_selectors.append(f"div.tuple:has-text('{quote.airline}'):has-text('{quote.departure_time}')")
+
         for sel in card_selectors:
             try:
                 loc = page.locator(sel)
