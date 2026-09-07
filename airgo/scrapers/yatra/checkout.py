@@ -111,17 +111,16 @@ class YatraCheckoutVerifier:
 
                 # 3. Expand fare options if button present
                 view_fares_btn = flight_card_locator.locator("button[autom='morefares'], button:has-text('View Fares')").first
-                if await view_fares_btn.count() > 0 and await view_fares_btn.is_visible():
+                if await view_fares_btn.count() > 0:
                     try:
-                        await view_fares_btn.click()
+                        await view_fares_btn.scroll_into_view_if_needed()
+                        await view_fares_btn.click(force=True)
                         await asyncio.sleep(1.0)
                     except Exception:
                         pass
 
-                # 4. Click Book button and capture new checkout tab
-                book_btn = flight_card_locator.locator(
-                    "button[autom='booknow'], div.booknow-btn button:has-text('Book'), button.secondary-button:has-text('Book')"
-                ).first
+                # 4. Locate Book button
+                book_btn = flight_card_locator.locator("button[autom='booknow']").first
 
                 if quote.fare_option_name:
                     fare_row_btn = flight_card_locator.locator(
@@ -130,19 +129,31 @@ class YatraCheckoutVerifier:
                     if await fare_row_btn.count() > 0:
                         book_btn = fare_row_btn
 
-                if await book_btn.count() == 0 or not await book_btn.is_visible():
-                    book_btn = flight_card_locator.locator("button.secondary-button, button:has-text('View Fares'), button").first
+                if await book_btn.count() == 0:
+                    try:
+                        await book_btn.wait_for(state="attached", timeout=3000)
+                    except Exception:
+                        pass
+
+                if await book_btn.count() == 0:
+                    quote.verification_status = DataStatus.VERIFICATION_FAILED
+                    quote.error_reason = f"Book button not found for flight {quote.flight_number}"
+                    print(f"[Yatra][ERROR] Book button not found for {quote.flight_number}")
+                    return quote
 
                 try:
+                    await book_btn.scroll_into_view_if_needed()
                     async with page.context.expect_page(timeout=15000) as new_page_info:
                         await book_btn.click(force=True)
                     checkout_page = await new_page_info.value
                     await checkout_page.wait_for_load_state("domcontentloaded", timeout=20000)
                     print("[Yatra] Booking page loaded")
                     await asyncio.sleep(2.0)
-                except Exception:
-                    # If expect_page failed or same page navigated
-                    checkout_page = page
+                except Exception as open_err:
+                    quote.verification_status = DataStatus.VERIFICATION_FAILED
+                    quote.error_reason = f"Checkout page failed to open: {open_err}"
+                    print(f"[Yatra][ERROR] Checkout page failed to open for {quote.flight_number}")
+                    return quote
 
                 # 5. Dismiss login popup modal if present
                 for _ in range(3):
@@ -303,6 +314,10 @@ class YatraCheckoutVerifier:
                     await checkout_page.close()
                 except Exception:
                     pass
+            try:
+                await page.bring_to_front()
+            except Exception:
+                pass
 
         return quote
 
