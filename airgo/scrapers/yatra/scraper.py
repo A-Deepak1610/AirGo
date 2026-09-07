@@ -365,6 +365,18 @@ class YatraScraper:
                                         candidates = f_quotes[:5]
                                         total_fares_selected += len(candidates)
 
+                                        page_closed = False
+                                        try:
+                                            v = page.is_closed()
+                                            if isinstance(v, bool):
+                                                page_closed = v
+                                        except Exception:
+                                            pass
+
+                                        if page_closed:
+                                            print(f"[Yatra] Search results page is closed. Halting further checkout verification.")
+                                            break
+
                                         try:
                                             await page.bring_to_front()
                                             await asyncio.sleep(1.0)

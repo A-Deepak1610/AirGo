@@ -80,6 +80,20 @@ class YatraCheckoutVerifier:
         8. Halts strictly without payment.
         9. Closes checkout tab.
         """
+        is_closed = False
+        try:
+            val = page.is_closed()
+            if isinstance(val, bool):
+                is_closed = val
+        except Exception:
+            pass
+
+        if is_closed:
+            quote.verification_status = DataStatus.VERIFICATION_FAILED
+            quote.error_reason = "Search page is closed"
+            print(f"[Yatra][ERROR] Search page was closed for {quote.flight_number}")
+            return quote
+
         print(f"[Yatra] Opening booking flow for {quote.flight_number} ({quote.airline})...")
         logger.info(
             f"Initiating checkout verification for {quote.route} | {quote.flight_number} | "
