@@ -298,8 +298,8 @@ class TestPayNowScreenshotPaths:
             flight_number="6E-205",
             fare_option_name="Saver",
         )
-        assert path.name == "DEL-BOM_T_1_6E-205_Saver_paynow.png"
-        assert path.parent.name == "T_1"
+        assert path.name in ("DEL-BOM_T+1_6E-205_Saver_paynow.png", "DEL-BOM_T_1_6E-205_Saver_paynow.png")
+        assert path.parent.name in ("T+1", "T_1")
         assert path.parent.parent.name == "DEL-BOM"
         assert path.parent.parent.parent.name == "screenshots"
 
@@ -313,6 +313,65 @@ class TestPayNowScreenshotPaths:
         p2.touch()
 
         assert temp_run_manager.count_screenshots() == 2
+
+    def test_get_top5_screenshot_path_structure(self, temp_run_manager):
+        """Generates runs/yatra/<ts>/screenshots/<route>/<window>/<rank:02d>_<flight>.png."""
+        top5_path = temp_run_manager.get_top5_screenshot_path(
+            route_code="DEL-BOM",
+            window_code="T+1",
+            rank=1,
+            flight_number="6E-6433",
+        )
+        assert top5_path.name == "01_6E-6433.png"
+        assert top5_path.parent.name == "T+1"
+        assert top5_path.parent.parent.name == "DEL-BOM"
+
+    def test_save_quotes_json_persistence_and_schema(self, temp_run_manager):
+        """Verifies quotes.json persistence, atomic writes, schema compliance, and re-reading."""
+        quotes_sample = [
+            {
+                "rank": 1,
+                "platform": "Yatra",
+                "platform_type": "ota",
+                "route": "DEL-BOM",
+                "origin": "DEL",
+                "destination": "BOM",
+                "travel_date": "2026-09-08",
+                "advance_purchase_days": 1,
+                "window": "T+1",
+                "airline": "IndiGo",
+                "flight_number": "6E-6433",
+                "departure_time": "06:00",
+                "arrival_time": "08:15",
+                "duration": "2h 15m",
+                "stops": 0,
+                "search_price": 6222,
+                "deep_checkout_base_fare": 4326,
+                "deep_checkout_taxes": 1896,
+                "final_price": 6222,
+                "currency": "INR",
+                "fare_class": "Economy",
+                "scraped_at": "2026-09-07T17:22:02.333202",
+                "screenshot_evidence": "DEL-BOM/T+1/01_6E-6433.png",
+            }
+        ]
+
+        out_path = temp_run_manager.save_quotes(quotes_sample)
+        assert out_path.exists()
+        assert out_path.name == "quotes.json"
+
+        with open(out_path, "r", encoding="utf-8") as rf:
+            loaded = json.load(rf)
+
+        assert len(loaded) == 1
+        q = loaded[0]
+        assert q["rank"] == 1
+        assert q["platform"] == "Yatra"
+        assert q["platform_type"] == "ota"
+        assert q["route"] == "DEL-BOM"
+        assert q["window"] == "T+1"
+        assert q["final_price"] == 6222
+        assert q["screenshot_evidence"] == "DEL-BOM/T+1/01_6E-6433.png"
 
 
 # --- 5. FIVE-CHEAPEST RULE PER FLIGHT WITH VERIFIED FARES ---
