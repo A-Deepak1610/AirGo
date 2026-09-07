@@ -122,6 +122,14 @@ class YatraCheckoutVerifier:
                 book_btn = flight_card_locator.locator(
                     "button[autom='booknow'], div.booknow-btn button:has-text('Book'), button.secondary-button:has-text('Book')"
                 ).first
+
+                if quote.fare_option_name:
+                    fare_row_btn = flight_card_locator.locator(
+                        f"div.table-box:has-text('{quote.fare_option_name}') button[autom='booknow']"
+                    ).first
+                    if await fare_row_btn.count() > 0:
+                        book_btn = fare_row_btn
+
                 if await book_btn.count() == 0 or not await book_btn.is_visible():
                     book_btn = flight_card_locator.locator("button.secondary-button, button:has-text('View Fares'), button").first
 
@@ -312,7 +320,7 @@ class YatraCheckoutVerifier:
             try:
                 loc = page.locator(sel)
                 first_loc = getattr(loc, "first", loc)
-                if await first_loc.count() > 0 and await first_loc.is_visible():
+                if await first_loc.count() > 0:
                     return first_loc
             except Exception:
                 continue
