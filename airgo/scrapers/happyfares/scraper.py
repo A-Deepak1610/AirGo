@@ -127,27 +127,29 @@ class HappyFaresScraper:
             "timezone_id": "Asia/Kolkata",
         }
         if self.headless:
-            launch_kwargs["viewport"] = {"width": 1440, "height": 900}
+            launch_kwargs["viewport"] = {"width": 1440, "height": 1200}
         else:
             launch_kwargs["no_viewport"] = True
             launch_kwargs["slow_mo"] = 500
 
         return await p.chromium.launch_persistent_context(**launch_kwargs)
 
-    async def _safe_capture_screenshot(self, page: Page, path: Path):
-        """Scrolls and captures high-resolution screenshot without exceeding Chromium limits."""
+    async def _safe_capture_screenshot(self, page: Page, path: Path, scroll_to_cards: bool = False):
+        """Captures high-resolution screenshot ensuring search price results or checkout are centered."""
         path.parent.mkdir(parents=True, exist_ok=True)
         try:
-            await page.evaluate(r"""async () => {
-                const scrollHeight = document.body.scrollHeight || document.documentElement.scrollHeight;
-                const step = 400;
-                for (let y = 0; y < Math.min(scrollHeight, 2500); y += step) {
-                    window.scrollBy(0, step);
-                    await new Promise(res => setTimeout(res, 50));
-                }
-                window.scrollTo(0, 0);
-                await new Promise(res => setTimeout(res, 100));
-            }""")
+            if scroll_to_cards:
+                await page.evaluate(r"""() => {
+                    const firstCard = document.querySelector('.search-card');
+                    if (firstCard) {
+                        firstCard.scrollIntoView({behavior: 'instant', block: 'start'});
+                        window.scrollBy(0, -70);
+                    }
+                }""")
+                await asyncio.sleep(0.5)
+            else:
+                await page.evaluate(r"""() => { window.scrollTo(0, 0); }""")
+                await asyncio.sleep(0.3)
         except Exception:
             pass
 
@@ -165,12 +167,12 @@ class HappyFaresScraper:
             cards.forEach((card, idx) => {
                 const text = card.innerText || '';
 
-                // 1. Airline and Flight Number (e.g. 'SG-164 | SpiceJet' or '6E-6027,6229 | Indigo')
+                // 1. Airline and Flight Number (e.g. 'SG-164 | SpiceJet', '6E- 738 | Indigo', or '6E- 571, 847 | Indigo')
                 let flightNo = 'FLT';
                 let airline = 'Unknown Airline';
-                const fnMatch = text.match(/([A-Z0-9]{2}(?:-[0-9]+(?:,[0-9]+)*)?)\s*\|\s*([A-Za-z\s]+)/);
+                const fnMatch = text.match(/([A-Z0-9]{2}(?:\s*-\s*[0-9]+(?:\s*,\s*[0-9]+)*)?)\s*\|\s*([A-Za-z\s]+)/);
                 if (fnMatch) {
-                    flightNo = fnMatch[1].trim();
+                    flightNo = fnMatch[1].replace(/\s+/g, '').trim();
                     airline = fnMatch[2].trim();
                 }
 
@@ -236,8 +238,9 @@ class HappyFaresScraper:
                 const seats = seatMatch ? seatMatch[1] : null;
 
                 // 7. Baggage
-                const bagMatch = text.match(/(\d+\s*kg\s*\([^)]*\))/i);
-                const baggage = bagMatch ? bagMatch[1] : '15 kg';
+                const bagMatches = text.match(/(\d+\s*kg\s*\([^)]*\))/gi);
+                const checkInBaggage = bagMatches && bagMatches.length > 0 ? bagMatches[0] : '15 kg (1 Piece Only)';
+                const cabinBaggage = bagMatches && bagMatches.length > 1 ? bagMatches[1] : '7 kg (1 PC)';
 
                 if (netPrice > 0) {
                     results.push({
@@ -252,7 +255,9 @@ class HappyFaresScraper:
                         regularPrice: regularPrice,
                         discountAmount: discountAmount,
                         availableSeats: seats,
-                        baggage: baggage
+                        checkInBaggage: checkInBaggage,
+                        cabinBaggage: cabinBaggage,
+                        baggage: checkInBaggage
                     });
                 }
             });
@@ -491,7 +496,7 @@ class HappyFaresScraper:
 
                         # Capture 00_search_results.png
                         shot_00 = window_dir / "00_search_results.png"
-                        await self._safe_capture_screenshot(page, shot_00)
+                        await self._safe_capture_screenshot(page, shot_00, scroll_to_cards=True)
                         print(f"  [Screenshot] Saved Ground-Truth Search Results: {shot_00.name}")
 
                         # Extract listings directly from rendered DOM
