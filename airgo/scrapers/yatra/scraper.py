@@ -17,7 +17,13 @@ from airgo.scrapers.yatra.browser import BROWSER_MANAGER, PlaywrightBrowserManag
 from airgo.scrapers.yatra.config import DEFAULT_YATRA_CONFIG, YatraScraperConfig
 from airgo.scrapers.yatra.dates import SearchWindow, generate_search_windows
 from airgo.scrapers.yatra.db_adapter import persist_fare_quotes_to_db
-from airgo.scrapers.yatra.models import AntiBotEvent, NormalizedFareQuote
+from airgo.scrapers.yatra.models import (
+    AntiBotEvent,
+    AntiBotEventType,
+    AvailabilityStatus,
+    DataStatus,
+    NormalizedFareQuote,
+)
 from airgo.scrapers.yatra.parser import YatraParser
 from airgo.scrapers.yatra.routes import RouteDefinition, get_route, list_routes
 from airgo.scrapers.yatra.run_manager import YatraRunManager
@@ -178,19 +184,66 @@ class YatraScraper:
             "normalized_quotes": normalized_quotes,
         }
 
+    async def verify_candidates(
+        self,
+        page: Page,
+        candidates: List[NormalizedFareQuote],
+        route: RouteDefinition,
+        window: SearchWindow,
+    ) -> List[NormalizedFareQuote]:
+        """
+        Runs checkout verification for candidate quotes.
+        Navigates each candidate through the booking flow up to Pay Now.
+        """
+        from airgo.scrapers.yatra.checkout import YatraCheckoutVerifier
+
+        verifier = YatraCheckoutVerifier(run_manager=self.run_manager)
+        verified_quotes: List[NormalizedFareQuote] = []
+
+        for idx, q in enumerate(candidates):
+            if q.availability_status == AvailabilityStatus.SOLD_OUT:
+                verified_quotes.append(q)
+                continue
+
+            await asyncio.sleep(self.config.request_delay)
+            updated_q = await verifier.verify_fare(page, q, window_code=window.window_code)
+            verified_quotes.append(updated_q)
+
+            # If challenge occurred, halt further checkout attempts for this search
+            if updated_q.verification_status in (DataStatus.CAPTCHA_BLOCKED, DataStatus.ACCESS_DENIED):
+                logger.warning("Checkout verification halted early due to security challenge.")
+                # Preserve remaining candidates as unverified
+                for remaining_q in candidates[idx + 1:]:
+                    remaining_q.verification_status = updated_q.verification_status
+                    remaining_q.error_reason = updated_q.error_reason
+                    verified_quotes.append(remaining_q)
+                break
+
+            # If more quotes remain, return to search page
+            if idx < len(candidates) - 1:
+                search_url = self.build_search_url(route.origin_iata, route.dest_iata, window.travel_date)
+                try:
+                    await page.goto(search_url, wait_until="domcontentloaded", timeout=self.config.browser_timeout_ms)
+                    await page.wait_for_selector(", ".join(YatraSelectors.FLIGHT_CARDS), timeout=10000)
+                except Exception:
+                    pass
+
+        return verified_quotes
+
     async def run_harvest(
         self,
         route_codes: Optional[List[str]] = None,
         horizons: Optional[List[int]] = None,
+        checkout: bool = False,
         persist_db: bool = True,
     ) -> Dict[str, Any]:
         """
         Master execution runner:
         Iterates over routes and horizons with controlled concurrency, rate delays,
-        and backoff.
+        optional deep checkout verification, and artifact collection.
         """
         start_time = datetime.now(timezone.utc)
-        logger.info(f"Starting Yatra Harvest Job [Run ID: {self.run_manager.run_id}]")
+        logger.info(f"Starting Yatra Harvest Job [Run ID: {self.run_manager.run_id}, Checkout: {checkout}]")
 
         # Select target corridors
         if route_codes:
@@ -204,11 +257,15 @@ class YatraScraper:
         challenge_events: List[AntiBotEvent] = []
         failures: List[Dict[str, Any]] = []
 
+        total_flights_found = 0
+        total_fare_options_found = 0
+        total_fares_selected = 0
+
         semaphore = asyncio.Semaphore(self.config.max_concurrency)
 
         async def _execute_single(route: RouteDefinition, window: SearchWindow):
+            nonlocal total_flights_found, total_fare_options_found, total_fares_selected
             async with semaphore:
-                # Polite inter-request delay
                 await asyncio.sleep(self.config.request_delay)
 
                 retries = 0
@@ -219,19 +276,58 @@ class YatraScraper:
                         ) as page:
                             res = await self.search_route_window(page, route, window)
 
-                        if res["status"] == "challenge":
-                            challenge_events.append(res["challenge"])
-                            # Back off gently without aggressive hammering
-                            await asyncio.sleep(self.config.request_delay * self.config.backoff_factor)
-                            break
-                        elif res["status"] == "success":
-                            all_raw_quotes.extend(res["raw_quotes"])
-                            all_normalized_quotes.extend(res["normalized_quotes"])
-                            break
-                        else:
-                            retries += 1
-                            backoff = self.config.request_delay * (self.config.backoff_factor ** retries)
-                            await asyncio.sleep(backoff)
+                            if res["status"] == "challenge":
+                                challenge_events.append(res["challenge"])
+                                await asyncio.sleep(self.config.request_delay * self.config.backoff_factor)
+                                break
+                            elif res["status"] == "success":
+                                cur_raw = res["raw_quotes"]
+                                cur_norm = res["normalized_quotes"]
+                                all_raw_quotes.extend(cur_raw)
+
+                                # Group by flight number
+                                flights_map: Dict[str, List[NormalizedFareQuote]] = {}
+                                for q in cur_norm:
+                                    flights_map.setdefault(q.flight_number, []).append(q)
+
+                                total_flights_found += len(flights_map)
+                                total_fare_options_found += len(cur_raw)
+
+                                processed_for_window: List[NormalizedFareQuote] = []
+
+                                if checkout and cur_norm:
+                                    logger.info(f"Executing checkout verification for {len(flights_map)} flights on {route.route_code} {window.window_code}")
+                                    for fn, f_quotes in flights_map.items():
+                                        # Sort candidate quotes by displayed price ascending
+                                        f_quotes.sort(key=lambda x: x.displayed_price)
+                                        # Select candidates up to 5
+                                        candidates = f_quotes[:5]
+                                        total_fares_selected += len(candidates)
+
+                                        # Verify candidates through checkout
+                                        verified = await self.verify_candidates(page, candidates, route, window)
+
+                                        # Re-sort using final_payable_price where available
+                                        verified.sort(
+                                            key=lambda x: (
+                                                x.final_payable_price if x.final_payable_price is not None else x.displayed_price
+                                            )
+                                        )
+                                        # Keep strictly the 5 cheapest per flight
+                                        processed_for_window.extend(verified[:5])
+                                else:
+                                    for fn, f_quotes in flights_map.items():
+                                        f_quotes.sort(key=lambda x: x.displayed_price)
+                                        selected = f_quotes[:5]
+                                        total_fares_selected += len(selected)
+                                        processed_for_window.extend(selected)
+
+                                all_normalized_quotes.extend(processed_for_window)
+                                break
+                            else:
+                                retries += 1
+                                backoff = self.config.request_delay * (self.config.backoff_factor ** retries)
+                                await asyncio.sleep(backoff)
                     except Exception as exc:
                         retries += 1
                         logger.warning(
@@ -267,27 +363,63 @@ class YatraScraper:
         end_time = datetime.now(timezone.utc)
         duration_seconds = round((end_time - start_time).total_seconds(), 2)
 
+        # Compute summary metrics
+        total_fares_verified = sum(1 for q in all_normalized_quotes if q.verification_status == DataStatus.FARE_VERIFIED)
+        total_price_changes = sum(1 for q in all_normalized_quotes if q.verification_status == DataStatus.PRICE_CHANGED)
+        total_sold_out = sum(
+            1 for q in all_normalized_quotes
+            if q.verification_status == DataStatus.SOLD_OUT or q.availability_status == AvailabilityStatus.SOLD_OUT
+        )
+        total_failed_extractions = sum(
+            1 for q in all_normalized_quotes if q.verification_status == DataStatus.VERIFICATION_FAILED
+        ) + len(failures)
+        total_successful_extractions = len(all_normalized_quotes) - total_failed_extractions
+
+        total_captcha_events = sum(
+            1 for e in challenge_events if e.event_type in (AntiBotEventType.CAPTCHA, "captcha")
+        )
+        total_access_denied_events = sum(
+            1 for e in challenge_events if e.event_type in (AntiBotEventType.ACCESS_DENIED, "access_denied")
+        )
+
+        screenshot_count = self.run_manager.count_screenshots()
+
+        overall_status = "COMPLETED"
+        if not all_normalized_quotes and (failures or challenge_events):
+            overall_status = "FAILED"
+        elif failures or challenge_events or total_failed_extractions > 0:
+            overall_status = "PARTIAL"
+
         summary = {
             "run_id": self.run_manager.run_id,
-            "platform": "Yatra",
             "started_at": start_time.isoformat(),
             "completed_at": end_time.isoformat(),
+            "source": "Yatra",
+            "routes_requested": [r.route_code for r in active_routes],
+            "advance_purchase_windows": [w.window_code for w in windows],
+            "total_searches": len(active_routes) * len(windows),
+            "total_flights_found": total_flights_found,
+            "total_fare_options_found": total_fare_options_found,
+            "total_fares_selected": total_fares_selected,
+            "total_fares_verified": total_fares_verified,
+            "total_successful_extractions": total_successful_extractions,
+            "total_failed_extractions": total_failed_extractions,
+            "total_sold_out": total_sold_out,
+            "total_price_changes": total_price_changes,
+            "total_antibot_events": len(challenge_events),
+            "total_captcha_events": total_captcha_events,
+            "total_access_denied_events": total_access_denied_events,
+            "screenshot_count": screenshot_count,
+            "overall_status": overall_status,
             "duration_seconds": duration_seconds,
-            "routes_count": len(active_routes),
-            "windows_count": len(windows),
-            "total_raw_quotes": len(all_raw_quotes),
-            "total_normalized_quotes": len(all_normalized_quotes),
             "db_inserted_quotes": db_inserted,
-            "challenges_encountered": len(challenge_events),
-            "failures_count": len(failures),
-            "failures": failures,
             "artifacts_directory": str(self.run_manager.run_dir),
         }
 
         self.run_manager.save_scraping_summary(summary)
         logger.info(
-            f"Completed Yatra harvest: {len(all_normalized_quotes)} quotes captured in {duration_seconds}s "
-            f"({db_inserted} persisted to DB)."
+            f"Completed Yatra harvest: {len(all_normalized_quotes)} quotes ({total_fares_verified} verified, "
+            f"{total_price_changes} price changes) in {duration_seconds}s ({db_inserted} persisted to DB)."
         )
         return summary
 
@@ -295,11 +427,12 @@ class YatraScraper:
 async def run_yatra_harvest(
     routes: Optional[List[str]] = None,
     horizons: Optional[List[int]] = None,
+    checkout: bool = False,
     headless: Optional[bool] = None,
 ) -> Dict[str, Any]:
-    """Helper entrypoint to trigger Yatra harvest with custom filters."""
+    """Helper entrypoint to trigger Yatra harvest with custom filters and checkout toggle."""
     cfg = YatraScraperConfig()
     if headless is not None:
         cfg.headless = headless
     scraper = YatraScraper(config=cfg)
-    return await scraper.run_harvest(route_codes=routes, horizons=horizons)
+    return await scraper.run_harvest(route_codes=routes, horizons=horizons, checkout=checkout)

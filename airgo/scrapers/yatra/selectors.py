@@ -136,3 +136,118 @@ class YatraSelectors:
         "Please verify you are a human",
         "Pardon Our Interruption",
     ]
+
+    # --- Phase 3: Booking Flow & Pre-Payment / Pay Now Selectors ---
+
+    # Flight card booking / selection buttons
+    BOOK_BUTTON: List[str] = [
+        "button.booking-btn",
+        "button[class*='book']",
+        "button[class*='choose']",
+        "input[value*='Book']",
+        "button:has-text('Book Now')",
+        "button:has-text('Book')",
+        "button:has-text('View Fares')",
+    ]
+
+    # Fare option selection buttons inside fare bundles
+    SELECT_FARE_BUTTON: List[str] = [
+        "button.select-fare-btn",
+        "button[class*='select-fare']",
+        "div.fare-option button",
+        "button:has-text('Book Fare')",
+        "button:has-text('Select')",
+    ]
+
+    # Review / Itinerary progression buttons
+    CONTINUE_BOOKING_BUTTON: List[str] = [
+        "button:has-text('Continue Booking')",
+        "button:has-text('Continue to Passenger Details')",
+        "button:has-text('Proceed to Payment')",
+        "button:has-text('Proceed to Pay')",
+        "button:has-text('Continue')",
+        "button:has-text('Proceed')",
+        "button[id*='continue']",
+        "input[value*='Continue']",
+    ]
+
+    # Popups, add-ons (insurance, seats, meals) skip/dismiss buttons
+    ADDON_SKIP_BUTTON: List[str] = [
+        "button:has-text('No, I will take the risk')",
+        "button:has-text('Skip to Payment')",
+        "button:has-text('Skip')",
+        "button:has-text('Maybe Later')",
+        "button:has-text('No Thanks')",
+        "span.close-popup",
+        "button.close",
+        "button[class*='close']",
+        "a:has-text('Skip')",
+    ]
+
+    # Pre-payment / Pay Now page container indicators
+    PAYNOW_CONTAINER: List[str] = [
+        "div.payment-options",
+        "div[class*='payment-container']",
+        "div[class*='payment-wrapper']",
+        "div#payment-modes",
+        "div[class*='pay-now']",
+        "button:has-text('Pay Now')",
+        "button:has-text('Make Payment')",
+        "button[id*='payNow']",
+    ]
+
+    # Pre-Payment / Pay Now total payable amount
+    PAYNOW_TOTAL_AMOUNT: List[str] = [
+        "span.total-payable",
+        "div[class*='total-amount']",
+        "span[class*='final-amount']",
+        "div.pay-amount",
+        "span.pay-amount",
+        "span[id*='totalPayable']",
+        "span[id*='payableAmount']",
+        "div.grand-total",
+        "span.grand-total",
+        "div[class*='total-fare']",
+        "p[class*='total-payable']",
+        "span[class*='total-price']",
+    ]
+
+    # Pre-Payment breakdown components (where exposed)
+    PAYNOW_BASE_FARE: List[str] = [
+        "span.base-fare",
+        "div.base-fare",
+        "span[class*='base-fare']",
+        "div[class*='baseFare']",
+        "td.base-fare",
+    ]
+    PAYNOW_TAXES: List[str] = [
+        "span.tax-amount",
+        "div.tax-amount",
+        "span[class*='taxes']",
+        "span[class*='tax']",
+        "div[class*='taxes']",
+        "td.tax-amount",
+    ]
+    PAYNOW_CONVENIENCE_FEE: List[str] = [
+        "span.convenience-fee",
+        "div.convenience-fee",
+        "span[class*='convenience']",
+        "div[class*='convenienceFee']",
+        "td.convenience-fee",
+    ]
+    PAYNOW_OTHER_CHARGES: List[str] = [
+        "span.other-charges",
+        "div.other-charges",
+        "span[class*='surcharges']",
+        "div[class*='udf']",
+        "td.other-charges",
+    ]
+
+    # Price change and sold-out notifications during checkout
+    PRICE_CHANGE_ALERT: List[str] = [
+        "div[class*='price-change']",
+        "div[class*='fare-update']",
+        "div[class*='alert-warning']",
+        "div.fare-change",
+        "p[class*='price-change']",
+    ]

@@ -30,13 +30,19 @@ def start_server(host: str = "127.0.0.1", port: int = 8000, reload: bool = True)
     uvicorn.run("airgo.api.app:app", host=host, port=port, reload=reload)
 
 
-def run_pipeline(routes: Optional[str] = None, top_n: int = 3, horizons: str = "1,7,15,30,45", headless: Optional[bool] = None):
+def run_pipeline(
+    routes: Optional[str] = None,
+    top_n: int = 3,
+    horizons: str = "1,7,15,30,45",
+    checkout: bool = False,
+    headless: Optional[bool] = None,
+):
     """Executes the automated end-to-end harvest across Yatra corridors."""
     import asyncio
     from airgo.scrapers.yatra import run_yatra_harvest, list_routes
 
     print("\n=======================================================")
-    print("[AirGo] Launching Yatra Airfare Scraper Pipeline...")
+    print(f"[AirGo] Launching Yatra Airfare Scraper Pipeline (Checkout Verification: {checkout})...")
     print("=======================================================\n")
 
     horizons_list = [int(h.strip()) for h in horizons.split(",") if h.strip().isdigit()]
@@ -51,11 +57,13 @@ def run_pipeline(routes: Optional[str] = None, top_n: int = 3, horizons: str = "
         run_yatra_harvest(
             routes=route_codes,
             horizons=horizons_list,
+            checkout=checkout,
             headless=headless,
         )
     )
     print("\n=======================================================")
-    print(f"[AirGo] Yatra Harvest Completed: {summary['total_normalized_quotes']} quotes captured.")
+    print(f"[AirGo] Yatra Harvest Completed: {summary['total_fares_selected']} fares selected, {summary['total_fares_verified']} verified.")
+    print(f"        Price changes detected: {summary.get('total_price_changes', 0)}")
     print(f"        Artifacts saved to: {summary['artifacts_directory']}")
     print(f"        Database records persisted: {summary['db_inserted_quotes']}")
     print("=======================================================\n")
@@ -110,6 +118,7 @@ def main():
             routes=args.routes,
             top_n=args.top_n,
             horizons=args.horizons,
+            checkout=args.checkout,
             headless=headless_mode,
         )
 

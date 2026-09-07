@@ -151,6 +151,10 @@ CREATE TABLE IF NOT EXISTS fare_quotes (
     convenience_fee            NUMERIC(10,2) DEFAULT 0,  -- OTA-specific; 0 for airline direct
     other_surcharges           NUMERIC(10,2) DEFAULT 0,
     total_fare                  NUMERIC(10,2) NOT NULL,   -- base + taxes + udf + convenience + other
+    displayed_search_price      NUMERIC(10,2),            -- initial displayed price on search result page
+    final_payable_price         NUMERIC(10,2),            -- verified price at pre-payment / pay now stage
+    verification_status         TEXT DEFAULT 'SEARCH_RESULT',
+    verification_timestamp      TIMESTAMPTZ,
     currency                  CHAR(3) DEFAULT 'INR',
 
     -- capacity

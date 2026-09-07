@@ -93,16 +93,37 @@ class NormalizedFareQuote(BaseModel):
     convenience_fee: Decimal = Decimal("0.00")
     other_charges: Decimal = Decimal("0.00")
     displayed_price: Decimal
+    displayed_search_price: Optional[Decimal] = None
     final_payable_price: Optional[Decimal] = None
+    price_difference: Optional[Decimal] = None
     currency: str = "INR"
 
     # Status & Audit Tracking
     availability_status: AvailabilityStatus = AvailabilityStatus.AVAILABLE
     scraped_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     verification_status: DataStatus = DataStatus.SEARCH_RESULT
+    verification_timestamp: Optional[datetime] = None
     error_reason: Optional[str] = None
+    paynow_screenshot_path: Optional[str] = None
 
-    @field_validator("base_fare", "taxes", "fees", "convenience_fee", "other_charges", "displayed_price", "final_payable_price", mode="before")
+    def model_post_init(self, __context) -> None:
+        if self.displayed_search_price is None:
+            self.displayed_search_price = self.displayed_price
+        if self.final_payable_price is not None and self.price_difference is None:
+            self.price_difference = (self.final_payable_price - self.displayed_search_price).quantize(Decimal("0.01"))
+
+    @field_validator(
+        "base_fare",
+        "taxes",
+        "fees",
+        "convenience_fee",
+        "other_charges",
+        "displayed_price",
+        "displayed_search_price",
+        "final_payable_price",
+        "price_difference",
+        mode="before",
+    )
     @classmethod
     def parse_decimals(cls, v):
         if v is None:

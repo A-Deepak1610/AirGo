@@ -263,7 +263,8 @@ class YatraParser:
                     fees=Decimal("0.00"),
                     convenience_fee=Decimal("0.00"),
                     displayed_price=price_dec,
-                    final_payable_price=price_dec,
+                    displayed_search_price=price_dec,
+                    final_payable_price=None,
                     currency="INR",
                     availability_status=avail_status,
                     verification_status=DataStatus.SEARCH_RESULT,
@@ -274,3 +275,98 @@ class YatraParser:
             f"Parsed {len(cards)} flight cards for {route_code} (Generated {len(normalized_quotes)} quotes, selecting <= 5 fares/flight)"
         )
         return raw_quotes, normalized_quotes
+
+    @classmethod
+    def parse_paynow_breakdown(cls, html: str) -> Dict[str, Optional[Decimal]]:
+        """
+        Extracts final payable total and component fee breakdown from the pre-payment / Pay Now page.
+        Returns a dictionary with Decimal values or None.
+        """
+        soup = BeautifulSoup(html, "html.parser")
+
+        def _extract_decimal(selectors: List[str]) -> Optional[Decimal]:
+            for sel in selectors:
+                el = soup.select_one(sel)
+                if el:
+                    text_val = el.get_text().strip()
+                    try:
+                        return normalize_price(text_val)
+                    except ValueError:
+                        continue
+            return None
+
+        final_payable = _extract_decimal(YatraSelectors.PAYNOW_TOTAL_AMOUNT)
+        base_fare = _extract_decimal(YatraSelectors.PAYNOW_BASE_FARE)
+        taxes = _extract_decimal(YatraSelectors.PAYNOW_TAXES)
+        convenience_fee = _extract_decimal(YatraSelectors.PAYNOW_CONVENIENCE_FEE)
+        other_charges = _extract_decimal(YatraSelectors.PAYNOW_OTHER_CHARGES)
+
+        # Fallback: check table rows for labeled fee components
+        for tr in soup.find_all("tr"):
+            cells = tr.find_all(["td", "th"])
+            if len(cells) >= 2:
+                label_text = cells[0].get_text().lower()
+                val_text = cells[-1].get_text().strip()
+                try:
+                    price_val = normalize_price(val_text)
+                    if not final_payable and ("total" in label_text or "payable" in label_text):
+                        final_payable = price_val
+                    elif not base_fare and "base" in label_text:
+                        base_fare = price_val
+                    elif not taxes and ("tax" in label_text or ("fee" in label_text and "convenience" not in label_text)):
+                        taxes = price_val
+                    elif not convenience_fee and "convenience" in label_text:
+                        convenience_fee = price_val
+                    elif not other_charges and ("other" in label_text or "udf" in label_text):
+                        other_charges = price_val
+                except ValueError:
+                    continue
+
+        return {
+            "final_payable_price": final_payable,
+            "base_fare": base_fare,
+            "taxes": taxes,
+            "convenience_fee": convenience_fee,
+            "other_charges": other_charges,
+        }
+
+    @classmethod
+    def detect_price_change_alert(cls, html: str) -> Optional[str]:
+        """
+        Detects price change or seat unavailability alerts during checkout.
+        """
+        soup = BeautifulSoup(html, "html.parser")
+        for sel in YatraSelectors.PRICE_CHANGE_ALERT:
+            el = soup.select_one(sel)
+            if el and el.get_text().strip():
+                return el.get_text().strip()
+
+        text_content = soup.get_text().lower()
+        signatures = [
+            "fare has changed",
+            "price has increased",
+            "fare has increased",
+            "price has changed",
+            "fare updated",
+            "price updated",
+            "fare increase",
+        ]
+        for sig in signatures:
+            if sig in text_content:
+                return sig.title()
+
+        return None
+
+    @classmethod
+    def is_paynow_page(cls, html: str) -> bool:
+        """
+        Determines whether the rendered HTML corresponds to the final pre-payment / Pay Now page.
+        """
+        soup = BeautifulSoup(html, "html.parser")
+        for sel in YatraSelectors.PAYNOW_CONTAINER:
+            if soup.select_one(sel):
+                return True
+        text_content = soup.get_text().lower()
+        if "pay now" in text_content or "make payment" in text_content or "payment options" in text_content:
+            return True
+        return False

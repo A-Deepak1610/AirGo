@@ -71,8 +71,39 @@ class YatraRunManager:
         if not clean_label.endswith(ext):
             clean_label += ext
 
-        filename = f"{self._sanitize_filename(route_code)}_{self._sanitize_filename(window_code)}_{clean_label}"
+        clean_route = self._sanitize_filename(route_code)
+        clean_window = self._sanitize_filename(window_code)
+        prefix = f"{clean_route}_{clean_window}_"
+
+        # Avoid duplicating route and window prefix if already present
+        if clean_label.startswith(prefix):
+            filename = clean_label
+        else:
+            filename = f"{prefix}{clean_label}"
+
         return window_dir / filename
+
+    def get_paynow_screenshot_path(
+        self,
+        route_code: str,
+        window_code: str,
+        flight_number: str,
+        fare_option_name: str = "fare_1",
+    ) -> Path:
+        """
+        Computes target path for a Pay Now / pre-payment verification screenshot.
+        Example: runs/yatra/<ts>/screenshots/DEL-BOM/T+1/DEL-BOM_T+1_6E-205_Saver_paynow.png
+        """
+        clean_flight = self._sanitize_filename(flight_number)
+        clean_fare = self._sanitize_filename(fare_option_name or "fare_1")
+        label = f"{clean_flight}_{clean_fare}_paynow.png"
+        return self.get_screenshot_path(route_code, window_code, label)
+
+    def count_screenshots(self) -> int:
+        """Counts all screenshot images stored across the run directory."""
+        if not self.screenshots_dir.exists():
+            return 0
+        return len(list(self.screenshots_dir.glob("**/*.png")))
 
     def save_raw_quotes(self, raw_quotes: List[Dict[str, Any]]) -> Path:
         """Saves raw scraped airfare observations to data/raw_quotes.json."""
@@ -92,10 +123,18 @@ class YatraRunManager:
         return out_path
 
     def save_scraping_summary(self, summary: Dict[str, Any]) -> Path:
-        """Saves overall execution statistics and metrics to data/scraping_summary.json."""
+        """
+        Saves overall execution statistics and metrics to data/scraping_summary.json
+        and dual-writes data/run_summary.json for backward compatibility.
+        """
         out_path = self.data_dir / "scraping_summary.json"
         with open(out_path, "w", encoding="utf-8") as f:
             json.dump(summary, f, indent=2, default=str)
+
+        compat_path = self.data_dir / "run_summary.json"
+        with open(compat_path, "w", encoding="utf-8") as f:
+            json.dump(summary, f, indent=2, default=str)
+
         logger.info(f"Saved scraping summary to {out_path}")
         return out_path
 

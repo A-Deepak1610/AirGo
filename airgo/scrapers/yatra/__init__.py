@@ -43,6 +43,7 @@ from airgo.scrapers.yatra.selectors import YatraSelectors
 from airgo.scrapers.yatra.parser import YatraParser
 from airgo.scrapers.yatra.run_manager import YatraRunManager
 from airgo.scrapers.yatra.db_adapter import persist_fare_quotes_to_db, ensure_platform_registered
+from airgo.scrapers.yatra.checkout import YatraCheckoutVerifier
 from airgo.scrapers.yatra.scraper import YatraScraper, run_yatra_harvest
 
 __all__ = [
@@ -83,4 +84,6 @@ __all__ = [
     "ensure_platform_registered",
     "YatraScraper",
     "run_yatra_harvest",
+    # Phase 3 Components
+    "YatraCheckoutVerifier",
 ]

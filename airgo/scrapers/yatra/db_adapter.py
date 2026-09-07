@@ -117,6 +117,10 @@ def persist_fare_quotes_to_db(
             taxes,
             convenience_fee,
             total_fare,
+            displayed_search_price,
+            final_payable_price,
+            verification_status,
+            verification_timestamp,
             currency,
             availability_status,
             dedup_hash,
@@ -144,6 +148,10 @@ def persist_fare_quotes_to_db(
             :taxes,
             :convenience_fee,
             :total_fare,
+            :displayed_search_price,
+            :final_payable_price,
+            :verification_status,
+            :verification_timestamp,
             :currency,
             :availability_status,
             :dedup_hash,
@@ -161,6 +169,11 @@ def persist_fare_quotes_to_db(
                 window_code = f"T+{q.advance_purchase_days}"
 
                 raw_payload_json = json.dumps(q.model_dump(mode="json"), default=str)
+
+                disp_price = float(q.displayed_search_price if q.displayed_search_price is not None else q.displayed_price)
+                fin_price = float(q.final_payable_price) if q.final_payable_price is not None else None
+                total_f = fin_price if fin_price is not None else disp_price
+                v_status = q.verification_status.value if hasattr(q.verification_status, "value") else str(q.verification_status)
 
                 conn.execute(
                     insert_sql,
@@ -186,7 +199,11 @@ def persist_fare_quotes_to_db(
                         "base_fare": float(q.base_fare),
                         "taxes": float(q.taxes),
                         "convenience_fee": float(q.convenience_fee),
-                        "total_fare": float(q.final_payable_price or q.displayed_price),
+                        "total_fare": total_f,
+                        "displayed_search_price": disp_price,
+                        "final_payable_price": fin_price,
+                        "verification_status": v_status,
+                        "verification_timestamp": q.verification_timestamp,
                         "currency": q.currency,
                         "availability_status": q.availability_status.value,
                         "dedup_hash": q.dedup_hash,
