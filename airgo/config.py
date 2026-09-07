@@ -28,3 +28,7 @@ YATRA_REQUEST_DELAY = float(os.getenv("YATRA_REQUEST_DELAY", "2.0"))
 YATRA_MAX_RETRIES = int(os.getenv("YATRA_MAX_RETRIES", "3"))
 YATRA_BACKOFF_FACTOR = float(os.getenv("YATRA_BACKOFF_FACTOR", "1.5"))
 
+# Headed Mode Observability Settings
+HEADED_SLOW_MO_MS = int(os.getenv("HEADED_SLOW_MO_MS", "250"))
+HEADED_OBSERVATION_DELAY = float(os.getenv("HEADED_OBSERVATION_DELAY", "3.0"))
+

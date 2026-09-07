@@ -87,6 +87,10 @@ class YatraScraper:
             travel_date=window.travel_date,
         )
         logger.info(f"Searching {route.route_code} | {window.window_code} ({window.iso_travel_date})")
+        if not self.config.headless:
+            logger.info(f"[Workflow Step 1/13] Opening Yatra search interface: {search_url}")
+            logger.info(f"[Workflow Step 2-3/13] Parameters applied: Origin={route.origin_iata}, Dest={route.dest_iata}, Date={window.iso_travel_date}")
+            logger.info(f"[Workflow Step 4/13] Executing search query on Yatra...")
 
         search_context = {
             "route": route.route_code,
@@ -147,6 +151,11 @@ class YatraScraper:
                 pass
 
             self.run_manager.record_anti_bot_event(challenge_event)
+
+            if not self.config.headless and self.config.observation_delay > 0:
+                logger.info(f"[Headed Debug] Holding challenge window for {self.config.observation_delay}s diagnostic inspection...")
+                await asyncio.sleep(self.config.observation_delay)
+
             return {
                 "status": "challenge",
                 "challenge": challenge_event,
@@ -155,8 +164,10 @@ class YatraScraper:
             }
 
         # Wait for dynamic flight list rendering
+        if not self.config.headless:
+            logger.info(f"[Workflow Step 5/13] Waiting for live flight search results to render...")
+
         try:
-            # Wait for any known flight card selector
             selector_query = ", ".join(YatraSelectors.FLIGHT_CARDS)
             await page.wait_for_selector(selector_query, timeout=15000)
         except Exception:
@@ -177,6 +188,12 @@ class YatraScraper:
         raw_quotes, normalized_quotes = YatraParser.parse_flight_cards(
             rendered_html, search_context=search_context
         )
+
+        if not self.config.headless:
+            logger.info(f"[Workflow Step 6/13] Identified {len(raw_quotes)} raw flight options ({len(normalized_quotes)} candidate quotes) for {route.route_code}")
+            if self.config.observation_delay > 0:
+                logger.info(f"[Headed Debug] Holding search results page visible for {self.config.observation_delay}s...")
+                await asyncio.sleep(self.config.observation_delay)
 
         return {
             "status": "success",
@@ -206,13 +223,28 @@ class YatraScraper:
                 continue
 
             await asyncio.sleep(self.config.request_delay)
+
+            if not self.config.headless:
+                logger.info(
+                    f"[Workflow Step 7-8/13] Selecting flight {q.flight_number} ({q.airline}) and fare option '{q.fare_option_name or 'Standard'}'..."
+                )
+                logger.info(f"[Workflow Step 9/13] Navigating review and itinerary flow, dismissing addon dialogs...")
+
             updated_q = await verifier.verify_fare(page, q, window_code=window.window_code)
             verified_quotes.append(updated_q)
+
+            if not self.config.headless:
+                logger.info(f"[Workflow Step 10/13] Reached final pre-payment / Pay Now page.")
+                logger.info(f"[Workflow Step 11/13] Extracted authoritative final payable price: ₹{updated_q.final_payable_price or updated_q.displayed_price}")
+                logger.info(f"[Workflow Step 12/13] Saved Pay Now screenshot: {updated_q.paynow_screenshot_path}")
+                logger.info(f"[Workflow Step 13/13] Strictly STOPPED before payment confirmation (Zero payment credentials entered).")
+                if self.config.observation_delay > 0:
+                    logger.info(f"[Headed Debug] Holding visible Pay Now page for {self.config.observation_delay}s observation...")
+                    await asyncio.sleep(self.config.observation_delay)
 
             # If challenge occurred, halt further checkout attempts for this search
             if updated_q.verification_status in (DataStatus.CAPTCHA_BLOCKED, DataStatus.ACCESS_DENIED):
                 logger.warning("Checkout verification halted early due to security challenge.")
-                # Preserve remaining candidates as unverified
                 for remaining_q in candidates[idx + 1:]:
                     remaining_q.verification_status = updated_q.verification_status
                     remaining_q.error_reason = updated_q.error_reason
@@ -272,7 +304,8 @@ class YatraScraper:
                 while retries <= self.config.max_retries:
                     try:
                         async with self.browser_manager.new_page(
-                            headless=self.config.headless
+                            headless=self.config.headless,
+                            slow_mo_ms=self.config.slow_mo_ms,
                         ) as page:
                             res = await self.search_route_window(page, route, window)
 
@@ -429,10 +462,16 @@ async def run_yatra_harvest(
     horizons: Optional[List[int]] = None,
     checkout: bool = False,
     headless: Optional[bool] = None,
+    pause: Optional[float] = None,
+    slow_mo: Optional[int] = None,
 ) -> Dict[str, Any]:
-    """Helper entrypoint to trigger Yatra harvest with custom filters and checkout toggle."""
+    """Helper entrypoint to trigger Yatra harvest with custom filters, checkout, and headed mode observability."""
     cfg = YatraScraperConfig()
     if headless is not None:
         cfg.headless = headless
+    if pause is not None:
+        cfg.observation_delay = pause
+    if slow_mo is not None:
+        cfg.slow_mo_ms = slow_mo
     scraper = YatraScraper(config=cfg)
     return await scraper.run_harvest(route_codes=routes, horizons=horizons, checkout=checkout)

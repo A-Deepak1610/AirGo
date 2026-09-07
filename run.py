@@ -36,6 +36,8 @@ def run_pipeline(
     horizons: str = "1,7,15,30,45",
     checkout: bool = False,
     headless: Optional[bool] = None,
+    pause: Optional[float] = None,
+    slow_mo: Optional[int] = None,
 ):
     """Executes the automated end-to-end harvest across Yatra corridors."""
     import asyncio
@@ -43,6 +45,12 @@ def run_pipeline(
 
     print("\n=======================================================")
     print(f"[AirGo] Launching Yatra Airfare Scraper Pipeline (Checkout Verification: {checkout})...")
+    if headless is False:
+        print("[AirGo] Running in 🖥️ HEADED VISIBLE BROWSER MODE (Chromium window visible on desktop)")
+        if pause:
+            print(f"[AirGo] Observation pause configured: {pause}s")
+        if slow_mo:
+            print(f"[AirGo] Action slow-mo configured: {slow_mo}ms")
     print("=======================================================\n")
 
     horizons_list = [int(h.strip()) for h in horizons.split(",") if h.strip().isdigit()]
@@ -59,6 +67,8 @@ def run_pipeline(
             horizons=horizons_list,
             checkout=checkout,
             headless=headless,
+            pause=pause,
+            slow_mo=slow_mo,
         )
     )
     print("\n=======================================================")
@@ -93,6 +103,8 @@ def main():
     parser.add_argument("--checkout", action="store_true", help="Execute deep checkout fee and tax audit")
     parser.add_argument("--headless", action="store_true", help="Run browser scrapers in headless mode (no GUI windows)")
     parser.add_argument("--headful", "--visible", dest="headful", action="store_true", help="Run browser in visible GUI window for debugging")
+    parser.add_argument("--pause", type=float, default=None, help="Observation delay in seconds when in headed mode (default: 3.0)")
+    parser.add_argument("--slow-mo", type=int, default=None, help="Playwright slow-mo action delay in ms (default: 250 in headed mode)")
 
     args = parser.parse_args()
 
@@ -120,6 +132,8 @@ def main():
             horizons=args.horizons,
             checkout=args.checkout,
             headless=headless_mode,
+            pause=args.pause,
+            slow_mo=args.slow_mo,
         )
 
     # Start Server

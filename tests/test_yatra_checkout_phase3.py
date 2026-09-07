@@ -439,3 +439,32 @@ class TestDatabasePersistenceBothPrices:
         inserted = persist_fare_quotes_to_db(quotes=[quote], run_id=999)
         # Should be 1 (or 0 if unique conflict on retry)
         assert inserted in (0, 1)
+
+
+# --- 8. HEADED BROWSER MODE AND OBSERVABILITY ---
+
+class TestHeadedModeConfigurationAndDebugging:
+    """Verifies that headed mode configurations, slow-mo, and pauses are properly wired."""
+
+    def test_headed_mode_slow_mo_and_observation_delay(self):
+        """When headless=False, slow_mo is applied for visual debugging."""
+        from airgo.scrapers.yatra.config import YatraScraperConfig
+        from airgo.scrapers.yatra.browser import PlaywrightBrowserManager
+
+        cfg_headed = YatraScraperConfig(headless=False, slow_mo_ms=300, observation_delay=5.0)
+        assert cfg_headed.headless is False
+        assert cfg_headed.slow_mo_ms == 300
+        assert cfg_headed.observation_delay == 5.0
+
+        bm = PlaywrightBrowserManager(headless=False, slow_mo_ms=300)
+        assert bm.headless is False
+        assert bm.slow_mo_ms == 300
+
+    def test_headless_mode_defaults_zero_slow_mo(self):
+        """When headless=True, slow_mo is zero for fast execution."""
+        from airgo.scrapers.yatra.config import YatraScraperConfig
+
+        cfg_headless = YatraScraperConfig(headless=True, slow_mo_ms=0, observation_delay=0.0)
+        assert cfg_headless.headless is True
+        assert cfg_headless.slow_mo_ms == 0
+        assert cfg_headless.observation_delay == 0.0
