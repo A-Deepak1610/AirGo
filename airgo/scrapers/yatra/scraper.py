@@ -7,6 +7,7 @@ saves screenshots and raw JSON to /runs/yatra/, and persists to PostgreSQL.
 
 import asyncio
 from datetime import date, datetime, timezone
+from decimal import Decimal
 import logging
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlencode
