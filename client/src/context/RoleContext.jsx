@@ -4,15 +4,26 @@ import { USER_ROLES } from '../config/roles';
 const RoleContext = createContext();
 
 export const RoleProvider = ({ children }) => {
-  const [activeRoleKey, setActiveRoleKey] = useState('STATISTICAL_OFFICER');
+  // Default to PLATFORM_ADMIN so all capabilities are available by default
+  const [activeRoleKey, setActiveRoleKey] = useState('PLATFORM_ADMIN');
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
 
-  const currentRole = USER_ROLES[activeRoleKey] || USER_ROLES.STATISTICAL_OFFICER;
+  const currentRole = USER_ROLES[activeRoleKey] || USER_ROLES.PLATFORM_ADMIN;
 
   const setRole = (roleKey) => {
     if (USER_ROLES[roleKey]) {
       setActiveRoleKey(roleKey);
     }
+  };
+
+  const hasPermission = (permissionKey) => {
+    if (!currentRole || !currentRole.permissions) return false;
+    return !!currentRole.permissions[permissionKey];
+  };
+
+  const canAccessPath = (path) => {
+    if (!currentRole || !currentRole.allowedPathPrefixes) return false;
+    return currentRole.allowedPathPrefixes.some(prefix => path.startsWith(prefix));
   };
 
   return (
@@ -21,6 +32,8 @@ export const RoleProvider = ({ children }) => {
         currentRole,
         activeRoleKey,
         setRole,
+        hasPermission,
+        canAccessPath,
         allRoles: USER_ROLES,
         isRoleModalOpen,
         setIsRoleModalOpen

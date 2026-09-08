@@ -2,10 +2,10 @@ import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useRole } from '../../context/RoleContext';
 import { useAuditModal } from '../../context/AuditModalContext';
-import { Calendar, Bell, ShieldCheck, Terminal } from 'lucide-react';
+import { Calendar, Bell, ShieldCheck, Terminal, ChevronDown } from 'lucide-react';
 
 export const Header = () => {
-  const { currentRole } = useRole();
+  const { currentRole, setIsRoleModalOpen } = useRole();
   const { openHeadless } = useAuditModal();
   const navigate = useNavigate();
   const location = useLocation();
@@ -14,16 +14,36 @@ export const Header = () => {
     switch (location.pathname) {
       case '/data-collection':
         return 'Data Collection';
+      case '/scraping-runs':
+        return 'Scraping Runs & Job History';
       case '/airfare-data':
         return 'Airfare Data';
+      case '/data-quality':
+        return 'Data Quality Center';
+      case '/source-catalog':
+        return 'Source Catalog';
+      case '/route-basket':
+        return 'Route & Basket Management';
       case '/index-apix':
         return 'Index / APIx';
-      case '/analytics':
-        return 'Analytics';
+      case '/index-methodology':
+        return 'Index Methodology';
+      case '/index-releases':
+        return 'Index Releases';
       case '/backtesting':
         return 'Back-testing';
+      case '/analytics':
+        return 'Analytics';
+      case '/reports-exports':
+        return 'Reports & Exports';
       case '/system-status':
         return 'System/API Status';
+      case '/api-access':
+        return 'API Access & Keys';
+      case '/audit-log':
+        return 'Audit Log';
+      case '/users-roles':
+        return 'User & Role Management';
       default:
         if (location.pathname.startsWith('/index/routes/')) {
           return 'Corridor Analysis';
@@ -87,21 +107,32 @@ export const Header = () => {
 
         <div className="h-6 w-px bg-slate-200 mx-0.5"></div>
 
-        {/* User Profile Persona Header */}
-        <div className="flex items-center gap-2.5 pl-1 pr-2 py-1 rounded-lg bg-slate-50 border border-slate-100 text-left">
+        {/* User Profile Persona Switcher Button */}
+        <button
+          onClick={() => setIsRoleModalOpen(true)}
+          className="flex items-center gap-2.5 pl-1.5 pr-2.5 py-1 rounded-lg bg-slate-50 hover:bg-blue-50/60 border border-slate-200 hover:border-blue-300 text-left transition-all cursor-pointer shadow-2xs group"
+          title="Click to switch user role and test permissions"
+        >
           <img
             src={currentRole.avatar}
             alt={currentRole.name}
-            className="w-8 h-8 rounded-full object-cover border border-slate-200"
+            className="w-7 h-7 rounded-full object-cover border border-slate-200"
           />
-          <div className="hidden lg:block">
-            <div className="flex items-center gap-1">
-              <p className="text-xs font-semibold text-[#111827] leading-tight">{currentRole.name}</p>
-              <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
+          <div className="hidden lg:block text-left">
+            <div className="flex items-center gap-1.5">
+              <p className="text-xs font-semibold text-[#111827] leading-tight group-hover:text-blue-600">
+                {currentRole.name}
+              </p>
+              <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded border ${currentRole.badgeColor}`}>
+                {currentRole.roleLabel}
+              </span>
             </div>
-            <p className="text-[11px] text-[#6B7280] font-normal">{currentRole.title}</p>
+            <p className="text-[10px] text-[#6B7280] font-normal leading-tight mt-0.5">
+              {currentRole.title}
+            </p>
           </div>
-        </div>
+          <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 transition-transform" />
+        </button>
       </div>
     </header>
   );

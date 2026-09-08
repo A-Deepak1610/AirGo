@@ -5,9 +5,9 @@ import { FilterProvider } from './context/FilterContext';
 import { AuditModalProvider, useAuditModal } from './context/AuditModalContext';
 import { Sidebar } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
+import { RoleSwitcherModal } from './components/common/RoleSwitcherModal';
 
-// 7 Core Workflow Pages for SIH26056
-// 7 Core Workflow Pages for SIH26056
+// 7 Existing Core Pages
 import { DashboardPage } from './pages/DashboardPage';
 import { DataCollectionPage } from './pages/DataCollectionPage';
 import { AirfareDataPage } from './pages/AirfareDataPage';
@@ -15,6 +15,18 @@ import { IndexApixPage } from './pages/IndexApixPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
 import { BacktestingPage } from './pages/BacktestingPage';
 import { SystemStatusPage } from './pages/SystemStatusPage';
+
+// 10 New Institutional Pages
+import { SourceCatalogPage } from './pages/SourceCatalogPage';
+import { ScrapingRunsPage } from './pages/ScrapingRunsPage';
+import { RouteBasketPage } from './pages/RouteBasketPage';
+import { DataQualityPage } from './pages/DataQualityPage';
+import { IndexMethodologyPage } from './pages/IndexMethodologyPage';
+import { IndexReleasesPage } from './pages/IndexReleasesPage';
+import { ReportsExportsPage } from './pages/ReportsExportsPage';
+import { AuditLogPage } from './pages/AuditLogPage';
+import { UsersRolesPage } from './pages/UsersRolesPage';
+import { ApiAccessPage } from './pages/ApiAccessPage';
 
 // Public Institutional Landing Page
 import { LandingPage } from './pages/LandingPage';
@@ -50,7 +62,7 @@ function AppLayout() {
         {/* Page Content Body */}
         <main className="flex-1 p-6 space-y-6 max-w-[1600px] w-full mx-auto">
           <Routes>
-            {/* 7 Core Workflow Routes */}
+            {/* 7 Existing Core Routes */}
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/data-collection" element={<DataCollectionPage />} />
             <Route path="/airfare-data" element={<AirfareDataPage />} />
@@ -58,6 +70,18 @@ function AppLayout() {
             <Route path="/analytics" element={<AnalyticsPage />} />
             <Route path="/backtesting" element={<BacktestingPage />} />
             <Route path="/system-status" element={<SystemStatusPage />} />
+
+            {/* 10 Institutional Expansion Routes */}
+            <Route path="/source-catalog" element={<SourceCatalogPage />} />
+            <Route path="/scraping-runs" element={<ScrapingRunsPage />} />
+            <Route path="/route-basket" element={<RouteBasketPage />} />
+            <Route path="/data-quality" element={<DataQualityPage />} />
+            <Route path="/index-methodology" element={<IndexMethodologyPage />} />
+            <Route path="/index-releases" element={<IndexReleasesPage />} />
+            <Route path="/reports-exports" element={<ReportsExportsPage />} />
+            <Route path="/audit-log" element={<AuditLogPage />} />
+            <Route path="/users-roles" element={<UsersRolesPage />} />
+            <Route path="/api-access" element={<ApiAccessPage />} />
 
             {/* Corridor Drill-down */}
             <Route path="/index/routes/:routeId" element={<RouteDetailPage />} />
@@ -75,18 +99,16 @@ function AppLayout() {
             <Route path="/index/price-analytics" element={<Navigate to="/analytics" replace />} />
             <Route path="/index/inflation" element={<Navigate to="/index-apix" replace />} />
             <Route path="/index/raw-data" element={<Navigate to="/airfare-data" replace />} />
-            <Route path="/index/data-quality" element={<Navigate to="/system-status" replace />} />
-            <Route path="/index/methodology" element={<Navigate to="/backtesting" replace />} />
+            <Route path="/index/data-quality" element={<Navigate to="/data-quality" replace />} />
+            <Route path="/index/methodology" element={<Navigate to="/index-methodology" replace />} />
             <Route path="/fare-analytics" element={<Navigate to="/analytics" replace />} />
             <Route path="/passenger-demand" element={<Navigate to="/analytics" replace />} />
-            <Route path="/anomaly-detection" element={<Navigate to="/analytics" replace />} />
-            <Route path="/data-sources" element={<Navigate to="/data-collection" replace />} />
-            <Route path="/scraping-monitor" element={<Navigate to="/data-collection" replace />} />
-            <Route path="/data-quality" element={<Navigate to="/system-status" replace />} />
+            <Route path="/anomaly-detection" element={<Navigate to="/data-quality" replace />} />
+            <Route path="/data-sources" element={<Navigate to="/source-catalog" replace />} />
+            <Route path="/scraping-monitor" element={<Navigate to="/scraping-runs" replace />} />
             <Route path="/historical-data" element={<Navigate to="/backtesting" replace />} />
-            <Route path="/govt-reports" element={<Navigate to="/index-apix" replace />} />
-            <Route path="/export-centre" element={<Navigate to="/airfare-data" replace />} />
-            <Route path="/users-roles" element={<Navigate to="/system-status" replace />} />
+            <Route path="/govt-reports" element={<Navigate to="/reports-exports" replace />} />
+            <Route path="/export-centre" element={<Navigate to="/reports-exports" replace />} />
             <Route path="/system-settings" element={<Navigate to="/system-status" replace />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
@@ -97,6 +119,9 @@ function AppLayout() {
           </footer>
         </main>
       </div>
+
+      {/* Global Interactive Role Switcher Modal */}
+      <RoleSwitcherModal />
 
       {/* Ground-Truth Audit Modal (4-Step Screenshot Lightbox) */}
       <GroundTruthAuditModal 

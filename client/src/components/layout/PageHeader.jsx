@@ -4,26 +4,29 @@ import { Link } from 'react-router-dom';
 
 /**
  * Reusable PageHeader component for the AirGo statistical platform.
- * Establishes a consistent visual hierarchy:
- * 1. Optional Breadcrumbs
- * 2. Primary Title (the ONLY <h1> on the page) + Optional Status Badge
- * 3. Concise contextual description
- * 4. Primary/Secondary Actions (top-right)
+ * Standardizes typography across every page:
+ * 1. Optional Breadcrumbs (Inter 12px medium text-slate-500)
+ * 2. Primary Title (the ONLY <h1> on the page: Inter 24px-28px bold tracking-tight) + Optional Status Badge
+ * 3. Contextual description / subtitle (Inter 13px-14px normal text-slate-600 leading-relaxed)
+ * 4. Primary/Secondary Actions (top-right controls)
  * 5. Context-aware compact filters (only rendered when needed)
  */
 export const PageHeader = ({
   title,
   description,
+  subtitle,
   badge,
   actions,
   filters,
   breadcrumbs
 }) => {
+  const desc = description || subtitle;
+
   return (
-    <div className="space-y-3.5 pb-4 border-b border-slate-200/90">
+    <div className="space-y-3 pb-4 border-b border-slate-200/90 font-sans">
       {/* Optional Breadcrumb Navigation */}
       {breadcrumbs && breadcrumbs.length > 0 && (
-        <nav className="flex items-center gap-1.5 text-xs text-[#6B7280] font-medium -mb-1">
+        <nav className="flex items-center gap-1.5 text-xs text-slate-500 font-medium -mb-1">
           {breadcrumbs.map((crumb, idx) => {
             const isLast = idx === breadcrumbs.length - 1;
             return (
@@ -34,7 +37,7 @@ export const PageHeader = ({
                     {crumb.label}
                   </Link>
                 ) : (
-                  <span className={isLast ? "text-[#111827] font-semibold" : ""}>
+                  <span className={isLast ? "text-slate-900 font-semibold" : ""}>
                     {crumb.label}
                   </span>
                 )}
@@ -48,7 +51,7 @@ export const PageHeader = ({
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="space-y-1">
           <div className="flex items-center gap-2.5 flex-wrap">
-            <h1 className="text-2xl sm:text-[28px] font-semibold text-[#111827] tracking-tight leading-[1.2]">
+            <h1 className="text-2xl sm:text-[28px] font-bold text-slate-900 tracking-tight leading-tight">
               {title}
             </h1>
             {badge && (
@@ -57,9 +60,9 @@ export const PageHeader = ({
               </div>
             )}
           </div>
-          {description && (
-            <p className="text-xs sm:text-sm font-normal text-[#4B5563] leading-relaxed max-w-4xl">
-              {description}
+          {desc && (
+            <p className="text-xs sm:text-sm font-normal text-slate-600 leading-relaxed max-w-4xl">
+              {desc}
             </p>
           )}
         </div>

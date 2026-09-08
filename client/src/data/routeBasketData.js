@@ -1,0 +1,248 @@
+/**
+ * Route & Basket Management Dataset.
+ * Represents the representative city-pair basket used by APIx index computation,
+ * with DGCA traffic benchmarks, lead-time windows, and versioning audit trails.
+ */
+
+export const BASKET_VERSIONS = [
+  {
+    version: 'v2026.2',
+    status: 'ACTIVE',
+    effectiveFrom: '2026-07-01',
+    effectiveTo: 'Present',
+    totalRoutes: 25,
+    trafficCoverage: '78.4% of national scheduled traffic',
+    approvedBy: 'Dr. Ananya Rao (Chief Statistical Advisor, MoSPI)',
+    approvalDate: '2026-06-25',
+    notes: 'Updated traffic weights using DGCA Q1-Q2 2026 passenger actuals. Re-weighted BOM-GOX corridor.'
+  },
+  {
+    version: 'v2026.1',
+    status: 'SUPERSEDED',
+    effectiveFrom: '2026-01-01',
+    effectiveTo: '2026-06-30',
+    totalRoutes: 25,
+    trafficCoverage: '77.8% of national scheduled traffic',
+    approvedBy: 'Vikram Sharma (Director DGCA)',
+    approvalDate: '2025-12-20',
+    notes: 'Incorporated Goa Manohar International (GOX) alongside Dabolim (GOI).'
+  },
+  {
+    version: 'v2025.1',
+    status: 'ARCHIVED',
+    effectiveFrom: '2025-01-01',
+    effectiveTo: '2025-12-31',
+    totalRoutes: 20,
+    trafficCoverage: '73.2% of national scheduled traffic',
+    approvedBy: 'MoSPI National Accounts Committee',
+    approvalDate: '2024-12-15',
+    notes: 'Initial 20-corridor Laspeyres base basket.'
+  }
+];
+
+export const REPRESENTATIVE_ROUTES = [
+  {
+    id: 'BOM-DEL',
+    route: 'BOM-DEL',
+    origin: 'BOM',
+    originCity: 'Mumbai',
+    destination: 'DEL',
+    destCity: 'Delhi',
+    region: 'Trunk Metro',
+    dgcaRank: 1,
+    annualPax: 6850869,
+    basketWeightPct: 5.85,
+    nationalSharePct: 4.14,
+    status: 'ACTIVE',
+    collectionPriority: 'P1 (Critical)',
+    carriers: ['IndiGo', 'Air India', 'Akasa Air', 'SpiceJet'],
+    windows: { 'T+1': true, 'T+7': true, 'T+15': true, 'T+30': true, 'T+45': true },
+    averageFare: 6420
+  },
+  {
+    id: 'BLR-DEL',
+    route: 'BLR-DEL',
+    origin: 'BLR',
+    originCity: 'Bengaluru',
+    destination: 'DEL',
+    destCity: 'Delhi',
+    region: 'Trunk Metro',
+    dgcaRank: 2,
+    annualPax: 4681042,
+    basketWeightPct: 4.00,
+    nationalSharePct: 2.83,
+    status: 'ACTIVE',
+    collectionPriority: 'P1 (Critical)',
+    carriers: ['IndiGo', 'Air India', 'Akasa Air'],
+    windows: { 'T+1': true, 'T+7': true, 'T+15': true, 'T+30': true, 'T+45': true },
+    averageFare: 6890
+  },
+  {
+    id: 'BLR-BOM',
+    route: 'BLR-BOM',
+    origin: 'BLR',
+    originCity: 'Bengaluru',
+    destination: 'BOM',
+    destCity: 'Mumbai',
+    region: 'Trunk Metro',
+    dgcaRank: 3,
+    annualPax: 4114574,
+    basketWeightPct: 3.51,
+    nationalSharePct: 2.49,
+    status: 'ACTIVE',
+    collectionPriority: 'P1 (Critical)',
+    carriers: ['IndiGo', 'Air India', 'Akasa Air'],
+    windows: { 'T+1': true, 'T+7': true, 'T+15': true, 'T+30': true, 'T+45': true },
+    averageFare: 5120
+  },
+  {
+    id: 'DEL-HYD',
+    route: 'DEL-HYD',
+    origin: 'DEL',
+    originCity: 'Delhi',
+    destination: 'HYD',
+    destCity: 'Hyderabad',
+    region: 'Metro-Metro',
+    dgcaRank: 4,
+    annualPax: 3295918,
+    basketWeightPct: 2.82,
+    nationalSharePct: 1.99,
+    status: 'ACTIVE',
+    collectionPriority: 'P1 (Critical)',
+    carriers: ['IndiGo', 'Air India', 'SpiceJet'],
+    windows: { 'T+1': true, 'T+7': true, 'T+15': true, 'T+30': true, 'T+45': true },
+    averageFare: 5540
+  },
+  {
+    id: 'DEL-PNQ',
+    route: 'DEL-PNQ',
+    origin: 'DEL',
+    originCity: 'Delhi',
+    destination: 'PNQ',
+    destCity: 'Pune',
+    region: 'Metro-Tier2',
+    dgcaRank: 5,
+    annualPax: 2924045,
+    basketWeightPct: 2.50,
+    nationalSharePct: 1.77,
+    status: 'ACTIVE',
+    collectionPriority: 'P1 (Critical)',
+    carriers: ['IndiGo', 'Air India', 'SpiceJet'],
+    windows: { 'T+1': true, 'T+7': true, 'T+15': true, 'T+30': true, 'T+45': true },
+    averageFare: 5820
+  },
+  {
+    id: 'CCU-DEL',
+    route: 'CCU-DEL',
+    origin: 'CCU',
+    originCity: 'Kolkata',
+    destination: 'DEL',
+    destCity: 'Delhi',
+    region: 'Trunk Metro',
+    dgcaRank: 6,
+    annualPax: 2770386,
+    basketWeightPct: 2.37,
+    nationalSharePct: 1.67,
+    status: 'ACTIVE',
+    collectionPriority: 'P1 (Critical)',
+    carriers: ['IndiGo', 'Air India', 'SpiceJet'],
+    windows: { 'T+1': true, 'T+7': true, 'T+15': true, 'T+30': true, 'T+45': true },
+    averageFare: 6150
+  },
+  {
+    id: 'BOM-GOI',
+    route: 'BOM-GOI',
+    origin: 'BOM',
+    originCity: 'Mumbai',
+    destination: 'GOI',
+    destCity: 'Goa (Dabolim)',
+    region: 'Leisure Trunk',
+    dgcaRank: 7,
+    annualPax: 2650120,
+    basketWeightPct: 2.26,
+    nationalSharePct: 1.60,
+    status: 'ACTIVE',
+    collectionPriority: 'P2 (High)',
+    carriers: ['IndiGo', 'Air India', 'Akasa Air', 'SpiceJet'],
+    windows: { 'T+1': true, 'T+7': true, 'T+15': true, 'T+30': true, 'T+45': true },
+    averageFare: 4320
+  },
+  {
+    id: 'DEL-AMD',
+    route: 'DEL-AMD',
+    origin: 'DEL',
+    originCity: 'Delhi',
+    destination: 'AMD',
+    destCity: 'Ahmedabad',
+    region: 'Metro-Tier2',
+    dgcaRank: 8,
+    annualPax: 2480910,
+    basketWeightPct: 2.12,
+    nationalSharePct: 1.50,
+    status: 'ACTIVE',
+    collectionPriority: 'P2 (High)',
+    carriers: ['IndiGo', 'Air India'],
+    windows: { 'T+1': true, 'T+7': true, 'T+15': true, 'T+30': true, 'T+45': true },
+    averageFare: 4180
+  },
+  {
+    id: 'BLR-HYD',
+    route: 'BLR-HYD',
+    origin: 'BLR',
+    originCity: 'Bengaluru',
+    destination: 'HYD',
+    destCity: 'Hyderabad',
+    region: 'Southern Corridor',
+    dgcaRank: 9,
+    annualPax: 2310450,
+    basketWeightPct: 1.97,
+    nationalSharePct: 1.40,
+    status: 'ACTIVE',
+    collectionPriority: 'P2 (High)',
+    carriers: ['IndiGo', 'Air India', 'Akasa Air'],
+    windows: { 'T+1': true, 'T+7': true, 'T+15': true, 'T+30': true, 'T+45': true },
+    averageFare: 3850
+  },
+  {
+    id: 'MAA-DEL',
+    route: 'MAA-DEL',
+    origin: 'MAA',
+    originCity: 'Chennai',
+    destination: 'DEL',
+    destCity: 'Delhi',
+    region: 'Trunk Metro',
+    dgcaRank: 10,
+    annualPax: 2240180,
+    basketWeightPct: 1.91,
+    nationalSharePct: 1.35,
+    status: 'ACTIVE',
+    collectionPriority: 'P2 (High)',
+    carriers: ['IndiGo', 'Air India'],
+    windows: { 'T+1': true, 'T+7': true, 'T+15': true, 'T+30': true, 'T+45': true },
+    averageFare: 6720
+  }
+];
+
+export const BASKET_CHANGE_LOG = [
+  {
+    date: '2026-06-25',
+    user: 'Dr. Ananya Rao',
+    role: 'Policy Reviewer',
+    action: 'BASKET_WEIGHT_UPDATE',
+    details: 'Re-normalized weights across top 25 city-pairs based on DGCA 2026 H1 passenger manifests.'
+  },
+  {
+    date: '2026-04-10',
+    user: 'Priya Patel',
+    role: 'Data Engineer',
+    action: 'WINDOW_EXPANSION',
+    details: 'Enabled T+45 long-lead collection window for BOM-GOI and DEL-AMD corridors.'
+  },
+  {
+    date: '2026-01-01',
+    user: 'Vikram Sharma',
+    role: 'Platform Admin',
+    action: 'BASKET_ACTIVATION',
+    details: 'Activated official annual basket v2026.1 with 25 corridors.'
+  }
+];
