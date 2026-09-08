@@ -131,6 +131,7 @@ class MakeMyTripHarvester:
     def __init__(
         self,
         basket_csv: str = "data/processed/dgca_top100_route_basket.csv",
+        routes: Optional[List[Dict[str, Any]]] = None,
         horizons: Optional[List[int]] = None,
         top_n: Optional[int] = 1,
         deep_checkout: bool = False,
@@ -154,7 +155,10 @@ class MakeMyTripHarvester:
         self.run_dir = os.path.join(self.runs_dir, self.run_id)
         os.makedirs(self.run_dir, exist_ok=True)
 
-        self.routes = load_route_basket(self.basket_csv, top_n=self.top_n)
+        if routes:
+            self.routes = routes
+        else:
+            self.routes = load_route_basket(self.basket_csv, top_n=self.top_n)
         self.all_extracted_quotes: List[Dict[str, Any]] = []
 
         # Stable persistent profile directory per Patchright documentation

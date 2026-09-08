@@ -43,3 +43,10 @@ These rules are **MANDATORY** for all AI coding agents working on the AirGo code
 ## 6. 🌐 BROWSER ENGINE: ALWAYS USE CHROME AND NEVER MSEDGE
 - **MANDATORY CHROME**: Always launch Google Chrome (or Chromium via Patchright/Playwright with `channel="chrome"` or standard Chromium executable).
 - **NEVER MSEDGE**: Under NO circumstances should Microsoft Edge (`msedge`) be launched or used as a browser channel.
+
+---
+
+## 7. 🛑 MANDATORY ARCHITECTURAL CLARITY BEFORE CODE
+- **STOP AND ASK**: If the architecture is not clear, or if there are scraper files scattered without a clear architecture, unified design pattern, or designated directory structure, the agent **MUST STOP immediately** and ask the user what to do and how to structure/fix it.
+- **NO SPRAWL OR AD-HOC SCATTERING**: Do not create, scatter, or dump uncoordinated scraper files or one-off scripts across random directories. Always align on the project structure, design patterns, and module architecture with the user before proceeding.
+
