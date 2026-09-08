@@ -4,7 +4,6 @@ import argparse
 import asyncio
 import csv
 import json
-import os
 import random
 import re
 import sys
@@ -381,7 +380,7 @@ class IxigoScraper:
                 self.horizon_details.append({
                     "horizon": window_name,
                     "travel_date": travel_date.isoformat(),
-                    "flights_found": flights_found or len(raw_items),
+                    "flights_found": flights_found or len(raw_items_dict),
                     "top_5_extracted": len(top_5),
                     "min_price": min_price,
                     "max_price": max_price,
