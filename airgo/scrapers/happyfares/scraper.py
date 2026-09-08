@@ -425,11 +425,8 @@ class HappyFaresScraper:
 
                     print(f"\n[Scraping] {self.route} | {horizon_label} (Travel Date: {dept_date_str})...")
 
-                    # Open a fresh page per horizon for clean state, DOM isolation, and dedicated response listener
-                    if idx == 0 and init_page and not init_page.is_closed():
-                        page = init_page
-                    else:
-                        page = await context.new_page()
+                    # Reuse page across horizons to prevent closing the only page and crashing the browser
+                    page = context.pages[0] if context.pages else await context.new_page()
 
                     if not self.headless:
                         await page.bring_to_front()
@@ -597,12 +594,7 @@ class HappyFaresScraper:
                     except Exception as he:
                         print(f"  [!] Error scraping {self.route}_{horizon_label}: {he}")
                     finally:
-                        # Close intermediate pages; in visible mode keep the final page open for inspection
-                        if idx < total_horizons - 1 or self.headless:
-                            try:
-                                await page.close()
-                            except Exception:
-                                pass
+                        pass
 
                 if not self.headless:
                     print(f"\n[Visual Observation Mode] Pausing for {self.pause_at_end} seconds so you can see the open browser window...")
